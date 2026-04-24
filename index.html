@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Copa Psyzon</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-container">
+        <!-- The background image will be set via CSS or an img tag -->
+    </div>
+
+    <header class="header">
+        <button class="menu-btn" style="margin-left: auto;">
+            <i class="ph ph-list"></i>
+        </button>
+    </header>
+
+    <main class="main-content">
+        <div class="hero-header">
+            <div class="hero-logos">
+                <img src="imgs/logo/logo svg psyzon e prefeitura.svg" alt="Copa Psyzon e Prefeitura" class="main-logo">
+            </div>
+            <h1 class="hero-title">COPA PSYZON</h1>
+            <h2 class="hero-subtitle">EXCEDA OS LIMITES</h2>
+        </div>
+
+        <div class="login-card">
+            <h1 class="card-title" id="main-title">Acessar a Copa</h1>
+            <p class="card-subtitle" id="main-subtitle">Selecione o seu perfil para continuar</p>
+
+            <form class="login-form" id="login-form" style="display: none;">
+                <div class="input-group">
+                    <i class="ph ph-envelope"></i>
+                    <input type="email" placeholder="Email" required>
+                </div>
+
+                <div class="input-group">
+                    <i class="ph ph-lock-key"></i>
+                    <input type="password" placeholder="Senha" required>
+                    <button type="button" class="toggle-password">
+                        <i class="ph ph-eye"></i>
+                    </button>
+                </div>
+
+                <button type="submit" class="btn btn-primary">ENTRAR</button>
+                <button type="button" class="btn btn-role" id="btn-voltar" style="margin-top: 10px;">
+                    <i class="ph ph-arrow-left"></i> Voltar
+                </button>
+            </form>
+
+            <div class="card-actions" id="role-actions">
+                <!-- Principal -->
+                <a href="participante.html" target="_blank" class="btn btn-primary" style="margin-top: 0; text-decoration: none;">
+                    <i class="ph-fill ph-user"></i> Participante
+                </a>
+                
+                <!-- Público Secundário -->
+                <div class="btn-row" style="display: flex; gap: 0.6rem; margin-top: 0.4rem;">
+                    <button class="btn btn-role" id="btn-visitante" style="flex: 1; font-size: 0.95rem;">
+                        <i class="ph-fill ph-users"></i> Visitante
+                    </button>
+                    <button class="btn btn-blue" id="btn-apostador" style="flex: 1; font-size: 0.95rem;">
+                        <i class="ph-fill ph-money"></i> Apostador
+                    </button>
+                </div>
+
+                <div class="divider" style="margin: 1.2rem 0;">
+                    <span>ADMINISTRAÇÃO</span>
+                </div>
+
+                <!-- Restrito -->
+                <button class="btn btn-role" id="btn-organizador">
+                    <i class="ph-fill ph-crown"></i> Organizador
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <i class="ph-fill ph-shield-check"></i>
+        <p>Mais que um jogo. Uma <span>experiência.</span></p>
+    </footer>
+
+    <script src="login.js"></script>
+</body>
+</html>

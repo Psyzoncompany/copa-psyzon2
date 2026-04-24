@@ -1,0 +1,2 @@
+nao criar muitos css, sempre reutilizar e organizar o codigo quando possivel.
+site em liquid glass seguindo appel.

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Área do Participante - Copa Psyzon</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="participante.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-container"></div>
+
+    <main class="main-content">
+        <div class="hero-header">
+            <div class="hero-logos">
+                <img src="imgs/logo/logo svg psyzon e prefeitura.svg" alt="Copa Psyzon e Prefeitura" class="main-logo">
+            </div>
+            <h1 class="hero-title">ÁREA DO PARTICIPANTE</h1>
+            <h2 class="hero-subtitle">CÓDIGO DO ORGANIZADOR</h2>
+        </div>
+
+        <div class="login-card">
+            <h1 class="card-title">Validar Acesso</h1>
+            <p class="card-subtitle">Insira o código fornecido pelo seu organizador para acessar o chaveamento.</p>
+
+            <form class="login-form">
+                <div class="input-group">
+                    <i class="ph ph-hash"></i>
+                    <input type="text" placeholder="Código de Acesso" id="participante-codigo">
+                </div>
+                <button type="submit" class="btn btn-primary">VERIFICAR CÓDIGO</button>
+            </form>
+
+            <div class="divider"><span>OU</span></div>
+            
+            <a href="index.html" class="btn btn-role" style="text-decoration: none;">
+                <i class="ph ph-arrow-left"></i> VOLTAR AO LOGIN
+            </a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <i class="ph-fill ph-shield-check"></i>
+        <p>Mais que um jogo. Uma <span>experiência.</span></p>
+    </footer>
+</body>
+</html>

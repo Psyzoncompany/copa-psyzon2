@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel FIFA - Copa Psyzon</title>
+    <link rel="stylesheet" href="fifa.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <!-- Firebase SDKs Placeholder -->
+</head>
+
+<body>
+
+    <!-- ========== TOP BAR ========== -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <img src="../imgs/logo/logo svg psyzon e prefeitura.svg" alt="Copa Psyzon" class="topbar-logo">
+            <div class="topbar-title">
+                <h1>Copa Psyzon</h1>
+                <span class="topbar-game">FIFA</span>
+            </div>
+        </div>
+        <div class="topbar-right">
+            <button id="btn-toggle-organizer" class="topbar-menu-btn" title="Configurações">
+                <i class="ph-fill ph-dots-three-vertical"></i>
+            </button>
+            <span id="user-role-badge" class="role-badge">VISITANTE</span>
+            <a href="../index.html" class="topbar-exit">
+                <i class="ph ph-sign-out"></i>
+            </a>
+        </div>
+    </header>
+
+    <!-- ========== TABS NAVIGATION ========== -->
+    <nav class="tabs-nav">
+        <button class="tab active" data-tab="grupos"><i class="ph-fill ph-users-three"></i> Fase de Grupos</button>
+        <button class="tab" data-tab="mata-mata"><i class="ph-fill ph-tree-structure"></i> Mata-mata</button>
+        <button class="tab" data-tab="ranking"><i class="ph-fill ph-trophy"></i> Ranking</button>
+        <button class="tab" data-tab="historico"><i class="ph-fill ph-clock-counter-clockwise"></i> Histórico</button>
+    </nav>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="dashboard">
+
+        <!-- LEFT COLUMN: ORGANIZER CONTROLS -->
+        <aside class="sidebar" id="organizer-panel" style="display:none;">
+
+            <!-- 1. CONFIG DO TORNEIO -->
+            <div class="card" id="card-config">
+                <div class="card-header">
+                    <i class="ph-fill ph-gear-six"></i>
+                    <h3>Configuração</h3>
+                </div>
+                <div class="card-body">
+                    <div class="field">
+                        <label>Nome do Torneio</label>
+                        <input type="text" id="tourney-name" placeholder="Ex: Copa Psyzon 2025">
+                    </div>
+                    <div class="field">
+                        <label>Participantes</label>
+                        <input type="number" id="tourney-participants" value="8" min="2" max="64">
+                        <small id="phases-info">3 fases</small>
+                    </div>
+                    <div class="field">
+                        <label>Formato</label>
+                        <select id="tourney-format">
+                            <option value="grupos-mata-mata">Grupos + Mata-mata</option>
+                            <option value="eliminatoria">Eliminatória Direta</option>
+                            <option value="liga">Liga (Pontos Corridos)</option>
+                        </select>
+                    </div>
+                    <label class="checkbox-field">
+                        <input type="checkbox" id="tourney-home-away">
+                        <span>Casa e Fora (Ida/Volta)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 2. PREMIAÇÃO -->
+            <div class="card" id="card-premio">
+                <div class="card-header">
+                    <i class="ph-fill ph-trophy"></i>
+                    <h3>Premiação</h3>
+                </div>
+                <div class="card-body">
+                    <div class="field">
+                        <textarea id="premio-text" rows="3" placeholder="Ex: R$500 + troféu para o campeão"></textarea>
+                    </div>
+                    <button class="btn btn-secondary" id="btn-salvar-premio">
+                        <i class="ph-fill ph-floppy-disk"></i> Salvar Premiação
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. CLIENTES -->
+            <div class="card" id="card-clientes">
+                <div class="card-header">
+                    <i class="ph-fill ph-address-book"></i>
+                    <h3>Participantes</h3>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-outline-full" id="btn-ver-clientes">
+                        <i class="ph-fill ph-identification-card"></i> Ver ficha dos clientes
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. CÓDIGOS DE ACESSO -->
+            <div class="card" id="card-codigos">
+                <div class="card-header">
+                    <i class="ph-fill ph-key"></i>
+                    <h3>Códigos de Acesso</h3>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-accent" id="btn-gerar-codigos">
+                        <i class="ph-fill ph-plus-circle"></i> Gerar 32 códigos
+                    </button>
+                    <div class="codes-status">
+                        <span class="status-available">32 disponíveis</span>
+                        <span class="status-used">0 utilizados</span>
+                    </div>
+                    <div class="codes-list" id="codes-list">
+                        <!-- JS will populate -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. AÇÕES DO TORNEIO -->
+            <div class="card" id="card-acoes">
+                <div class="card-header">
+                    <i class="ph-fill ph-lightning"></i>
+                    <h3>Ações do Torneio</h3>
+                </div>
+                <div class="card-body actions-grid">
+                    <button class="btn btn-action btn-orange" id="btn-embaralhar">
+                        <i class="ph-fill ph-shuffle"></i> Embaralhar Chaveamento
+                    </button>
+                    <button class="btn btn-action btn-blue" id="btn-atualizar">
+                        <i class="ph-fill ph-arrows-clockwise"></i> Atualizar Chaveamento
+                    </button>
+                    <button class="btn btn-action btn-green" id="btn-encerrar">
+                        <i class="ph-fill ph-check-circle"></i> Encerrar e Salvar
+                    </button>
+                    <button class="btn btn-action btn-red" id="btn-resetar">
+                        <i class="ph-fill ph-x-circle"></i> Resetar Torneio
+                    </button>
+                    <button class="btn btn-action btn-red-outline" id="btn-resetar-tudo">
+                        <i class="ph-fill ph-trash"></i> Resetar Tudo
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- RIGHT COLUMN: TOURNAMENT VIEW -->
+        <section class="content-area">
+
+            <!-- TAB 1: FASE DE GRUPOS -->
+            <div id="tab-grupos" class="tab-content active" style="display: block;">
+                <!-- PRIZE BANNER -->
+                <div class="prize-banner" id="prize-banner" style="display:none;">
+                    <i class="ph-fill ph-trophy"></i>
+                    <div class="prize-text">
+                        <strong id="prize-title">Premiação R$ 500,00 +</strong>
+                        <span>Para o campeão</span>
+                    </div>
+                </div>
+
+                <!-- TOP 3 -->
+                <div class="top3-container" id="top3-container" style="display:none;">
+                    <div class="podium-card second">
+                        <span class="podium-pos">2º</span>
+                        <div class="podium-avatar"><i class="ph-fill ph-user"></i></div>
+                        <span class="podium-name" id="top3-2nd">—</span>
+                    </div>
+                    <div class="podium-card first">
+                        <span class="podium-pos">1º</span>
+                        <div class="podium-avatar gold"><i class="ph-fill ph-crown"></i></div>
+                        <span class="podium-name" id="top3-1st">—</span>
+                        <i class="ph-fill ph-trophy podium-trophy"></i>
+                    </div>
+                    <div class="podium-card third">
+                        <span class="podium-pos">3º</span>
+                        <div class="podium-avatar"><i class="ph-fill ph-user"></i></div>
+                        <span class="podium-name" id="top3-3rd">—</span>
+                    </div>
+                </div>
+
+                <!-- BRACKET HEADER -->
+                <div class="bracket-bar">
+                    <h2>Chaveamento Oficial</h2>
+                    <div class="live-badge" id="status-badge">AGUARDANDO</div>
+                </div>
+
+                <!-- GROUPS GRID -->
+                <div class="groups-grid" id="groups-container">
+                    <div class="empty-state">
+                        <i class="ph ph-soccer-ball"></i>
+                        <h3>Nenhum torneio ativo</h3>
+                        <p>Configure e gere o chaveamento para começar.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: MATA-MATA -->
+            <div id="tab-mata-mata" class="tab-content" style="display: none;">
+                <div class="empty-state">
+                    <i class="ph ph-tree-structure"></i>
+                    <h3>Mata-Mata</h3>
+                    <p>Fase eliminatória em construção.</p>
+                </div>
+            </div>
+
+            <!-- TAB 3: RANKING -->
+            <div id="tab-ranking" class="tab-content" style="display: none;">
+                <div class="empty-state">
+                    <i class="ph ph-trophy"></i>
+                    <h3>Ranking Geral</h3>
+                    <p>Ranking de jogadores em construção.</p>
+                </div>
+            </div>
+
+            <!-- TAB 4: HISTÓRICO -->
+            <div id="tab-historico" class="tab-content" style="display: none;">
+                <div class="empty-state">
+                    <i class="ph ph-clock-counter-clockwise"></i>
+                    <h3>Histórico de Torneios</h3>
+                    <p>Histórico em construção.</p>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- FLOATING ACTION BUTTON -->
+    <button class="fab" id="fab-share" title="Compartilhar">
+        <i class="ph-fill ph-share-network"></i>
+    </button>
+
+    <script src="fifa.js"></script>
+</body>
+
+</html>
