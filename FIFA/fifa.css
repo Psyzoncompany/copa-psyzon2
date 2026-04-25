@@ -1509,6 +1509,26 @@ body {
     scroll-behavior: smooth;
 }
 
+.bracket-scroll-shell {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    border-radius: 16px;
+    scrollbar-width: thin;
+}
+
+.bracket-scroll-shell::-webkit-scrollbar {
+    height: 8px;
+}
+
+.bracket-scroll-shell::-webkit-scrollbar-thumb {
+    background: rgba(22, 163, 74, 0.25);
+    border-radius: 999px;
+}
+
 .bracket-round {
     display: flex;
     flex-direction: column;
@@ -1775,28 +1795,14 @@ body {
 /* MOBILE SCROLL */
 @media (max-width: 768px) {
     #tab-mata-mata {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+        overflow-x: hidden;
         padding-bottom: 2rem;
         position: relative;
-    }
-
-    /* Scroll shadow indicators */
-    #tab-mata-mata::after {
-        content: '';
-        position: sticky;
-        right: 0;
-        top: 0;
-        height: 100%;
-        width: 30px;
-        pointer-events: none;
-        background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
-        z-index: 5;
     }
     
     .bracket-container {
         padding-top: 5rem;
-        min-width: max-content;
+        min-width: 780px;
     }
 
     .bracket-round {
@@ -1841,6 +1847,34 @@ body {
         width: 45px !important;
         height: 45px !important;
     }
+
+    .bracket-scroll-shell::after {
+        content: '';
+        position: sticky;
+        right: 0;
+        top: 0;
+        width: 24px;
+        height: 100%;
+        pointer-events: none;
+        background: linear-gradient(to left, rgba(255,255,255,0.72), transparent);
+    }
+}
+
+#sensitive-password-input,
+#next-phase-order-input {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.7);
+    padding: 0.8rem 1rem;
+    color: #042D15;
+    outline: none;
+}
+
+#sensitive-password-input:focus,
+#next-phase-order-input:focus {
+    border-color: rgba(22, 163, 74, 0.8);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
 }
 
 /* INTERACTIVE PLAYER NAMES */
@@ -2147,4 +2181,3 @@ body {
 .stat-box { transition: all 0.2s; cursor: default; }
 .stat-box:hover { background: #f8fafc; transform: scale(1.05); }
 .stat-box.highlight:hover { transform: scale(1.02); }
-

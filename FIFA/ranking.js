@@ -385,17 +385,24 @@ export function initRankingSystem(db, role) {
             let html = '';
             snap.forEach(childSnap => {
                 const d = childSnap.val();
+                const isHistory = d.type === 'tournament-history';
+                const title = d.name || d.tournamentName || 'Torneio';
+                const modality = (d.modality || d.tournamentType || 'fifa').toUpperCase();
+                const playersCount = d.playersCount || (d.participants ? d.participants.length : 0);
+                const matchesCount = d.matchesCount || (d.results?.groups ? d.results.groups.length : 0);
+                const date = d.importedAt || d.finishedAt || d.createdAt;
                 html += `
                     <div class="group-card" style="display:flex; justify-content:space-between; align-items:center; padding: 15px;">
                         <div>
-                            <h4 style="margin:0 0 5px 0; color:#fff;">${d.name}</h4>
-                            <div style="font-size:12px; color:rgba(255,255,255,0.5);">
-                                Modalidade: <strong style="text-transform:uppercase;">${d.modality}</strong> • 
-                                ${d.playersCount} Jogadores • ${d.matchesCount} Partidas
+                            <h4 style="margin:0 0 5px 0; color:#042D15;">${title}</h4>
+                            <div style="font-size:12px; color:#51715C;">
+                                ${isHistory ? 'Histórico finalizado' : 'Importação'} •
+                                Modalidade: <strong style="text-transform:uppercase;">${modality}</strong> • 
+                                ${playersCount} Jogadores • ${matchesCount} Partidas
                             </div>
                         </div>
-                        <div style="font-size:11px; color:rgba(255,255,255,0.3);">
-                            Importado em: ${new Date(d.importedAt).toLocaleDateString()}
+                        <div style="font-size:11px; color:#8A9E8F;">
+                            ${isHistory ? 'Encerrado em' : 'Importado em'}: ${date ? new Date(date).toLocaleDateString() : '—'}
                         </div>
                     </div>
                 `;
