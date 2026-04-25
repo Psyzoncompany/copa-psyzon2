@@ -488,18 +488,20 @@
             <div class="modal-header">
                 <div class="header-info">
                     <h2>Definir confrontos da próxima fase</h2>
-                    <p>Confirme ou ajuste a ordem dos classificados</p>
+                    <p>Monte manualmente os confrontos da primeira rodada</p>
                 </div>
                 <button class="btn-close-modal" id="btn-close-next-phase"><i class="ph ph-x"></i></button>
             </div>
             <div class="modal-body">
-                <p style="color:#51715C; font-size:0.9rem;">Ordem dos classificados (um por linha):</p>
-                <textarea id="next-phase-order-input" rows="8" class="form-control" style="resize: vertical;"></textarea>
+                <p style="color:#51715C; font-size:0.9rem;">Classificados reais da próxima fase (somente leitura):</p>
+                <textarea id="next-phase-order-input" rows="6" class="form-control" style="resize: vertical;" readonly></textarea>
                 <div id="next-phase-preview" style="margin-top: 12px; font-size: 0.9rem;"></div>
                 <div id="next-phase-match-editor" class="next-phase-match-editor"></div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline-full" id="btn-shuffle-next-phase"><i class="ph ph-shuffle"></i> Embaralhar</button>
+                <button class="btn btn-outline-full" id="btn-clear-next-phase"><i class="ph ph-eraser"></i> Limpar confrontos</button>
+                <button class="btn btn-outline-full" id="btn-shuffle-next-phase"><i class="ph ph-shuffle"></i> Embaralhar automaticamente</button>
+                <button class="btn btn-outline-full" id="btn-fill-next-phase"><i class="ph ph-list-checks"></i> Preencher automaticamente</button>
                 <button class="btn btn-primary" id="btn-confirm-next-phase"><i class="ph ph-check-circle"></i> Confirmar confrontos</button>
             </div>
         </div>
