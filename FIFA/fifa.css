@@ -211,15 +211,16 @@ body {
    SIDEBAR (ORGANIZER)
    ======================== */
 .sidebar {
-    flex: 0 0 340px;
+    flex: 0 0 350px;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    max-height: calc(100vh - 120px);
+    gap: 1.5rem;
+    max-height: calc(100vh - 100px);
     overflow-y: auto;
     position: sticky;
-    top: 120px;
-    padding-right: 0.5rem;
+    top: 90px;
+    padding-right: 0.8rem;
+    padding-bottom: 2rem;
 }
 
 /* Scrollbar */
@@ -280,10 +281,10 @@ body {
 }
 
 .card-body {
-    padding: 1.2rem 1.5rem;
+    padding: 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.2rem;
 }
 
 /* ========================

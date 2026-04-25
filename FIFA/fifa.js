@@ -59,16 +59,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const prizeTitle = document.getElementById('prize-title');
     const top3Container = document.getElementById('top3-container');
 
-    // ========== DYNAMIC PHASES CALC ==========
+    // ========== DYNAMIC PHASES CALC & PREVIEW ==========
     if (participantsInput) {
         participantsInput.addEventListener('input', () => {
             const n = parseInt(participantsInput.value) || 0;
             if (n >= 2) {
                 phasesInfo.textContent = `${Math.ceil(Math.log2(n))} fases`;
+                generateGroups(n);
             } else {
                 phasesInfo.textContent = '—';
+                groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Configure e gere o chaveamento para começar.</p></div>`;
             }
         });
+        
+        // Inicializar a pré-visualização ao carregar
+        const initialN = parseInt(participantsInput.value) || 8;
+        if (initialN >= 2) {
+            generateGroups(initialN);
+        }
     }
 
     // ========== TABS NAVIGATION ==========
