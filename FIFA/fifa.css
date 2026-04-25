@@ -2181,3 +2181,217 @@ body {
 .stat-box { transition: all 0.2s; cursor: default; }
 .stat-box:hover { background: #f8fafc; transform: scale(1.05); }
 .stat-box.highlight:hover { transform: scale(1.02); }
+
+/* ================================================
+   APP-LIKE LAYOUT + MOBILE FIXES (2026)
+   ================================================ */
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    min-height: 100dvh;
+    height: 100dvh;
+}
+
+.topbar {
+    flex-shrink: 0;
+    padding-top: calc(0.8rem + env(safe-area-inset-top));
+}
+
+.tabs-nav {
+    position: sticky;
+    top: 0;
+    z-index: 180;
+    flex-shrink: 0;
+}
+
+.dashboard {
+    height: calc(100dvh - 128px - env(safe-area-inset-top));
+    overflow: hidden;
+}
+
+.content-area {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.tab-content {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+.mata-mata-tab {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.bracket-scroll-area {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+.bracket-scroll-shell {
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
+.bracket-container {
+    width: max-content;
+    min-width: 100%;
+}
+
+.ranking-cards-mobile {
+    display: none;
+}
+
+.next-phase-match-editor {
+    margin-top: 12px;
+    display: grid;
+    gap: 10px;
+}
+
+.next-phase-match-card {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 8px;
+    align-items: center;
+    padding: 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.82);
+}
+
+.next-phase-match-vs {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #51715C;
+}
+
+.next-phase-alert {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #b45309;
+}
+
+@media (max-width: 768px) {
+    .topbar {
+        padding-inline: 0.9rem;
+    }
+
+    .topbar-title h1 {
+        max-width: 160px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .role-badge {
+        max-width: 90px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-inline: 0.6rem;
+    }
+
+    .tabs-nav {
+        top: 0;
+        padding-inline: 0.25rem;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .tabs-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .dashboard {
+        height: calc(100dvh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        padding: 0.5rem;
+    }
+
+    #tab-ranking .table-responsive {
+        display: none;
+    }
+
+    .ranking-cards-mobile {
+        display: grid;
+        gap: 10px;
+    }
+
+    .ranking-player-card {
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.88);
+        background: rgba(255, 255, 255, 0.62);
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+    }
+
+    .ranking-player-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .ranking-player-position {
+        font-weight: 900;
+        color: #16A34A;
+    }
+
+    .ranking-player-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .ranking-chip {
+        border-radius: 999px;
+        background: rgba(22, 163, 74, 0.09);
+        padding: 4px 8px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    #modal-next-phase .modal-content {
+        max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        width: min(96vw, 560px);
+    }
+
+    #modal-next-phase .modal-body {
+        overflow-y: auto;
+        max-height: 58dvh;
+    }
+
+    #modal-next-phase .modal-footer {
+        position: sticky;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(8px);
+        padding-bottom: calc(0.8rem + env(safe-area-inset-bottom));
+    }
+
+    .next-phase-match-card {
+        grid-template-columns: 1fr;
+    }
+
+    .next-phase-match-vs {
+        text-align: center;
+    }
+}
