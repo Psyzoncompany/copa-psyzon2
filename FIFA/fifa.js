@@ -278,20 +278,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Recalculate
         (group.matches || []).forEach(m => {
-            if (m.gHome !== "" && m.gAway !== "") {
-                const gh = parseInt(m.gHome);
-                const ga = parseInt(m.gAway);
-                const pHome = group.players.find(p => p.name === m.home);
-                const pAway = group.players.find(p => p.name === m.away);
+            const h = m.gHome;
+            const a = m.gAway;
+            
+            // Check if both are numbers or non-empty strings
+            if (h !== "" && h !== null && a !== "" && a !== null) {
+                const gh = parseInt(h);
+                const ga = parseInt(a);
+                
+                if (!isNaN(gh) && !isNaN(ga)) {
+                    const pHome = group.players.find(p => p.name === m.home);
+                    const pAway = group.players.find(p => p.name === m.away);
 
-                if (pHome && pAway) {
-                    pHome.j++; pAway.j++;
-                    pHome.gp += gh; pHome.gc += ga;
-                    pAway.gp += ga; pAway.gc += gh;
+                    if (pHome && pAway) {
+                        pHome.j++; pAway.j++;
+                        pHome.gp += gh; pHome.gc += ga;
+                        pAway.gp += ga; pAway.gc += gh;
 
-                    if (gh > ga) { pHome.v++; pAway.d++; pHome.pts += 3; }
-                    else if (gh < ga) { pAway.v++; pHome.d++; pAway.pts += 3; }
-                    else { pHome.e++; pAway.e++; pHome.pts += 1; pAway.pts += 1; }
+                        if (gh > ga) { pHome.v++; pAway.d++; pHome.pts += 3; }
+                        else if (gh < ga) { pAway.v++; pHome.d++; pAway.pts += 3; }
+                        else { pHome.e++; pAway.e++; pHome.pts += 1; pAway.pts += 1; }
+                    }
                 }
             }
         });
@@ -1027,7 +1034,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (closePerfil) closePerfil.addEventListener('click', () => modalPerfil.style.display = 'none');
 
     async function openPlayerProfile(playerName) {
-        window.openPlayerProfile = openPlayerProfile; // Make it global
         if (!playerName || playerName.startsWith('A definir') || playerName.startsWith('1º ') || playerName.startsWith('2º ') || playerName.startsWith('Vencedor ') || playerName.startsWith('Classificado')) return;
 
         // Mostrar loading no modal
@@ -1054,8 +1060,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (regP) pData = { nome: regP.name, nick: regP.nick, photo: regP.photo, countryCode: regP.countryCode };
             }
 
-            // 2. Simular/Calcular estatísticas (Aqui você pode buscar do histórico real futuramente)
-            // Por enquanto, usaremos valores padrão ou do histórico se existir
+            // 2. Calcular estatísticas REAIS
             const stats = {
                 nome: pData ? pData.nome : playerName,
                 username: pData ? `@${pData.nick || pData.nome.split(' ')[0].toLowerCase()}` : '@atleta',
@@ -1064,18 +1069,63 @@ document.addEventListener('DOMContentLoaded', async () => {
                 jogos: 0, vitorias: 0, empates: 0, derrotas: 0, gols: 0, golsSofridos: 0
             };
 
-            // 3. Renderizar o card (Inspirado no perfil.js)
+            // Loop nos grupos para somar stats da fase de grupos
+            (tournamentState.groups || []).forEach(group => {
+                const p = group.players.find(p => p.name === playerName);
+                if (p) {
+                    stats.jogos += (p.j || 0);
+                    stats.vitorias += (p.v || 0);
+                    stats.empates += (p.e || 0);
+                    stats.derrotas += (p.d || 0);
+                    stats.gols += (p.gp || 0);
+                    stats.golsSofridos += (p.gc || 0);
+                }
+            });
+
+            // Loop no mata-mata
+            if (tournamentState.knockout) {
+                const allKMatches = [];
+                if (tournamentState.knockout.repechage) allKMatches.push(...tournamentState.knockout.repechage);
+                (tournamentState.knockout.rounds || []).forEach(r => allKMatches.push(...r.matches));
+
+                allKMatches.forEach(m => {
+                    if ((m.p1 === playerName || m.p2 === playerName) && m.s1 !== "" && m.s2 !== "") {
+                        stats.jogos++;
+                        const sMe = m.p1 === playerName ? parseInt(m.s1) : parseInt(m.s2);
+                        const sOpp = m.p1 === playerName ? parseInt(m.s2) : parseInt(m.s1);
+                        stats.gols += sMe;
+                        stats.golsSofridos += sOpp;
+                        if (sMe > sOpp) stats.vitorias++;
+                        else if (sMe < sOpp) stats.derrotas++;
+                    }
+                });
+
+                // Detectar Finais e Semis para os badges
+                const rounds = tournamentState.knockout.rounds || [];
+                rounds.forEach(r => {
+                    r.matches.forEach(m => {
+                        if (m.p1 === playerName || m.p2 === playerName) {
+                            if (r.name === 'Final') stats.finals = 1;
+                            if (r.name === 'Semifinal') stats.semis = 1;
+                        }
+                    });
+                });
+
+                if (tournamentState.top3 && tournamentState.top3.first === playerName) stats.trofeus = 1;
+            }
+
+            // 3. Renderizar o card
             const saldo = stats.gols - stats.golsSofridos;
             let saldoClass = saldo > 0 ? 'saldo-pos' : (saldo < 0 ? 'saldo-neg' : 'saldo-neu');
 
             perfilTarget.innerHTML = `
-                <div class="profile-card" style="margin: 0 auto; max-width: 100%;">
+                <div class="profile-card">
                     <div class="profile-header">
                         <div class="avatar-wrapper">
                             <img src="${stats.foto}" alt="">
                         </div>
-                        <div class="profile-info">
-                            <h1>${stats.nome}</h1>
+                        <div class="profile-info" style="flex: 1; min-width: 0;">
+                            <h1 style="word-break: break-word; line-height: 1.1;">${stats.nome}</h1>
                             <span class="username">${stats.username}</span>
                         </div>
                     </div>
@@ -1106,7 +1156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <div class="stat-box"><span class="stat-box-value">${stats.golsSofridos}</span><span class="stat-box-label">Sofridos</span></div>
                             <div class="stat-box highlight ${saldoClass}">
                                 <span class="stat-box-label">Saldo de Gols</span>
-                                <span class="stat-box-value">${saldo > 0 ? '+' : ''}${saldo}</span>
+                                <span class="stat-box-value" style="font-size: 1.2rem; font-weight: 800;">${saldo > 0 ? '+' : ''}${saldo}</span>
                             </div>
                         </div>
                     </div>
@@ -1117,6 +1167,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             perfilTarget.innerHTML = '<p style="padding: 20px; color: #ef4444; text-align: center;">Erro ao carregar os dados do atleta.</p>';
         }
     }
+    window.openPlayerProfile = openPlayerProfile; // Torna global para o onclick
 
     // ========== ACTION BUTTONS ==========
     const actions = {
