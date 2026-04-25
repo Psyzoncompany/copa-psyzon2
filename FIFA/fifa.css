@@ -53,12 +53,8 @@
     --shadow-glow-green: 0 0 20px rgba(22, 163, 74, 0.1);
 }
 
-html, body {
-    min-height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: none;
-    -webkit-tap-highlight-color: transparent;
+html {
+    font-size: 14px;
 }
 
 body {
@@ -70,8 +66,10 @@ body {
     background-attachment: fixed;
     background-repeat: no-repeat;
     color: var(--text-primary);
-    min-height: 100vh;
+    min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 @media (max-width: 768px) {
@@ -229,7 +227,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    max-height: calc(100vh - 100px);
+    max-height: calc(100dvh - 100px);
     overflow-y: auto;
     position: sticky;
     top: 90px;
@@ -265,9 +263,12 @@ body {
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border-glass);
     border-radius: var(--radius-xl);
-    overflow: hidden;
     box-shadow: var(--shadow-card);
-    transition: border-color 0.3s;
+    overflow: visible;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    width: 100%;
+    height: auto;
+    min-height: auto;
 }
 
 .card:hover {
@@ -726,6 +727,88 @@ body {
     }
 }
 
+/* ========================
+   PREVIEW & MATA-MATA
+   ======================== */
+.preview-mode {
+    opacity: 0.85;
+    position: relative;
+    border: 1px dashed rgba(22, 163, 74, 0.4) !important;
+}
+
+.preview-badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: var(--orange);
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 12px;
+    font-weight: 800;
+    box-shadow: 0 4px 10px rgba(234, 88, 12, 0.3);
+    z-index: 10;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.bracket-container {
+    display: flex;
+    gap: 3rem;
+    overflow-x: auto;
+    padding: 2rem 1rem;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+}
+
+.bracket-round {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 2rem;
+    min-width: 240px;
+}
+
+.bracket-round-title {
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.bracket-match {
+    background: var(--bg-card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-card);
+    position: relative;
+}
+
+.bracket-slot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.bracket-slot:first-child {
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.bracket-slot span:last-child {
+    font-weight: 800;
+}
+
 /* Groups Grid */
 .groups-grid {
     display: grid;
@@ -873,30 +956,19 @@ body {
         position: fixed;
         top: 0;
         left: -100%;
-        width: 100%;
-        max-width: 360px;
+        width: 320px;
         height: 100dvh;
-        min-height: 100dvh;
+        max-height: 100dvh;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(25px);
         -webkit-backdrop-filter: blur(25px);
         z-index: 1000;
-        padding: 2rem 1.2rem;
-        padding-bottom: calc(60px + env(safe-area-inset-bottom));
+        padding: 2rem 1.5rem;
+        padding-bottom: calc(80px + env(safe-area-inset-bottom));
         transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 20px 0 50px rgba(0, 0, 0, 0.1);
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    }
-
-    .sidebar .card {
-        height: auto;
-        min-height: auto;
-        overflow: visible;
-        border-radius: 22px;
     }
 
     .sidebar.active {
@@ -928,6 +1000,8 @@ body {
 
     .dashboard {
         padding: 0.8rem;
+        padding-bottom: calc(40px + env(safe-area-inset-bottom));
+        min-height: 100dvh;
     }
 
     .bracket-bar h2 {

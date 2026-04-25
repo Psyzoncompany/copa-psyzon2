@@ -81,25 +81,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const prizeTitle = document.getElementById('prize-title');
     const top3Container = document.getElementById('top3-container');
 
-    // ========== DYNAMIC PHASES CALC & PREVIEW ==========
-    if (participantsInput) {
-        participantsInput.addEventListener('input', () => {
-            const n = parseInt(participantsInput.value) || 0;
-            if (n >= 2) {
-                phasesInfo.textContent = `${Math.ceil(Math.log2(n))} fases`;
-                generateGroups(n);
-            } else {
-                phasesInfo.textContent = '—';
-                groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Configure e gere o chaveamento para começar.</p></div>`;
-            }
-        });
+    // ========== PREVIEW UPDATE ==========
+    const formatSelect = document.getElementById('tourney-format');
+    
+    function updatePreview() {
+        if (tournamentState.status !== 'aguardando') return;
+        const n = parseInt(participantsInput.value) || 0;
+        const format = formatSelect ? formatSelect.value : 'grupos-mata-mata';
         
-        // Inicializar a pré-visualização ao carregar (Apenas se visitante/apostador não puxar do banco)
-        const initialN = parseInt(participantsInput.value) || 8;
-        if (initialN >= 2 && !db) {
-            generateGroups(initialN);
+        if (n >= 2) {
+            phasesInfo.textContent = `${Math.ceil(Math.log2(n))} fases`;
+            generatePreviewStructure(n, format);
+        } else {
+            phasesInfo.textContent = '—';
+            groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Configure e gere o chaveamento para começar.</p></div>`;
+            const tabMata = document.getElementById('tab-mata-mata');
+            if(tabMata) tabMata.innerHTML = `<div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata</h3><p>Fase eliminatória pendente.</p></div>`;
         }
     }
+
+    if (participantsInput) participantsInput.addEventListener('input', updatePreview);
+    if (formatSelect) formatSelect.addEventListener('change', updatePreview);
 
     // ========== FIREBASE REAL-TIME SYNC ==========
     if (db) {
@@ -108,8 +110,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = docSnap.data();
                 tournamentState = data;
                 
-                // Se não for organizador, usamos a tela gerada pelo DB
-                if (role !== 'organizador') {
+                // Se o torneio estiver rodando OU se for visão de visitante, renderiza
+                if (data.status !== 'aguardando' || role !== 'organizador') {
                     renderGroupsFromState();
                     updateStatus(data.status);
                     
@@ -119,13 +121,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else {
                         prizeBanner.style.display = 'none';
                     }
+                } else if (role === 'organizador') {
+                    updatePreview();
                 }
-            } else if (role !== 'organizador') {
-                groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Aguarde o organizador iniciar a partida.</p></div>`;
-                updateStatus('aguardando');
-                prizeBanner.style.display = 'none';
+            } else {
+                if (role !== 'organizador') {
+                    groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Aguarde o organizador iniciar a partida.</p></div>`;
+                    updateStatus('aguardando');
+                    prizeBanner.style.display = 'none';
+                } else {
+                    updatePreview();
+                }
             }
         });
+    } else {
+        // Fallback local
+        if (role === 'organizador') updatePreview();
     }
 
     function renderGroupsFromState() {
@@ -200,6 +211,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             tournamentState.createdAt = new Date().toISOString();
 
             generateGroups(participants);
+            renderGroupsFromState(); // Renderiza visualmente o que gerou
             updateStatus('ativo');
 
             // Sincronizar com Firebase
@@ -213,11 +225,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // ========== GENERATE GROUPS ==========
+    // ========== GENERATE GROUPS (STATE ONLY) ==========
     function generateGroups(total) {
         const playersPerGroup = 4;
         const numGroups = Math.max(1, Math.ceil(total / playersPerGroup));
-        groupsContainer.innerHTML = '';
         tournamentState.groups = [];
 
         for (let g = 0; g < numGroups; g++) {
@@ -225,37 +236,97 @@ document.addEventListener('DOMContentLoaded', async () => {
             const count = Math.min(playersPerGroup, total - (g * playersPerGroup));
             const players = [];
 
-            let rows = '';
             for (let p = 0; p < count; p++) {
                 const playerNum = p + 1 + (g * playersPerGroup);
-                const statusClass = p < 2 ? 'classified' : (p === 2 ? 'playoff' : 'possible-3rd');
                 players.push({ name: `Jogador #${playerNum}`, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0 });
-
-                rows += `
-                    <tr class="${statusClass}">
-                        <td>Jogador #${playerNum}</td>
-                        <td>0</td><td>0</td><td>0</td><td>0</td>
-                        <td>0</td><td>0</td><td>0</td><td>0</td>
-                    </tr>`;
             }
 
             tournamentState.groups.push({ name: `Grupo ${letter}`, players });
+        }
+    }
 
-            const card = document.createElement('div');
-            card.className = 'group-card';
-            card.innerHTML = `
-                <div class="group-title">Grupo ${letter}</div>
-                <table class="group-table">
-                    <thead>
+    // ========== GENERATE PREVIEW STRUCTURE ==========
+    function generatePreviewStructure(total, format) {
+        const showGroups = format === 'grupos' || format === 'grupos-mata-mata';
+        const showMataMata = format === 'mata-mata' || format === 'grupos-mata-mata';
+        
+        // --- Grupos Preview ---
+        if (showGroups) {
+            const playersPerGroup = 4;
+            const numGroups = Math.max(1, Math.ceil(total / playersPerGroup));
+            groupsContainer.innerHTML = '';
+            
+            for (let g = 0; g < numGroups; g++) {
+                const letter = String.fromCharCode(65 + g);
+                const count = Math.min(playersPerGroup, total - (g * playersPerGroup));
+                
+                let rows = '';
+                for (let p = 0; p < count; p++) {
+                    const playerNum = p + 1 + (g * playersPerGroup);
+                    rows += `
                         <tr>
-                            <th>Jogador</th>
-                            <th>J</th><th>V</th><th>E</th><th>D</th>
-                            <th>GP</th><th>GC</th><th>SG</th><th>PTS</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>`;
-            groupsContainer.appendChild(card);
+                            <td>A definir (Slot ${playerNum})</td>
+                            <td>—</td><td>—</td><td>—</td><td>—</td>
+                            <td>—</td><td>—</td><td>—</td><td>—</td>
+                        </tr>`;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'group-card preview-mode';
+                card.innerHTML = `
+                    <div class="preview-badge">PREVIEW</div>
+                    <div class="group-title">Grupo ${letter}</div>
+                    <table class="group-table">
+                        <thead>
+                            <tr>
+                                <th>Jogador</th>
+                                <th>J</th><th>V</th><th>E</th><th>D</th>
+                                <th>GP</th><th>GC</th><th>SG</th><th>PTS</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
+                groupsContainer.appendChild(card);
+            }
+        } else {
+            groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Fase de Grupos desativada</h3><p>O formato atual não inclui grupos.</p></div>`;
+        }
+
+        // --- Mata-Mata Preview ---
+        const mataMataContainer = document.getElementById('tab-mata-mata');
+        if (mataMataContainer) {
+            if (showMataMata) {
+                let power = Math.pow(2, Math.ceil(Math.log2(total)));
+                if (power < 2) power = 2;
+                let roundsCount = Math.log2(power);
+                
+                let bracketHTML = `<div class="bracket-container preview-mode">
+                                    <div class="preview-badge">PREVIEW</div>`;
+                                    
+                for (let r = 0; r < roundsCount; r++) {
+                    let matchesInRound = power / Math.pow(2, r + 1);
+                    let roundName = matchesInRound === 1 ? 'Final' : (matchesInRound === 2 ? 'Semifinal' : (matchesInRound === 4 ? 'Quartas de Final' : `Fase de ${matchesInRound*2}`));
+                    
+                    let matchesHTML = '';
+                    for (let m = 0; m < matchesInRound; m++) {
+                        matchesHTML += `
+                            <div class="bracket-match">
+                                <div class="bracket-slot"><span>A definir</span><span>—</span></div>
+                                <div class="bracket-slot"><span>A definir</span><span>—</span></div>
+                            </div>`;
+                    }
+                    
+                    bracketHTML += `
+                        <div class="bracket-round">
+                            <div class="bracket-round-title">${roundName}</div>
+                            ${matchesHTML}
+                        </div>`;
+                }
+                bracketHTML += `</div>`;
+                mataMataContainer.innerHTML = bracketHTML;
+            } else {
+                mataMataContainer.innerHTML = `<div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div>`;
+            }
         }
     }
 
@@ -321,8 +392,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ========== ACTION BUTTONS ==========
     const actions = {
         'btn-embaralhar': () => {
-            if (tournamentState.groups.length === 0) return;
+            if (tournamentState.groups.length === 0 && tournamentState.status === 'aguardando') return;
             generateGroups(tournamentState.participants);
+            renderGroupsFromState();
             console.log('[Action] Bracket shuffled');
         },
         'btn-atualizar': () => {
