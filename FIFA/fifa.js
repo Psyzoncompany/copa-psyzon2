@@ -847,11 +847,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderTournamentFromState(false);
             updateStatus('ativo');
 
-            // ===== 2. GERAR 32 CÓDIGOS =====
+            // ===== 2. GERAR CÓDIGOS POR PARTICIPANTE =====
             const newCodes = [];
             const existingSet = new Set();
 
-            for (let i = 0; i < 32; i++) {
+            for (let i = 0; i < participants; i++) {
                 let code;
                 do {
                     const num = String(Math.floor(1000 + Math.random() * 9000));
