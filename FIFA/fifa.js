@@ -136,11 +136,70 @@ document.addEventListener('DOMContentLoaded', async () => {
     let pendingSensitiveAction = null;
     let pendingNextPhaseQualified = [];
     let pendingNextPhaseMatches = [];
+    let pendingNextPhaseSignature = '';
     let repechageModalShown = false;
 
+    function isBye(value) {
+        return typeof value === 'string' && value.trim().toUpperCase() === 'BYE';
+    }
+
+    function isWinnerPlaceholder(value) {
+        return typeof value === 'string' && value.trim().toLowerCase().startsWith('vencedor');
+    }
+
+    function isRealPlayer(value) {
+        return !!value && typeof value === 'string' && !isBye(value) && !isWinnerPlaceholder(value) && value.trim().toLowerCase() !== 'a definir' && !/^\dº grupo/i.test(value) && !/^classificado/i.test(value);
+    }
+
     function isPlaceholder(name) {
-        if (!name) return true;
-        return /^A definir|^\dº Grupo|^Vencedor |^Classificado/i.test(name);
+        return !isRealPlayer(name);
+    }
+
+    function displayParticipantName(name) {
+        if (!name || isWinnerPlaceholder(name)) return 'A definir';
+        return name;
+    }
+
+    function getByeAutoWinner(match) {
+        const p1Bye = isBye(match?.p1);
+        const p2Bye = isBye(match?.p2);
+        if (p1Bye && !p2Bye && isRealPlayer(match?.p2)) return match.p2;
+        if (p2Bye && !p1Bye && isRealPlayer(match?.p1)) return match.p1;
+        return null;
+    }
+
+    function clearMatchResultFields(match) {
+        if (!match) return;
+        ['s1', 's2', 'pen', 'pen1', 'pen2', 'winner', 'status', 'finished', 'completed', 'walkover', 'autoAdvance', 'idaS1', 'idaS2', 'voltaS1', 'voltaS2'].forEach(key => {
+            delete match[key];
+        });
+        match.s1 = '';
+        match.s2 = '';
+        match.pen1 = '';
+        match.pen2 = '';
+        match.winner = null;
+        match.status = 'pending';
+        match.completed = false;
+        match.walkover = false;
+    }
+
+    function createMatchData(p1, p2, winnerToken, extra = {}) {
+        return {
+            p1,
+            p2,
+            p1Source: p1,
+            p2Source: p2,
+            winnerToken,
+            s1: '',
+            s2: '',
+            pen1: '',
+            pen2: '',
+            winner: null,
+            status: 'pending',
+            completed: false,
+            walkover: false,
+            ...extra
+        };
     }
 
     function getGroupLeaders(position = 0) {
@@ -158,6 +217,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function getKnockoutMatchWinner(match) {
         if (!match) return null;
+        if (isRealPlayer(match.winner)) return match.winner;
+        const byeWinner = getByeAutoWinner(match);
+        if (byeWinner) return byeWinner;
         const hasResult = match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null;
         if (!hasResult) return null;
         const s1 = parseInt(match.s1);
@@ -281,8 +343,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             singleEl.style.display = 'none';
             legsEl.style.display = 'block';
 
-            document.getElementById('edit-legs-p1').textContent = formatName(match.p1);
-            document.getElementById('edit-legs-p2').textContent = formatName(match.p2);
+            document.getElementById('edit-legs-p1').textContent = formatName(displayParticipantName(match.p1));
+            document.getElementById('edit-legs-p2').textContent = formatName(displayParticipantName(match.p2));
 
             document.getElementById('edit-ida-s1').value = match.idaS1 || '';
             document.getElementById('edit-ida-s2').value = match.idaS2 || '';
@@ -303,8 +365,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const agg2 = ida2 + volta2;
                 if (type === 'repechage' && agg1 === agg2 && (document.getElementById('edit-ida-s1').value !== '' || document.getElementById('edit-volta-s1').value !== '')) {
                     penaltyEl.style.display = 'block';
-                    document.getElementById('pen-p1-name').textContent = formatName(match.p1);
-                    document.getElementById('pen-p2-name').textContent = formatName(match.p2);
+                    document.getElementById('pen-p1-name').textContent = formatName(displayParticipantName(match.p1));
+                    document.getElementById('pen-p2-name').textContent = formatName(displayParticipantName(match.p2));
                 } else {
                     penaltyEl.style.display = 'none';
                 }
@@ -321,8 +383,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             singleEl.style.display = 'flex';
             legsEl.style.display = 'none';
 
-            if (editP1Name) editP1Name.textContent = match.p1;
-            if (editP2Name) editP2Name.textContent = match.p2;
+            if (editP1Name) editP1Name.textContent = displayParticipantName(match.p1);
+            if (editP2Name) editP2Name.textContent = displayParticipantName(match.p2);
             if (editS1) editS1.value = match.s1 || '';
             if (editS2) editS2.value = match.s2 || '';
 
@@ -332,8 +394,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const v2 = parseInt(editS2.value);
                 if (type === 'repechage' && !isNaN(v1) && !isNaN(v2) && v1 === v2 && editS1.value !== '') {
                     penaltyEl.style.display = 'block';
-                    document.getElementById('pen-p1-name').textContent = formatName(match.p1);
-                    document.getElementById('pen-p2-name').textContent = formatName(match.p2);
+                    document.getElementById('pen-p1-name').textContent = formatName(displayParticipantName(match.p1));
+                    document.getElementById('pen-p2-name').textContent = formatName(displayParticipantName(match.p2));
                 } else {
                     penaltyEl.style.display = 'none';
                 }
@@ -364,18 +426,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         `).join('');
     }
 
-    function normalizeQualifiedNames() {
-        const typed = (nextPhaseOrderInput?.value || '')
-            .split('\n')
-            .map(n => n.trim())
-            .filter(Boolean);
-        return typed.length ? typed : [...pendingNextPhaseQualified];
-    }
-
-    function buildMatchesFromNames(names) {
+    function buildMatchesFromNames(names, emptySlots = false) {
         const matches = [];
         for (let i = 0; i < names.length; i += 2) {
-            matches.push({ p1: names[i] || 'BYE', p2: names[i + 1] || 'BYE' });
+            matches.push({
+                p1: emptySlots ? '' : (names[i] || 'BYE'),
+                p2: emptySlots ? '' : (names[i + 1] || 'BYE')
+            });
         }
         return matches;
     }
@@ -384,58 +441,119 @@ document.addEventListener('DOMContentLoaded', async () => {
         const counts = new Map();
         matches.forEach(m => {
             [m.p1, m.p2].forEach(name => {
-                if (!name || name === 'BYE') return;
+                if (!isRealPlayer(name)) return;
                 counts.set(name, (counts.get(name) || 0) + 1);
             });
         });
         return [...counts.entries()].filter(([, count]) => count > 1).map(([name]) => name);
     }
 
+    function initializeNextPhaseMatchEditor(qualifiedNames, mode = 'empty') {
+        const normalized = [...new Set((qualifiedNames || []).map(n => (n || '').trim()).filter(isRealPlayer))];
+        pendingNextPhaseQualified = normalized;
+        const count = Math.max(1, Math.ceil(normalized.length / 2));
+        if (mode === 'shuffle') {
+            pendingNextPhaseMatches = buildMatchesFromNames(shuffleArray(normalized));
+        } else if (mode === 'autofill') {
+            pendingNextPhaseMatches = buildMatchesFromNames(normalized);
+        } else {
+            pendingNextPhaseMatches = Array.from({ length: count }, () => ({ p1: '', p2: '' }));
+        }
+        pendingNextPhaseSignature = normalized.join('|');
+    }
+
+    function updatePendingNextPhaseMatch(matchIndex, side, value) {
+        if (!pendingNextPhaseMatches[matchIndex]) return;
+        pendingNextPhaseMatches[matchIndex] = {
+            ...pendingNextPhaseMatches[matchIndex],
+            [side]: value
+        };
+    }
+
     function renderNextPhaseMatchEditor() {
         if (!nextPhaseMatchEditor) return;
-        const names = normalizeQualifiedNames();
-        pendingNextPhaseMatches = buildMatchesFromNames(names);
-
         if (!pendingNextPhaseMatches.length) {
             nextPhaseMatchEditor.innerHTML = '';
             return;
         }
 
-        const options = ['<option value="BYE">BYE</option>', ...names.map(name => `<option value="${name}">${formatName(name)}</option>`)].join('');
+        const allSelectedPlayers = pendingNextPhaseMatches.flatMap(m => [m.p1, m.p2]).filter(isRealPlayer);
         const duplicates = getDuplicatePlayersFromMatches(pendingNextPhaseMatches);
 
         nextPhaseMatchEditor.innerHTML = `
             ${pendingNextPhaseMatches.map((match, idx) => `
                 <div class="next-phase-match-card">
                     <select class="form-control next-phase-select-a" data-match-index="${idx}">
-                        ${options}
+                        <option value="">Selecionar jogador</option>
+                        <option value="BYE">BYE</option>
                     </select>
                     <span class="next-phase-match-vs">Jogo ${idx + 1} • VS</span>
                     <select class="form-control next-phase-select-b" data-match-index="${idx}">
-                        ${options}
+                        <option value="">Selecionar jogador</option>
+                        <option value="BYE">BYE</option>
                     </select>
                 </div>
             `).join('')}
             ${duplicates.length ? `<div class="next-phase-alert">⚠️ Jogadores repetidos detectados: ${duplicates.map(formatName).join(', ')}</div>` : ''}
         `;
 
+        function populateSelect(select, currentValue) {
+            const available = pendingNextPhaseQualified.filter(name => name === currentValue || !allSelectedPlayers.includes(name));
+            available.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = formatName(name);
+                select.appendChild(opt);
+            });
+            select.value = currentValue || '';
+        }
+
         nextPhaseMatchEditor.querySelectorAll('.next-phase-select-a').forEach(select => {
             const idx = Number(select.dataset.matchIndex);
-            select.value = pendingNextPhaseMatches[idx].p1 || 'BYE';
+            populateSelect(select, pendingNextPhaseMatches[idx].p1 || '');
             select.addEventListener('change', () => {
-                pendingNextPhaseMatches[idx].p1 = select.value;
+                updatePendingNextPhaseMatch(idx, 'p1', select.value);
                 renderNextPhaseMatchEditor();
             });
         });
 
         nextPhaseMatchEditor.querySelectorAll('.next-phase-select-b').forEach(select => {
             const idx = Number(select.dataset.matchIndex);
-            select.value = pendingNextPhaseMatches[idx].p2 || 'BYE';
+            populateSelect(select, pendingNextPhaseMatches[idx].p2 || '');
             select.addEventListener('change', () => {
-                pendingNextPhaseMatches[idx].p2 = select.value;
+                updatePendingNextPhaseMatch(idx, 'p2', select.value);
                 renderNextPhaseMatchEditor();
             });
         });
+    }
+
+    function getNextPhaseQualifiersFromBracket(tournament) {
+        const qualifiers = [];
+        const pushIfReal = (name) => {
+            if (!isRealPlayer(name)) return;
+            if (!qualifiers.includes(name)) qualifiers.push(name);
+        };
+
+        const rep = tournament?.knockout?.repechage || [];
+        const repTokenWinner = new Map();
+        rep.forEach((match, idx) => {
+            const winner = match?.winner || getKnockoutMatchWinner(match) || getByeAutoWinner(match);
+            if (isRealPlayer(winner)) repTokenWinner.set(`Vencedor Rep. ${idx + 1}`, winner);
+        });
+
+        const firstRound = tournament?.knockout?.rounds?.[0];
+        if (firstRound?.matches?.length) {
+            firstRound.matches.forEach(match => {
+                [match.p1, match.p2].forEach(slot => {
+                    if (repTokenWinner.has(slot)) pushIfReal(repTokenWinner.get(slot));
+                    else pushIfReal(slot);
+                });
+            });
+        } else {
+            getGroupLeaders(0).forEach(pushIfReal);
+            repTokenWinner.forEach(v => pushIfReal(v));
+        }
+        return qualifiers;
     }
 
     function checkAndOpenNextPhaseModal() {
@@ -444,18 +562,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!rep.length) return;
         const done = rep.every(m => getKnockoutMatchWinner(m));
         if (!done) return;
-
-        const firstPlaced = getGroupLeaders(0);
-        const repWinners = rep.map(m => getKnockoutMatchWinner(m)).filter(Boolean);
-        const qualified = [...firstPlaced, ...repWinners];
+        const qualified = getNextPhaseQualifiersFromBracket(tournamentState);
         if (!qualified.length) return;
-
-        pendingNextPhaseQualified = qualified;
+        const signature = qualified.join('|');
+        if (signature !== pendingNextPhaseSignature || !pendingNextPhaseMatches.length) {
+            initializeNextPhaseMatchEditor(qualified, 'empty');
+        }
         if (nextPhaseOrderInput) nextPhaseOrderInput.value = qualified.join('\n');
         renderNextPhasePreview(qualified);
         renderNextPhaseMatchEditor();
         modalNextPhase?.classList.add('active');
         repechageModalShown = true;
+    }
+
+    function propagateWinnerToNextRound(knockout, winnerToken, winnerName, fromRoundIdx = -1) {
+        if (!winnerToken || !winnerName || !knockout?.rounds?.length) return;
+        for (let r = fromRoundIdx + 1; r < knockout.rounds.length; r++) {
+            (knockout.rounds[r].matches || []).forEach(nextMatch => {
+                if (nextMatch.p1 === winnerToken) nextMatch.p1 = winnerName;
+                if (nextMatch.p2 === winnerToken) nextMatch.p2 = winnerName;
+            });
+        }
     }
 
     if (btnSaveKnockout) {
@@ -473,8 +600,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             let winner = null;
             let totalS1 = 0, totalS2 = 0;
+            const byeWinner = getByeAutoWinner(match);
+            if (byeWinner) {
+                match.winner = byeWinner;
+                match.completed = true;
+                match.walkover = true;
+                match.status = 'walkover';
+                match.s1 = match.p1 === byeWinner ? '1' : '0';
+                match.s2 = match.p2 === byeWinner ? '1' : '0';
+                winner = byeWinner;
+            }
 
-            if (isHomeAway) {
+            if (!winner && isHomeAway) {
                 // Ida e Volta
                 const ida1 = document.getElementById('edit-ida-s1').value;
                 const ida2 = document.getElementById('edit-ida-s2').value;
@@ -496,7 +633,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 match.s1 = String(totalS1);
                 match.s2 = String(totalS2);
 
-            } else {
+            } else if (!winner) {
                 // Placar único
                 const s1Val = editS1.value;
                 const s2Val = editS2.value;
@@ -542,6 +679,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             // Advance winner
+            match.winner = winner;
+            match.completed = true;
+            match.status = 'completed';
             if (type === 'repechage') {
                 const firstRound = tournamentState.knockout.rounds[0];
                 const placeholder = `Vencedor Rep. ${mIdx + 1}`;
@@ -550,13 +690,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (m.p2 === placeholder) m.p2 = winner;
                 });
             } else if (rIdx < tournamentState.knockout.rounds.length - 1) {
-                const nextRound = tournamentState.knockout.rounds[rIdx + 1];
-                const roundName = tournamentState.knockout.rounds[rIdx].name;
-                const placeholder = `Vencedor ${roundName} ${mIdx + 1}`;
-                nextRound.matches.forEach(m => {
-                    if (m.p1 === placeholder) m.p1 = winner;
-                    if (m.p2 === placeholder) m.p2 = winner;
-                });
+                const winnerToken = match.winnerToken || `Vencedor ${tournamentState.knockout.rounds[rIdx].name} ${mIdx + 1}`;
+                match.winnerToken = winnerToken;
+                propagateWinnerToNextRound(tournamentState.knockout, winnerToken, winner, rIdx);
             } else {
                 tournamentState.top3.first = winner;
                 tournamentState.top3.second = (winner === match.p1) ? match.p2 : match.p1;
@@ -797,21 +933,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updatePreview() {
         if (tournamentState.status !== 'aguardando') return;
         let n = parseInt(participantsInput.value) || 0;
-        
-        // Force valid numbers
-        if (n > 2) {
-            if (n <= 8) n = 8;
-            else if (n <= 16) n = 16;
-            else if (n <= 32) n = 32;
-            else n = 64;
-            participantsInput.value = n;
-        }
 
         const format = formatSelect ? formatSelect.value : 'grupos-mata-mata';
         
-        if (n >= 8) {
-            const phaseMap = { 8: 3, 16: 4, 32: 5, 64: 6 };
-            phasesInfo.textContent = `${phaseMap[n] || Math.ceil(Math.log2(n))} fases`;
+        if (n >= 2) {
+            const totalPhases = Math.max(1, Math.ceil(Math.log2(Math.max(2, n))));
+            phasesInfo.textContent = `${totalPhases} fases`;
             
             // Verifica os participantes reais que já entraram
             let realParticipants = tournamentState.registeredPlayers || [];
@@ -859,8 +986,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const newHomeAway = document.getElementById('tourney-home-away').checked;
 
             if (!newName) { alert('Informe o nome do torneio.'); return; }
-            if (![8, 16, 32, 64].includes(newParticipants)) {
-                alert('Número de participantes deve ser 8, 16, 32 ou 64.');
+            if (!Number.isInteger(newParticipants) || newParticipants < 2) {
+                alert('Número de participantes inválido. Informe pelo menos 2 participantes.');
                 return;
             }
 
@@ -924,8 +1051,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (document.getElementById('tourney-home-away')) document.getElementById('tourney-home-away').checked = !!tournamentState.homeAway;
                     
                     const n = tournamentState.participants || 8;
-                    const phaseMap = { 8: 3, 16: 4, 32: 5, 64: 6 };
-                    if (phasesInfo) phasesInfo.textContent = `${phaseMap[n] || 3} fases`;
+                    if (phasesInfo) phasesInfo.textContent = `${Math.max(1, Math.ceil(Math.log2(Math.max(2, n))))} fases`;
                 }
 
                 // If not in preview or if visitor, render real data
@@ -1016,7 +1142,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 for(let i=0; i < M; i++) {
                     let p1 = repechagePlayers.shift();
                     let p2 = repechagePlayers.shift();
-                    repechageRound.push({ p1, p2, s1: '', s2: '' });
+                    repechageRound.push(createMatchData(p1, p2, `Vencedor Rep. ${i + 1}`));
                     repechagePlayers.push(`Vencedor Rep. ${i+1}`);
                 }
             }
@@ -1045,8 +1171,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 for(let m=0; m < currentRoundPlayers.length; m+=2) {
                     let p1 = currentRoundPlayers[m] || 'A definir';
                     let p2 = currentRoundPlayers[m+1] || 'A definir';
-                    roundMatches.push({ p1, p2, s1: '', s2: '' });
-                    nextRoundPlayers.push(`Vencedor ${roundName} ${m/2 + 1}`);
+                    const winnerToken = `Vencedor ${roundName} ${m / 2 + 1}`;
+                    roundMatches.push(createMatchData(p1, p2, winnerToken));
+                    nextRoundPlayers.push(winnerToken);
                 }
                 rounds.push({ name: roundName, matches: roundMatches });
                 currentRoundPlayers = nextRoundPlayers;
@@ -1061,6 +1188,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         const parts = fullName.trim().split(/\s+/);
         if (parts.length <= 1) return fullName;
         return `${parts[0]} ${parts[parts.length - 1]}`;
+    }
+
+    function resetKnockoutResults(knockout) {
+        if (!knockout) return;
+        (knockout.repechage || []).forEach(match => {
+            match.p1 = match.p1Source || match.p1;
+            match.p2 = match.p2Source || match.p2;
+            clearMatchResultFields(match);
+        });
+        (knockout.rounds || []).forEach((round, idx) => {
+            (round.matches || []).forEach(match => {
+                if (idx > 0) {
+                    match.p1 = match.p1Source || match.p1;
+                    match.p2 = match.p2Source || match.p2;
+                }
+                clearMatchResultFields(match);
+                if (idx === 0) {
+                    const byeWinner = getByeAutoWinner(match);
+                    if (byeWinner) {
+                        match.winner = byeWinner;
+                        match.completed = true;
+                        match.walkover = true;
+                        match.status = 'walkover';
+                        match.s1 = match.p1 === byeWinner ? '1' : '0';
+                        match.s2 = match.p2 === byeWinner ? '1' : '0';
+                    }
+                }
+            });
+        });
     }
 
     function renderTournamentFromState(isPreview = false) {
@@ -1167,18 +1323,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Helper: render a single bracket match card
                 function renderBracketMatch(match, type, rIdx, mIdx) {
                     const showBtn = role === 'organizador' && !isPreview;
-                    const hasResult = match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null;
-                    
-                    let winner = null;
-                    if (hasResult) {
-                        const ms1 = parseInt(match.s1);
-                        const ms2 = parseInt(match.s2);
-                        if (ms1 > ms2) winner = match.p1;
-                        else if (ms2 > ms1) winner = match.p2;
-                        else if (match.pen1 && match.pen2) {
-                            winner = parseInt(match.pen1) > parseInt(match.pen2) ? match.p1 : match.p2;
-                        }
-                    }
+                    const hasResult = (match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null) || !!match.completed;
+                    const winner = getKnockoutMatchWinner(match);
 
                     const p1Win = winner === match.p1;
                     const p2Win = winner === match.p2;
@@ -1188,21 +1334,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // Score display
                     let score1 = match.s1 || '—';
                     let score2 = match.s2 || '—';
+                    if (match.walkover && winner) {
+                        score1 = match.p1 === winner ? 'WO' : '—';
+                        score2 = match.p2 === winner ? 'WO' : '—';
+                    }
                     
                     // Penalty indicator
                     let penaltyBadge = '';
                     if (match.pen1 && match.pen2) {
                         penaltyBadge = `<div class="penalty-badge"><i class="ph-fill ph-soccer-ball"></i> Pên: ${match.pen1} x ${match.pen2}</div>`;
                     }
+                    const statusText = match.walkover ? 'walkover' : (winner ? 'concluído' : (match.status === 'in-progress' ? 'em andamento' : 'pendente'));
 
                     return `
                         <div class="bracket-match ${hasResult ? 'has-result' : ''}">
+                            <span class="bracket-status">${statusText}</span>
                             <div class="${p1Class}">
-                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${formatName(match.p1)}</span>
+                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${formatName(displayParticipantName(match.p1))}</span>
                                 <span class="slot-score">${score1}</span>
                             </div>
                             <div class="${p2Class}">
-                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${formatName(match.p2)}</span>
+                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${formatName(displayParticipantName(match.p2))}</span>
                                 <span class="slot-score">${score2}</span>
                             </div>
                             ${penaltyBadge}
@@ -1630,64 +1782,76 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     document.getElementById('btn-shuffle-next-phase')?.addEventListener('click', () => {
-        pendingNextPhaseQualified = shuffleArray(pendingNextPhaseQualified);
-        if (nextPhaseOrderInput) nextPhaseOrderInput.value = pendingNextPhaseQualified.join('\n');
+        initializeNextPhaseMatchEditor(pendingNextPhaseQualified, 'shuffle');
         renderNextPhasePreview(pendingNextPhaseQualified);
         renderNextPhaseMatchEditor();
     });
 
-    nextPhaseOrderInput?.addEventListener('input', () => {
-        const lines = nextPhaseOrderInput.value.split('\n').map(n => n.trim()).filter(Boolean);
-        renderNextPhasePreview(lines);
+    document.getElementById('btn-clear-next-phase')?.addEventListener('click', () => {
+        initializeNextPhaseMatchEditor(pendingNextPhaseQualified, 'empty');
+        renderNextPhaseMatchEditor();
+    });
+
+    document.getElementById('btn-fill-next-phase')?.addEventListener('click', () => {
+        initializeNextPhaseMatchEditor(pendingNextPhaseQualified, 'autofill');
         renderNextPhaseMatchEditor();
     });
 
     document.getElementById('btn-confirm-next-phase')?.addEventListener('click', async () => {
-        const names = normalizeQualifiedNames();
-        const matchesFromEditor = pendingNextPhaseMatches.length ? pendingNextPhaseMatches : buildMatchesFromNames(names);
-        if (!names.length && !matchesFromEditor.length) {
+        const matchesFromEditor = pendingNextPhaseMatches.length ? pendingNextPhaseMatches : [];
+        if (!pendingNextPhaseQualified.length || !matchesFromEditor.length) {
             alert('Informe ao menos um classificado.');
             return;
         }
         if (!tournamentState.knockout?.rounds?.length) return;
-        const duplicates = getDuplicatePlayersFromMatches(matchesFromEditor);
-        if (duplicates.length) {
-            const keepGoing = confirm(`Há jogadores repetidos em jogos diferentes (${duplicates.map(formatName).join(', ')}). Deseja confirmar mesmo assim?`);
-            if (!keepGoing) return;
-        }
-        const hasSameMatchPlayer = matchesFromEditor.some(m => m.p1 && m.p2 && m.p1 !== 'BYE' && m.p1 === m.p2);
-        if (hasSameMatchPlayer) {
-            alert('Um confronto não pode ter o mesmo jogador nos dois lados.');
+        const hasEmpty = matchesFromEditor.some(m => !m.p1 || !m.p2);
+        if (hasEmpty) {
+            alert('Ainda existem confrontos vazios.');
             return;
         }
+        const duplicates = getDuplicatePlayersFromMatches(matchesFromEditor);
+        if (duplicates.length) {
+            alert('Este jogador já foi selecionado em outro jogo.');
+            return;
+        }
+        const hasSameMatchPlayer = matchesFromEditor.some(m => isRealPlayer(m.p1) && isRealPlayer(m.p2) && m.p1 === m.p2);
+        if (hasSameMatchPlayer) {
+            alert('Não é permitido o mesmo jogador contra ele mesmo.');
+            return;
+        }
+        const selectedPlayers = matchesFromEditor.flatMap(m => [m.p1, m.p2]).filter(isRealPlayer);
+        const missingPlayers = pendingNextPhaseQualified.filter(name => !selectedPlayers.includes(name));
+        if (missingPlayers.length) {
+            alert('Distribuição inválida de classificados.');
+            return;
+        }
+
         const firstRound = tournamentState.knockout.rounds[0];
         const matches = [];
         for (let i = 0; i < matchesFromEditor.length; i++) {
             const p1 = matchesFromEditor[i].p1 || 'BYE';
             const p2 = matchesFromEditor[i].p2 || 'BYE';
-            if (p2 === 'BYE') {
-                matches.push({ p1, p2: 'BYE', s1: '1', s2: '0', autoAdvance: true });
-            } else {
-                matches.push({ p1, p2, s1: '', s2: '' });
+            const winnerToken = firstRound.matches?.[i]?.winnerToken || `Vencedor ${firstRound.name} ${i + 1}`;
+            const newMatch = createMatchData(p1, p2, winnerToken);
+            const byeWinner = getByeAutoWinner(newMatch);
+            if (byeWinner) {
+                newMatch.winner = byeWinner;
+                newMatch.completed = true;
+                newMatch.walkover = true;
+                newMatch.status = 'walkover';
+                newMatch.s1 = newMatch.p1 === byeWinner ? '1' : '0';
+                newMatch.s2 = newMatch.p2 === byeWinner ? '1' : '0';
             }
+            matches.push(newMatch);
         }
         firstRound.matches = matches;
-        const nextRound = tournamentState.knockout.rounds[1];
-        if (nextRound) {
-            nextRound.matches.forEach(m => {
-                if (m.p1?.startsWith('Vencedor')) m.p1 = 'A definir';
-                if (m.p2?.startsWith('Vencedor')) m.p2 = 'A definir';
-            });
-            matches.forEach((m, idx) => {
-                if (!m.autoAdvance) return;
-                const winnerSlot = m.p1;
-                nextRound.matches.forEach(nm => {
-                    const placeholder = `Vencedor ${firstRound.name} ${idx + 1}`;
-                    if (nm.p1 === placeholder || nm.p1 === 'A definir') nm.p1 = winnerSlot;
-                    else if (nm.p2 === placeholder || nm.p2 === 'A definir') nm.p2 = winnerSlot;
-                });
-            });
-        }
+
+        matches.forEach(m => {
+            if (m.walkover && m.winner) {
+                propagateWinnerToNextRound(tournamentState.knockout, m.winnerToken, m.winner, 0);
+            }
+        });
+
         recalculateGeneralStats();
         await persistCurrentTournament();
         renderTournamentFromState();
@@ -1697,6 +1861,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-close-next-phase')?.addEventListener('click', () => {
         pendingNextPhaseMatches = [];
+        pendingNextPhaseSignature = '';
         modalNextPhase?.classList.remove('active');
     });
 
@@ -1853,8 +2018,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 g.players.forEach(p => { p.j = 0; p.v = 0; p.e = 0; p.d = 0; p.gp = 0; p.gc = 0; p.sg = 0; p.pts = 0; });
             });
             if (tournamentState.knockout) {
-                (tournamentState.knockout.repechage || []).forEach(m => { m.s1 = ''; m.s2 = ''; m.pen1 = ''; m.pen2 = ''; });
-                (tournamentState.knockout.rounds || []).forEach(r => (r.matches || []).forEach(m => { m.s1 = ''; m.s2 = ''; m.pen1 = ''; m.pen2 = ''; }));
+                resetKnockoutResults(tournamentState.knockout);
             }
             tournamentState.top3 = { first: '—', second: '—', third: '—' };
             tournamentState.status = 'ativo';
