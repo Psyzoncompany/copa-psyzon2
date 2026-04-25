@@ -1285,6 +1285,258 @@ document.addEventListener('DOMContentLoaded', async () => {
             downloadAnchorNode.remove();
         });
     }
+
+    // ========== IMPORT BACKUP (COMPLETO) ==========
+    let pendingImportData = null;
+
+    const btnPreviewImport = document.getElementById('btn-preview-import');
+    const btnConfirmImport = document.getElementById('btn-confirm-import');
+    const importPreviewArea = document.getElementById('import-preview-area');
+    const importFileInput = document.getElementById('import-file');
+
+    if (btnPreviewImport) {
+        btnPreviewImport.addEventListener('click', () => {
+            const file = importFileInput ? importFileInput.files[0] : null;
+            if (!file) { alert('Selecione um arquivo JSON de backup.'); return; }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    pendingImportData = data;
+
+                    // Build preview
+                    const groups = data.groups || [];
+                    const players = data.players || [];
+                    const totalMatches = groups.reduce((acc, g) => acc + (g.matches || []).length, 0);
+                    const totalTeams = groups.reduce((acc, g) => acc + (g.teams || []).length, 0);
+
+                    let html = `<h4 style="margin:0 0 8px; color:#16A34A;">📦 Resumo do Backup</h4>`;
+                    html += `<p><b>Torneio:</b> ${data.tournamentName || 'N/A'}</p>`;
+                    html += `<p><b>Formato:</b> ${data.tournamentFormat || 'N/A'} | <b>Ida/Volta:</b> ${data.twoLegged ? 'Sim' : 'Não'}</p>`;
+                    html += `<p><b>Grupos:</b> ${groups.length} | <b>Times:</b> ${totalTeams} | <b>Jogos:</b> ${totalMatches}</p>`;
+                    html += `<p><b>Jogadores cadastrados:</b> ${players.length}</p>`;
+                    html += `<hr style="border-color:rgba(255,255,255,0.1);margin:8px 0;">`;
+
+                    groups.forEach(g => {
+                        html += `<p style="margin:4px 0;"><b>${g.name || g.id}</b> — ${(g.teams || []).length} times, ${(g.matches || []).length} jogos</p>`;
+                    });
+
+                    if (data.groupDirectQualified) html += `<p><b>Classificados diretos:</b> ${data.groupDirectQualified.length}</p>`;
+                    if (data.groupRepechage) html += `<p><b>Repescagem:</b> ${data.groupRepechage.length} jogos</p>`;
+
+                    html += `<p style="margin-top:10px; color:#facc15;">⚠️ Clique em "IMPORTAR BACKUP" para restaurar o torneio.</p>`;
+
+                    importPreviewArea.innerHTML = html;
+                    importPreviewArea.style.display = 'block';
+                    if (btnConfirmImport) btnConfirmImport.style.display = 'block';
+                } catch (err) {
+                    alert('Erro ao ler o arquivo JSON. Verifique se é válido.');
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    if (btnConfirmImport) {
+        btnConfirmImport.addEventListener('click', async () => {
+            if (!pendingImportData) { alert('Nenhum backup pré-visualizado.'); return; }
+            if (!db) { alert('Firebase não conectado.'); return; }
+
+            const data = pendingImportData;
+            btnConfirmImport.disabled = true;
+            btnConfirmImport.innerHTML = '<i class="ph ph-circle-notch animate-spin"></i> Importando...';
+
+            try {
+                // ======= 1. CRIAR JOGADORES (participants) =======
+                const playersFromBackup = data.players || [];
+                for (const p of playersFromBackup) {
+                    const key = p.cpf || p.id;
+                    if (!key) continue;
+                    await set(ref(db, 'participants/' + key), {
+                        nome: p.name || p.playerName || '',
+                        nick: p.nick || p.teamName || '',
+                        instagram: p.instagram || '',
+                        whatsapp: p.whatsapp || '',
+                        cpf: p.cpf || '',
+                        photo: p.photo || '',
+                        flagId: p.flagId || 'br',
+                        code: p.code || '',
+                        registeredAt: p.registeredAt || new Date().toISOString(),
+                        id: p.id || key
+                    });
+                }
+                console.log(`✅ ${playersFromBackup.length} jogadores importados para Firebase.`);
+
+                // ======= 2. CONSTRUIR TOURNAMENT STATE =======
+                const groups = (data.groups || []).map((g, gIdx) => {
+                    const groupName = g.name || `Grupo ${String.fromCharCode(65 + gIdx)}`;
+                    
+                    // Build players from standings (mais confiável que teams para stats)
+                    const standings = g.standings || [];
+                    const players = standings.map(s => ({
+                        name: s.playerName || s.teamName || 'Sem nome',
+                        j: s.played || 0,
+                        v: s.wins || 0,
+                        e: s.draws || 0,
+                        d: s.losses || 0,
+                        gp: s.goalsFor || 0,
+                        gc: s.goalsAgainst || 0,
+                        sg: s.goalDiff || (s.goalsFor || 0) - (s.goalsAgainst || 0),
+                        pts: s.points || 0
+                    }));
+
+                    // Garantir que os jogadores do teams[] que não estão no standings[] sejam adicionados
+                    if (players.length === 0 && g.teams) {
+                        g.teams.forEach(t => {
+                            players.push({
+                                name: t.playerName || t.teamName || 'Sem nome',
+                                j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0
+                            });
+                        });
+                    }
+
+                    // Build matches
+                    const matches = (g.matches || []).map(m => {
+                        const homeName = m.team1 ? (m.team1.playerName || m.team1.teamName) : '?';
+                        const awayName = m.team2 ? (m.team2.playerName || m.team2.teamName) : '?';
+                        
+                        if (m.twoLegged && m.ida && m.volta) {
+                            return {
+                                home: homeName,
+                                away: awayName,
+                                idaVolta: true,
+                                gHomeIda: m.ida.score1 != null ? String(m.ida.score1) : '',
+                                gAwayIda: m.ida.score2 != null ? String(m.ida.score2) : '',
+                                gHomeVolta: m.volta.score1 != null ? String(m.volta.score1) : '',
+                                gAwayVolta: m.volta.score2 != null ? String(m.volta.score2) : '',
+                                gHome: m.team1 ? String(m.team1.score || '') : '',
+                                gAway: m.team2 ? String(m.team2.score || '') : '',
+                                status: m.status || 'pending'
+                            };
+                        }
+
+                        return {
+                            home: homeName,
+                            away: awayName,
+                            idaVolta: false,
+                            gHome: m.team1 ? String(m.team1.score || '') : '',
+                            gAway: m.team2 ? String(m.team2.score || '') : '',
+                            status: m.status || 'pending'
+                        };
+                    });
+
+                    return { name: groupName, players, matches };
+                });
+
+                // ======= 3. CONSTRUIR REGISTERED PLAYERS =======
+                const registeredPlayers = [];
+                const allTeamsFromGroups = [];
+                (data.groups || []).forEach(g => {
+                    (g.teams || []).forEach(t => {
+                        allTeamsFromGroups.push(t);
+                        const playerData = playersFromBackup.find(p => p.id === t.id) || {};
+                        registeredPlayers.push({
+                            name: t.playerName || '',
+                            nick: t.teamName || '',
+                            photo: playerData.photo || '',
+                            flagId: t.flagId || 'br',
+                            countryCode: t.flagId || 'br',
+                            id: t.id || ''
+                        });
+                    });
+                });
+
+                // ======= 4. CONSTRUIR KNOCKOUT =======
+                let knockout = null;
+                const hasKnockout = data.groupDirectQualified || data.groupRepechage;
+                
+                if (hasKnockout) {
+                    knockout = { rounds: [] };
+
+                    // Repechage round
+                    if (data.groupRepechage && data.groupRepechage.length > 0) {
+                        knockout.repechage = data.groupRepechage.map(m => ({
+                            p1: m.team1 ? (m.team1.playerName || m.team1.teamName) : 'A definir',
+                            p2: m.team2 ? (m.team2.playerName || m.team2.teamName) : 'A definir',
+                            s1: m.team1 ? (m.team1.score || '') : '',
+                            s2: m.team2 ? (m.team2.score || '') : '',
+                            status: m.status || 'pending',
+                            winner: m.winner || 0
+                        }));
+                    }
+
+                    // Direct qualified → 1st round of knockout
+                    if (data.groupDirectQualified && data.groupDirectQualified.length > 0) {
+                        const qualified = data.groupDirectQualified;
+                        const firstRoundMatches = [];
+                        for (let i = 0; i < qualified.length; i += 2) {
+                            const p1 = qualified[i] ? (qualified[i].playerName || qualified[i].teamName) : 'A definir';
+                            const p2 = qualified[i + 1] ? (qualified[i + 1].playerName || qualified[i + 1].teamName) : 'A definir';
+                            firstRoundMatches.push({ p1, p2, s1: '', s2: '' });
+                        }
+                        knockout.rounds.push({ name: 'Quartas de Final', matches: firstRoundMatches });
+                    }
+                }
+
+                // ======= 5. MONTAR TOURNAMENT STATE FINAL =======
+                const format = data.tournamentFormat === 'groups' ? 'grupos-mata-mata' : (data.tournamentFormat || 'grupos-mata-mata');
+                
+                const newState = {
+                    name: data.tournamentName || 'Torneio Importado',
+                    participants: allTeamsFromGroups.length,
+                    format: format,
+                    homeAway: data.twoLegged || false,
+                    status: 'ativo',
+                    tournamentCode: tournamentState.tournamentCode || 'IMP' + Date.now().toString(36).toUpperCase(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    registeredPlayers: registeredPlayers,
+                    groups: groups,
+                    knockout: knockout
+                };
+
+                // ======= 6. SALVAR NO FIREBASE =======
+                await set(ref(db, 'tournaments/current'), newState);
+                console.log('✅ Torneio importado e salvo no Firebase!');
+
+                // ======= 7. ATUALIZAR UI =======
+                Object.assign(tournamentState, newState);
+                renderTournamentFromState(false);
+                updateStatus('ativo');
+
+                // Atualizar campos de config
+                const nameInput = document.getElementById('tourney-name');
+                if (nameInput) nameInput.value = newState.name;
+                if (participantsInput) participantsInput.value = newState.participants;
+                if (formatSelect) formatSelect.value = newState.format;
+
+                const haInput = document.getElementById('tourney-home-away');
+                if (haInput) haInput.checked = newState.homeAway;
+
+                // Esconder preview
+                if (importPreviewArea) importPreviewArea.style.display = 'none';
+                btnConfirmImport.style.display = 'none';
+
+                alert('✅ Backup restaurado com sucesso!\n\n' +
+                    `• ${groups.length} grupos criados\n` +
+                    `• ${registeredPlayers.length} jogadores vinculados\n` +
+                    `• ${playersFromBackup.length} cadastros no Firebase\n` +
+                    `• Classificação e jogos restaurados`);
+
+                pendingImportData = null;
+
+            } catch (err) {
+                console.error('❌ Erro na importação:', err);
+                alert('Erro ao importar backup: ' + err.message);
+            } finally {
+                btnConfirmImport.disabled = false;
+                btnConfirmImport.innerHTML = '<i class="ph-bold ph-upload-simple"></i> IMPORTAR BACKUP';
+            }
+        });
+    }
+
     // ========== GROUP MATCHES MODAL LISTENERS ==========
     const chkIdaVolta = document.getElementById('chk-ida-volta');
     if (chkIdaVolta) {
