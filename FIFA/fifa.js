@@ -5,21 +5,24 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 
 const firebaseConfig = {
-    // PREENCHER COM SEUS DADOS DO FIREBASE AQUI:
-    apiKey: "SUA_API_KEY",
-    authDomain: "seu-projeto.firebaseapp.com",
-    projectId: "seu-projeto",
-    storageBucket: "seu-projeto.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyCL2u-oSlw8EWQ96atPI9Tc-0cIl2k9K6M",
+  authDomain: "copa-psyzon2.firebaseapp.com",
+  projectId: "copa-psyzon2",
+  storageBucket: "copa-psyzon2.firebasestorage.app",
+  messagingSenderId: "934292793843",
+  appId: "1:934292793843:web:2f67fc6d314e1185f6ca86",
+  measurementId: "G-G9Q14JE533"
 };
 
 let db = null;
+let analytics = null;
 try {
     if (firebaseConfig.apiKey !== "SUA_API_KEY") {
         const app = initializeApp(firebaseConfig);
+        analytics = getAnalytics(app);
         db = getFirestore(app);
         console.log("🔥 Firebase inicializado!");
     } else {
