@@ -3,41 +3,26 @@
    Logic Controller (Firebase-Ready)
    ================================================ */
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-import { initRankingSystem } from './ranking.js';
+import { doc, onSnapshot, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { db } from "../firebase-client.js";
+import {
+    createTournament,
+    generateTournamentCode,
+    getTournamentByCode,
+    normalizeTournamentCode,
+    updateTournamentData
+} from "../tournament-service.js";
+import { initRankingSystem } from "./ranking.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCL2u-oSlw8EWQ96atPI9Tc-0cIl2k9K6M",
-  authDomain: "copa-psyzon2.firebaseapp.com",
-  projectId: "copa-psyzon2",
-  storageBucket: "copa-psyzon2.firebasestorage.app",
-  messagingSenderId: "934292793843",
-  appId: "1:934292793843:web:2f67fc6d314e1185f6ca86",
-  measurementId: "G-G9Q14JE533"
-};
-
-let db = null;
-let analytics = null;
-try {
-    if (firebaseConfig.apiKey !== "SUA_API_KEY") {
-        const app = initializeApp(firebaseConfig);
-        analytics = getAnalytics(app);
-        db = getFirestore(app);
-        console.log("🔥 Firebase inicializado!");
-    } else {
-        console.warn("⚠️ Firebase: Configure sua API Key no fifa.js para ativar a nuvem.");
-    }
-} catch (e) {
-    console.error("Erro ao inicializar Firebase", e);
-}
+console.log("🔥 Firebase inicializado!");
 
 document.addEventListener('DOMContentLoaded', async () => {
 
     // ========== ROLE DETECTION ==========
     const urlParams = new URLSearchParams(window.location.search);
     const role = urlParams.get('role') || 'visitante';
+    const tournamentCodeFromUrl = normalizeTournamentCode(urlParams.get('code'));
+    let currentTournamentCode = tournamentCodeFromUrl || null;
 
     const badge = document.getElementById('user-role-badge');
     const organizerPanel = document.getElementById('organizer-panel');
@@ -75,6 +60,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         top3: { first: '—', second: '—', third: '—' },
         createdAt: null,
     };
+
+    if (currentTournamentCode) {
+        getTournamentByCode(currentTournamentCode).then((result) => {
+            if (result.exists) {
+                tournamentState = { ...tournamentState, ...result.data };
+            }
+        }).catch((error) => {
+            console.error('Erro ao carregar torneio por código:', error);
+        });
+    }
 
     // ========== DOM REFERENCES ==========
     const participantsInput = document.getElementById('tourney-participants');
@@ -123,8 +118,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (formatSelect) formatSelect.addEventListener('change', updatePreview);
 
     // ========== FIREBASE REAL-TIME SYNC ==========
-    if (db) {
-        onSnapshot(doc(db, 'tournaments', 'current'), (docSnap) => {
+    if (currentTournamentCode) {
+        onSnapshot(doc(db, 'tournaments', currentTournamentCode), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 tournamentState = data;
@@ -153,9 +148,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         });
-    } else {
-        // Fallback local
-        if (role === 'organizador') updatePreview();
+    } else if (role === 'organizador') {
+        updatePreview();
     }
 
     function buildTournamentState(participantsArray, format) {
@@ -340,7 +334,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ========== GENERATE BRACKET ==========
     const btnGerar = document.getElementById('btn-gerar-chaveamento');
     if (btnGerar) {
-        btnGerar.addEventListener('click', () => {
+        btnGerar.addEventListener('click', async () => {
             const name = document.getElementById('tourney-name').value || 'Copa Psyzon FIFA';
             const participants = parseInt(participantsInput.value) || 8;
             const format = document.getElementById('tourney-format').value;
@@ -360,13 +354,46 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             updateStatus('ativo');
 
-            // Sincronizar com Firebase
-            if (db) {
-                setDoc(doc(db, 'tournaments', 'current'), tournamentState)
-                    .then(() => console.log('Torneio salvo no Firebase!'))
-                    .catch(e => console.error("Erro ao salvar:", e));
-            } else {
-                console.log('[Local] Tournament Data:', tournamentState);
+            try {
+                if (!currentTournamentCode) {
+                    currentTournamentCode = await generateTournamentCode('fifa');
+                    const payload = await createTournament({
+                        code: currentTournamentCode,
+                        type: 'fifa',
+                        name,
+                        participants: tournamentState.registeredPlayers || [],
+                        groups: tournamentState.groups,
+                        knockout: tournamentState.knockout?.rounds || [],
+                        repechage: tournamentState.knockout?.repechage || [],
+                        ranking: [],
+                        status: 'active',
+                        maxParticipants: participants,
+                        format: format
+                    });
+                    tournamentState.id = payload.id;
+                    tournamentState.code = payload.code;
+                }
+
+                await updateTournamentData(currentTournamentCode, {
+                    ...tournamentState,
+                    id: currentTournamentCode,
+                    code: currentTournamentCode,
+                    type: 'fifa',
+                    name,
+                    status: 'active',
+                    settings: {
+                        maxParticipants: participants,
+                        format,
+                        codePrefix: 'F'
+                    },
+                    knockout: tournamentState.knockout?.rounds || [],
+                    repechage: tournamentState.knockout?.repechage || []
+                });
+
+                alert(`Torneio salvo com sucesso no Firebase. Código: ${currentTournamentCode}`);
+            } catch (e) {
+                console.error('Erro ao salvar torneio:', e);
+                alert(`Erro ao salvar torneio: ${e.message}`);
             }
         });
     }
@@ -388,9 +415,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             prizeTitle.textContent = text;
             prizeBanner.style.display = 'flex';
 
-            // Firebase Update
-            if (db) {
-                updateDoc(doc(db, 'tournaments', 'current'), { prize: text })
+            if (currentTournamentCode) {
+                updateTournamentData(currentTournamentCode, { prize: text })
                     .catch(e => console.error("Erro Prêmio:", e));
             }
         });
@@ -401,40 +427,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     const codesList = document.getElementById('codes-list');
 
     if (btnGerarCodigos) {
-        btnGerarCodigos.addEventListener('click', () => {
-            codesList.innerHTML = '';
-            // Gerar códigos aleatórios
-            tournamentState.codes = [];
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            for (let i = 0; i < 32; i++) {
-                let randomPart = '';
-                for (let j = 0; j < 5; j++) {
-                    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+        btnGerarCodigos.addEventListener('click', async () => {
+            const btnText = btnGerarCodigos.innerHTML;
+            btnGerarCodigos.disabled = true;
+            btnGerarCodigos.innerHTML = '<i class="ph ph-spinner-gap"></i> Gerando...';
+
+            try {
+                if (!currentTournamentCode) {
+                    currentTournamentCode = await generateTournamentCode('fifa');
                 }
-                const code = `F-${randomPart}`; // F para FIFA
-                tournamentState.codes.push({ code, used: false });
-            }
-            
-            // Render codes list
-            tournamentState.codes.forEach(c => {
-                const item = document.createElement('div');
-                item.className = 'code-item';
-                item.innerHTML = `
-                    <span class="code-value">${c.code}</span>
-                    <span class="${c.used ? 'code-used' : 'code-available'}">${c.used ? 'Utilizado' : 'Disponível'}</span>
-                `;
-                codesList.appendChild(item);
-            });
 
-            const availCount = tournamentState.codes.filter(c => !c.used).length;
-            const usedCount = tournamentState.codes.filter(c => c.used).length;
-            document.querySelector('.status-available').textContent = `${availCount} disponíveis`;
-            document.querySelector('.status-used').textContent = `${usedCount} utilizados`;
+                const name = document.getElementById('tourney-name').value || 'Copa Psyzon FIFA';
+                const participants = parseInt(participantsInput.value, 10) || 8;
+                const format = document.getElementById('tourney-format').value || 'grupos-mata-mata';
 
-            // Sincronizar códigos
-            if (db) {
-                setDoc(doc(db, 'codes', 'pool'), { codes: tournamentState.codes })
-                    .catch(e => console.error("Erro Códigos:", e));
+                tournamentState.id = currentTournamentCode;
+                tournamentState.code = currentTournamentCode;
+                tournamentState.type = 'fifa';
+                tournamentState.name = name;
+                tournamentState.settings = {
+                    maxParticipants: participants,
+                    format,
+                    codePrefix: 'F'
+                };
+                tournamentState.codes = [{ code: currentTournamentCode, used: false }];
+
+                await createTournament({
+                    code: currentTournamentCode,
+                    type: 'fifa',
+                    name,
+                    participants: Array.isArray(tournamentState.registeredPlayers) ? tournamentState.registeredPlayers : [],
+                    groups: tournamentState.groups || [],
+                    knockout: tournamentState.knockout?.rounds || [],
+                    repechage: tournamentState.knockout?.repechage || [],
+                    ranking: [],
+                    status: 'active',
+                    maxParticipants: participants,
+                    format
+                });
+
+                await updateTournamentData(currentTournamentCode, {
+                    ...tournamentState,
+                    participants: Array.isArray(tournamentState.registeredPlayers) ? tournamentState.registeredPlayers : [],
+                    groups: tournamentState.groups || [],
+                    knockout: tournamentState.knockout?.rounds || [],
+                    repechage: tournamentState.knockout?.repechage || []
+                });
+
+                codesList.innerHTML = '';
+                tournamentState.codes.forEach(c => {
+                    const item = document.createElement('div');
+                    item.className = 'code-item';
+                    item.innerHTML = `
+                        <span class="code-value">${c.code}</span>
+                        <span class="code-available">Ativo</span>
+                    `;
+                    codesList.appendChild(item);
+                });
+
+                document.querySelector('.status-available').textContent = '1 disponível';
+                document.querySelector('.status-used').textContent = '0 utilizados';
+
+                alert(`Torneio criado e salvo com sucesso. Código: ${currentTournamentCode}`);
+            } catch (error) {
+                console.error('Erro ao gerar código do torneio:', error);
+                alert('Falha ao gerar código do torneio. Verifique o console.');
+            } finally {
+                btnGerarCodigos.disabled = false;
+                btnGerarCodigos.innerHTML = btnText;
             }
         });
     }
@@ -457,7 +517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 updateStatus('encerrado');
                 top3Container.style.display = 'flex';
                 
-                if (db) updateDoc(doc(db, 'tournaments', 'current'), { status: 'encerrado' });
+                if (currentTournamentCode) updateTournamentData(currentTournamentCode, { status: 'encerrado' });
             }
         },
         'btn-resetar': () => {
@@ -473,7 +533,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     generateTournamentStructure(Array(tournamentState.participants).fill(null), tournamentState.format);
                 }
                 
-                if (db) deleteDoc(doc(db, 'tournaments', 'current'));
+                if (currentTournamentCode) deleteDoc(doc(db, 'tournaments', currentTournamentCode));
             }
         },
         'btn-resetar-tudo': () => {
