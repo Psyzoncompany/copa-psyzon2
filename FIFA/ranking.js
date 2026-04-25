@@ -304,11 +304,12 @@ export function initRankingSystem(db, role) {
             html += `
                 <tr>
                     <td style="font-weight:bold; color: #042D15;">${medal}</td>
-                    <td style="text-align:left; display:flex; align-items:center; gap:8px;">
-                        <img src="https://flagcdn.com/24x18/${p.flagId || 'br'}.png" alt="flag" style="border-radius:2px;">
+                    <td style="text-align:left; display:flex; align-items:center; gap:12px;">
+                        <div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; background: #eee; flex-shrink: 0; border: 2px solid rgba(22,163,74,0.1); display: flex; align-items: center; justify-content: center;">
+                            ${p.photo ? `<img src="${p.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<img src="https://flagcdn.com/w80/${p.countryCode || 'br'}.png" style="transform:scale(1.6); width:100%; height:100%; object-fit:cover;">`}
+                        </div>
                         <div style="display:flex; flex-direction:column;">
-                            <span style="font-weight:600; color:#042D15;">${p.name}</span>
-                            <span style="font-size:11px; color:#8A9E8F;">${p.nick || 'Sem Time'}</span>
+                            <span style="font-weight:600; color:#042D15;">${formatName(p.name)}</span>
                         </div>
                     </td>
                     <td style="color:#D97706; font-weight:bold;">${s.titles > 0 ? s.titles : '-'}</td>
@@ -324,6 +325,13 @@ export function initRankingSystem(db, role) {
                 </tr>
             `;
         });
+
+    function formatName(fullName) {
+        if (!fullName) return '';
+        const parts = fullName.trim().split(/\s+/);
+        if (parts.length <= 2) return fullName;
+        return `${parts[0]} ${parts[parts.length - 1]}`;
+    }
         rankingTbody.innerHTML = html;
 
         // Render Highlights
@@ -334,17 +342,17 @@ export function initRankingSystem(db, role) {
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
                 <div style="background: rgba(217,119,6,0.1); padding: 15px; border-radius: 16px; border: 1px solid rgba(217,119,6,0.15); backdrop-filter: blur(8px);">
                     <div style="font-size:12px; color:#D97706; font-weight:bold; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">MAIOR CAMPEÃO</div>
-                    <div style="color:#042D15; font-size:18px; font-weight:800;">${list[0].name}</div>
+                    <div style="color:#042D15; font-size:18px; font-weight:800;">${formatName(list[0].name)}</div>
                     <div style="color:#51715C; font-size:13px;">${list[0].currentStats.titles} Títulos / ${list[0].currentStats.pts} PTS</div>
                 </div>
                 <div style="background: rgba(13,110,253,0.08); padding: 15px; border-radius: 16px; border: 1px solid rgba(13,110,253,0.12); backdrop-filter: blur(8px);">
                     <div style="font-size:12px; color:#0D6EFD; font-weight:bold; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">MÁQUINA DE GOLS</div>
-                    <div style="color:#042D15; font-size:18px; font-weight:800;">${topScorer.name}</div>
+                    <div style="color:#042D15; font-size:18px; font-weight:800;">${formatName(topScorer.name)}</div>
                     <div style="color:#51715C; font-size:13px;">${topScorer.currentStats.gp} Gols Marcados</div>
                 </div>
                 <div style="background: rgba(22,163,74,0.08); padding: 15px; border-radius: 16px; border: 1px solid rgba(22,163,74,0.12); backdrop-filter: blur(8px);">
                     <div style="font-size:12px; color:#16A34A; font-weight:bold; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">MELHOR DEFESA</div>
-                    <div style="color:#042D15; font-size:18px; font-weight:800;">${topDefense.name}</div>
+                    <div style="color:#042D15; font-size:18px; font-weight:800;">${formatName(topDefense.name)}</div>
                     <div style="color:#51715C; font-size:13px;">Apenas ${topDefense.currentStats.gc} Gols Sofridos</div>
                 </div>
             </div>

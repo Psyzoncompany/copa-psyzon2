@@ -380,16 +380,35 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Save
-                const newParticipant = {
-                    nome,
-                    cpf: cpfRaw,
-                    flag,
-                    insta,
-                    whats,
-                    nick,
-                    createdAt: new Date().toISOString()
-                };
+                // Handle Photo Upload (Convert to Base64)
+                let photoBase64 = null;
+                const photoFile = document.getElementById('reg-foto').files[0];
+                if (photoFile) {
+                    photoBase64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsDataURL(photoFile);
+                    });
+                }
+
+            const countryCodeMap = {
+                'BRAZIL': 'br', 'ENGLAND': 'gb', 'SPAIN': 'es', 'ITALY': 'it',
+                'GERMANY': 'de', 'FRANCE': 'fr', 'PORTUGAL': 'pt'
+            };
+            const countryCode = countryCodeMap[document.getElementById('reg-pais').value] || 'br';
+
+            // Save
+            const newParticipant = {
+                nome,
+                cpf: cpfRaw,
+                flag, // Team name
+                countryCode,
+                insta,
+                whats,
+                nick,
+                photo: photoBase64,
+                createdAt: new Date().toISOString()
+            };
 
                 await set(docRef, newParticipant);
                 
@@ -410,21 +429,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function markCodeAsUsed(codeStr, participantData) {
         if (!codeStr) return;
         try {
-            // 1. Marcar código como usado
-            const docRef = ref(db, 'codes/pool');
-            const docSnap = await get(docRef);
-            if (docSnap.exists()) {
-                const data = docSnap.val();
-                const codesArray = data.codes || [];
-                const updatedCodes = codesArray.map(c => {
-                    if (c.code === codeStr) {
-                        return { ...c, used: true, usedBy: participantData.cpf };
-                    }
-                    return c;
-                });
-                await update(docRef, { codes: updatedCodes });
-            }
-
             // 2. Adicionar ao torneio e encaixar no chaveamento
             if (participantData) {
                 const tRef = ref(db, 'tournaments/current');
@@ -434,12 +438,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     let regPlayers = tData.registeredPlayers || [];
 
                     // Evitar duplicidade
-                    if (!regPlayers.find(p => p.id === participantData.cpf)) {
-                        regPlayers.push({
+                    if (regPlayers.find(p => p.id === participantData.cpf)) {
+                        alert('Você já está inscrito neste torneio!');
+                        return; // Não marca o código como usado nem faz nada
+                    }
+
+                    // 1. Marcar código como usado (moved after check)
+                    const cRef = ref(db, 'codes/pool');
+                    const cSnap = await get(cRef);
+                    if (cSnap.exists()) {
+                        const data = cSnap.val();
+                        const codesArray = data.codes || [];
+                        const updatedCodes = codesArray.map(c => {
+                            if (c.code === codeStr) {
+                                return { ...c, used: true, usedBy: participantData.cpf };
+                            }
+                            return c;
+                        });
+                        await update(cRef, { codes: updatedCodes });
+                    }
+
+                    regPlayers.push({
                             id: participantData.cpf,
                             name: participantData.nome,
                             nick: participantData.nick || "",
-                            flagId: participantData.flag || "br"
+                            flagId: participantData.flag || "br",
+                            countryCode: participantData.countryCode || "br",
+                            photo: participantData.photo || null
                         });
 
                         // 3. ENCAIXAR NO CHAVEAMENTO — Fase de Grupos
@@ -489,9 +514,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.log(`✅ ${participantData.nome} encaixado no chaveamento!`);
                     }
                 }
+            } catch(e) {
+                console.error("Failed to update code usage", e);
             }
-        } catch(e) {
-            console.error("Failed to update code usage", e);
         }
-    }
 });

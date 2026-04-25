@@ -74,10 +74,14 @@
                             <option value="liga">Liga (Pontos Corridos)</option>
                         </select>
                     </div>
-                    <label class="checkbox-field">
+                    <label class="checkbox-field" style="margin-top: 15px;">
                         <input type="checkbox" id="tourney-home-away">
                         <span>Casa e Fora (Ida/Volta)</span>
                     </label>
+
+                    <button class="btn btn-primary" id="btn-update-config" style="width: 100%; margin-top: 20px;">
+                        <i class="ph ph-check-circle"></i> Atualizar Configurações
+                    </button>
 
                     <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
                         <label style="display:flex; justify-content:space-between; align-items:center;">
@@ -126,9 +130,12 @@
                     <i class="ph-fill ph-address-book"></i>
                     <h3>Participantes</h3>
                 </div>
-                <div class="card-body">
+                <div class="card-body" style="display: flex; flex-direction: column; gap: 8px;">
                     <button class="btn btn-outline-full" id="btn-ver-clientes">
                         <i class="ph-fill ph-identification-card"></i> Ver ficha dos clientes
+                    </button>
+                    <button class="btn btn-red-outline" id="btn-apagar-cadastro" style="width: 100%; border-color: #ef4444; color: #ef4444; font-size: 12px; padding: 8px;">
+                        <i class="ph-fill ph-trash-simple"></i> Apagar Cadastro
                     </button>
                 </div>
             </div>
@@ -140,9 +147,14 @@
                     <h3>Códigos de Acesso</h3>
                 </div>
                 <div class="card-body">
-                    <button class="btn btn-accent" id="btn-gerar-codigos">
-                        <i class="ph-fill ph-plus-circle"></i> Gerar 32 códigos
-                    </button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                        <button class="btn btn-accent" id="btn-gerar-codigos" style="font-size: 11px; padding: 8px 4px;">
+                            <i class="ph-fill ph-plus-circle"></i> Gerar 32 códigos
+                        </button>
+                        <button class="btn btn-orange-outline" id="btn-resetar-codigos" style="font-size: 11px; padding: 8px 4px; border: 1px solid #f97316; color: #f97316; background: transparent; border-radius: 8px; cursor: pointer;">
+                            <i class="ph-fill ph-arrows-counter-clockwise"></i> Resetar Códigos
+                        </button>
+                    </div>
                     <div class="codes-status">
                         <span class="status-available">32 disponíveis</span>
                         <span class="status-used">0 utilizados</span>
@@ -303,6 +315,39 @@
     <button class="fab" id="fab-share" title="Compartilhar">
         <i class="ph-fill ph-share-network"></i>
     </button>
+
+    <!-- MODAL JOGOS DO GRUPO -->
+    <div id="modal-jogos-grupo" class="modal">
+        <div class="modal-content glass-modal wide-modal">
+            <div class="modal-header">
+                <div class="header-info">
+                    <h2 id="modal-group-title">Jogos do Grupo</h2>
+                    <p>Gerencie os placares e confrontos</p>
+                </div>
+                <button class="btn-close-modal" id="btn-close-group-matches"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-controls">
+                    <label class="modern-checkbox">
+                        <input type="checkbox" id="chk-ida-volta">
+                        <span>Jogos de ida e volta (Casa e Fora)</span>
+                    </label>
+                    <div id="group-matches-stats" class="header-info" style="text-align: right;">
+                        <p>Total de jogos: <strong id="total-matches-count">0</strong></p>
+                    </div>
+                </div>
+                <div id="group-matches-list" class="matches-grid">
+                    <!-- Jogos injetados aqui -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-full" id="btn-cancelar-jogos">Cancelar</button>
+                <button class="btn btn-primary" id="btn-salvar-jogos-grupo">
+                    <i class="ph-fill ph-floppy-disk"></i> Salvar todos os placares
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="fifa.js"></script>
 </body>

@@ -1071,3 +1071,397 @@ body {
         min-width: 90px;
     }
 }
+
+/* ========================
+   MODERN GROUP CARDS (Image Reference)
+   ======================== */
+/* ========================
+   MODERN GROUP CARDS (Image Reference) - OPTIMIZED
+   ======================== */
+.group-card-modern {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+    color: #042D15;
+}
+
+.group-header {
+    padding: 0.8rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.3);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.group-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.group-card-modern .group-title {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #042D15;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.group-status-tag {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16A34A;
+    font-size: 0.6rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+
+.games-count {
+    background: rgba(0, 0, 0, 0.03);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #51715C;
+    white-space: nowrap;
+}
+
+.modern-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.modern-table thead th {
+    padding: 0.6rem 0.4rem;
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: #8A9E8F;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.modern-table tbody tr {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+    transition: background 0.2s;
+}
+
+.modern-table tbody tr:hover {
+    background: rgba(34, 197, 94, 0.02);
+}
+
+.modern-table tbody td {
+    padding: 0.5rem 0.4rem;
+    font-size: 0.8rem;
+    text-align: center;
+    color: #042D15;
+}
+
+.rank-col {
+    font-weight: 800;
+    color: #8A9E8F;
+    width: 45px;
+}
+
+.border-green { border-left: 3px solid #22C55E; }
+.border-gold { border-left: 3px solid #FACC15; }
+.border-orange { border-left: 3px solid #F97316; }
+
+.player-col {
+    text-align: left !important;
+    min-width: 150px;
+}
+
+.player-info-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    color: #042D15;
+}
+
+.player-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.05);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.player-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.player-avatar .flag-avatar {
+    transform: scale(1.6);
+}
+
+.player-status-badge {
+    font-size: 0.6rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
+.status-classified { background: rgba(34, 197, 94, 0.15); color: #16A34A; }
+.status-playoff { background: rgba(250, 204, 21, 0.15); color: #FACC15; }
+.status-possible { background: rgba(249, 115, 22, 0.15); color: #F97316; }
+
+.stat-col {
+    font-weight: 600;
+    color: #51715C;
+    width: 25px;
+}
+
+.sg-col {
+    color: #8A9E8F;
+    width: 35px;
+}
+
+.pts-col {
+    font-weight: 800;
+    color: #16A34A;
+    font-size: 0.95rem;
+    width: 40px;
+}
+
+.group-footer {
+    padding: 0.6rem 1rem;
+    background: rgba(255, 255, 255, 0.4);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.btn-group-games {
+    background: none;
+    border: none;
+    color: #51715C;
+    font-weight: 700;
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    transition: all 0.2s;
+}
+
+.btn-group-games:hover {
+    color: #042D15;
+    transform: translateX(3px);
+}
+
+/* ========================
+   MODALS (Premium Glass)
+   ======================== */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 20, 10, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none; /* JS toggles flex */
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    z-index: 1000;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.glass-modal {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 1);
+    border-radius: 28px;
+    width: 100%;
+    max-width: 550px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    max-height: 90dvh;
+    animation: modal-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wide-modal {
+    max-width: 850px;
+}
+
+@keyframes modal-in {
+    from { transform: translateY(30px) scale(0.95); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.modal-header {
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.header-info h2 {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #042D15;
+}
+
+.header-info p {
+    font-size: 0.85rem;
+    color: #51715C;
+}
+
+.modal-body {
+    padding: 2rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.modal-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.03);
+    padding: 1rem 1.5rem;
+    border-radius: 16px;
+}
+
+.modal-footer {
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Matches Grid */
+.matches-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1rem;
+}
+
+.match-card {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 16px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    transition: all 0.2s;
+}
+
+.match-card:hover {
+    border-color: #22C55E;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+}
+
+.match-team {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #042D15;
+}
+
+.match-team.home { justify-content: flex-end; text-align: right; }
+.match-team.away { justify-content: flex-start; text-align: left; }
+
+.match-vs {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #8A9E8F;
+    text-transform: uppercase;
+}
+
+.match-score-input {
+    width: 45px;
+    height: 45px;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #042D15;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.match-score-input:focus {
+    border-color: #22C55E;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
+}
+
+.btn-close-modal {
+    background: rgba(0, 0, 0, 0.05);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-close-modal:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+/* Modern Checkbox */
+.modern-checkbox {
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    cursor: pointer;
+}
+
+.modern-checkbox input {
+    width: 20px;
+    height: 20px;
+    accent-color: #22C55E;
+}
+
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

@@ -84,6 +84,128 @@ document.addEventListener('DOMContentLoaded', async () => {
         createdAt: null,
     };
 
+    let selectedGroupIndex = null;
+
+    // ROUND ROBIN MATCH GENERATION
+    function generateRoundRobin(playersNames, idaVolta = false) {
+        const matches = [];
+        const n = playersNames.length;
+        if (n < 2) return [];
+
+        for (let i = 0; i < n; i++) {
+            for (let j = i + 1; j < n; j++) {
+                matches.push({
+                    id: `m_${Date.now()}_${i}_${j}`,
+                    home: playersNames[i],
+                    away: playersNames[j],
+                    gHome: "",
+                    gAway: ""
+                });
+            }
+        }
+
+        if (idaVolta) {
+            const returnMatches = matches.map(m => ({
+                id: m.id + '_r',
+                home: m.away,
+                away: m.home,
+                gHome: "",
+                gAway: ""
+            }));
+            return [...matches, ...returnMatches];
+        }
+        return matches;
+    }
+
+    function openGroupMatches(index) {
+        selectedGroupIndex = index;
+        const group = tournamentState.groups[index];
+        document.getElementById('modal-group-title').textContent = `Jogos: ${group.name}`;
+        
+        // Initialize matches if not exist
+        if (!group.matches || group.matches.length === 0) {
+            const names = group.players.map(p => p.name);
+            group.matches = generateRoundRobin(names, false);
+            document.getElementById('chk-ida-volta').checked = false;
+        } else {
+            // Detect if idaVolta is active based on match count
+            const n = group.players.length;
+            const expectedSingle = (n * (n - 1)) / 2;
+            document.getElementById('chk-ida-volta').checked = group.matches.length > expectedSingle;
+        }
+
+        renderGroupMatchesList();
+        document.getElementById('modal-jogos-grupo').classList.add('active');
+    }
+
+    function renderGroupMatchesList() {
+        const group = tournamentState.groups[selectedGroupIndex];
+        const container = document.getElementById('group-matches-list');
+        const countEl = document.getElementById('total-matches-count');
+        
+        if (!group.matches || group.matches.length === 0) {
+            container.innerHTML = '<div class="empty-state">Nenhum jogo disponível</div>';
+            countEl.textContent = "0";
+            return;
+        }
+
+        countEl.textContent = group.matches.length;
+        container.innerHTML = group.matches.map((m, i) => `
+            <div class="match-card">
+                <div class="match-team home">
+                    <span>${formatName(m.home)}</span>
+                </div>
+                <input type="number" min="0" class="match-score-input" value="${m.gHome}" data-idx="${i}" data-side="home" placeholder="0">
+                <span class="match-vs">VS</span>
+                <input type="number" min="0" class="match-score-input" value="${m.gAway}" data-idx="${i}" data-side="away" placeholder="0">
+                <div class="match-team away">
+                    <span>${formatName(m.away)}</span>
+                </div>
+            </div>
+        `).join('');
+
+        // Add listeners to inputs to update the local state
+        container.querySelectorAll('.match-score-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const idx = e.target.dataset.idx;
+                const side = e.target.dataset.side;
+                const val = e.target.value;
+                if (side === 'home') group.matches[idx].gHome = val;
+                else group.matches[idx].gAway = val;
+            });
+        });
+    }
+
+    function updateGroupStats(groupIndex) {
+        const group = tournamentState.groups[groupIndex];
+        // Reset stats
+        group.players.forEach(p => {
+            p.j = 0; p.v = 0; p.e = 0; p.d = 0; p.gp = 0; p.gc = 0; p.sg = 0; p.pts = 0;
+        });
+
+        // Recalculate
+        (group.matches || []).forEach(m => {
+            if (m.gHome !== "" && m.gAway !== "") {
+                const gh = parseInt(m.gHome);
+                const ga = parseInt(m.gAway);
+                const pHome = group.players.find(p => p.name === m.home);
+                const pAway = group.players.find(p => p.name === m.away);
+
+                if (pHome && pAway) {
+                    pHome.j++; pAway.j++;
+                    pHome.gp += gh; pHome.gc += ga;
+                    pAway.gp += ga; pAway.gc += gh;
+
+                    if (gh > ga) { pHome.v++; pAway.d++; pHome.pts += 3; }
+                    else if (gh < ga) { pAway.v++; pHome.d++; pAway.pts += 3; }
+                    else { pHome.e++; pAway.e++; pHome.pts += 1; pAway.pts += 1; }
+                }
+            }
+        });
+        
+        group.players.forEach(p => p.sg = p.gp - p.gc);
+    }
+
     // ========== RENDER CODES (reusable) ==========
     function renderCodes(codesArray) {
         const codesList = document.getElementById('codes-list');
@@ -92,17 +214,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!codesArray || codesArray.length === 0) return;
 
-        codesArray.forEach(c => {
+        codesArray.forEach((c, idx) => {
             const item = document.createElement('div');
             item.className = 'code-item';
             item.innerHTML = `
                 <span class="code-value">${c.code}</span>
                 <div style="display:flex; align-items:center; gap:6px;">
                     <span class="${c.used ? 'code-used' : 'code-available'}">${c.used ? 'Utilizado' : 'Disponível'}</span>
-                    ${!c.used ? `<button class="code-copy-btn" data-code="${c.code}" title="Copiar código" style="background:none; border:1px solid rgba(22,163,74,0.2); border-radius:6px; padding:3px 6px; cursor:pointer; color:#16A34A; font-size:0.8rem; display:flex; align-items:center; transition:all 0.2s;"><i class="ph ph-copy"></i></button>` : ''}
+                    ${!c.used ? `<button class="code-copy-btn" data-code="${c.code}" title="Copiar" style="background:none; border:1px solid rgba(22,163,74,0.2); border-radius:6px; padding:3px 6px; cursor:pointer; color:#16A34A; font-size:0.8rem; display:flex; align-items:center; transition:all 0.2s;"><i class="ph ph-copy"></i></button>` : `<button class="code-reset-btn" data-idx="${idx}" title="Resetar código" style="background:none; border:1px solid rgba(239,68,68,0.2); border-radius:6px; padding:3px 6px; cursor:pointer; color:#ef4444; font-size:0.8rem; display:flex; align-items:center; transition:all 0.2s;"><i class="ph ph-trash"></i></button>`}
                 </div>
             `;
-            // Copiar ao clicar
+            
+            // Copiar
             const copyBtn = item.querySelector('.code-copy-btn');
             if (copyBtn) {
                 copyBtn.addEventListener('click', () => {
@@ -118,6 +241,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 });
             }
+
+            // Reset Individual
+            const resetBtn = item.querySelector('.code-reset-btn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', async () => {
+                    const cpfToRemove = c.usedBy;
+                    if (confirm(`Deseja liberar o código ${c.code} e APAGAR o cadastro do jogador associado?`)) {
+                        if (!db) return;
+                        try {
+                            // 1. Reset code in pool
+                            const newCodes = [...codesArray];
+                            newCodes[idx] = { ...newCodes[idx], used: false, usedBy: null };
+                            await set(ref(db, 'codes/pool'), { codes: newCodes });
+
+                            if (cpfToRemove) {
+                                // 2. Remove from participants
+                                await remove(ref(db, 'participants/' + cpfToRemove));
+
+                                // 3. Remove from current tournament registeredPlayers
+                                if (tournamentState && tournamentState.registeredPlayers) {
+                                    const filtered = tournamentState.registeredPlayers.filter(p => p.id !== cpfToRemove);
+                                    if (filtered.length !== tournamentState.registeredPlayers.length) {
+                                        await update(ref(db, 'tournaments/current'), { registeredPlayers: filtered });
+                                    }
+                                }
+                            }
+                            alert('Código liberado e cadastro removido!');
+                        } catch (e) {
+                            console.error('Erro ao resetar código e apagar cadastro:', e);
+                            alert('Erro ao processar remoção completa.');
+                        }
+                    }
+                });
+            }
+
             codesList.appendChild(item);
         });
 
@@ -143,11 +301,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     function updatePreview() {
         if (tournamentState.status !== 'aguardando') return;
-        const n = parseInt(participantsInput.value) || 0;
+        let n = parseInt(participantsInput.value) || 0;
+        
+        // Force valid numbers
+        if (n > 2) {
+            if (n <= 8) n = 8;
+            else if (n <= 16) n = 16;
+            else if (n <= 32) n = 32;
+            else n = 64;
+            participantsInput.value = n;
+        }
+
         const format = formatSelect ? formatSelect.value : 'grupos-mata-mata';
         
-        if (n >= 2) {
-            phasesInfo.textContent = `${Math.ceil(Math.log2(n))} fases`;
+        if (n >= 8) {
+            const phaseMap = { 8: 3, 16: 4, 32: 5, 64: 6 };
+            phasesInfo.textContent = `${phaseMap[n] || Math.ceil(Math.log2(n))} fases`;
             
             // Verifica os participantes reais que já entraram
             let realParticipants = tournamentState.registeredPlayers || [];
@@ -175,47 +344,119 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (participantsInput) participantsInput.addEventListener('input', updatePreview);
     if (formatSelect) formatSelect.addEventListener('change', updatePreview);
 
-    // ========== FIREBASE REAL-TIME SYNC ==========
-    if (db) {
-        // --- Listener do Torneio ---
-        onValue(ref(db, 'tournaments/current'), (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.val();
-                tournamentState = data;
+    // ========== CONFIG UPDATE BUTTON ==========
+    const btnUpdateConfig = document.getElementById('btn-update-config');
+    if (btnUpdateConfig) {
+        btnUpdateConfig.addEventListener('click', async () => {
+            const newName = document.getElementById('tourney-name').value.trim();
+            let newParticipants = parseInt(participantsInput.value);
+            const newFormat = formatSelect.value;
+            const newHomeAway = document.getElementById('tourney-home-away').checked;
+
+            if (!newName) { alert('Informe o nome do torneio.'); return; }
+            if (![8, 16, 32, 64].includes(newParticipants)) {
+                alert('Número de participantes deve ser 8, 16, 32 ou 64.');
+                return;
+            }
+
+            const btn = btnUpdateConfig;
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-circle-notch animate-spin"></i> Atualizando...';
+
+            try {
+                // Update local state
+                tournamentState.name = newName;
+                tournamentState.participants = newParticipants;
+                tournamentState.format = newFormat;
+                tournamentState.homeAway = newHomeAway;
+                tournamentState.updatedAt = new Date().toISOString();
+
+                // Re-build state preserving real players
+                const realPlayers = tournamentState.registeredPlayers || [];
+                const finalPlayers = [];
+                for (let i = 0; i < newParticipants; i++) {
+                    if (realPlayers[i]) finalPlayers.push({ name: realPlayers[i].name });
+                    else finalPlayers.push({ name: `A definir (Slot ${i+1})` });
+                }
+
+                buildTournamentState(finalPlayers, newFormat);
                 
-                // Se o torneio estiver rodando OU se for visão de visitante, renderiza
-                if (data.status !== 'aguardando' || role !== 'organizador') {
-                    renderTournamentFromState(false);
-                    updateStatus(data.status);
-                    
-                    if(data.prize) {
-                        prizeTitle.textContent = data.prize;
-                        prizeBanner.style.display = 'flex';
-                    } else {
-                        prizeBanner.style.display = 'none';
+                if (db) {
+                    await set(ref(db, 'tournaments/current'), tournamentState);
+                    if (tournamentState.tournamentCode) {
+                        await set(ref(db, 'tournaments/' + tournamentState.tournamentCode), tournamentState);
                     }
+                }
+
+                renderTournamentFromState();
+                alert('Configurações atualizadas com sucesso!');
+            } catch (e) {
+                console.error('Erro ao atualizar config:', e);
+                alert('Erro ao salvar no Firebase.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        });
+    }
+
+    // ========== REAL-TIME SYNC (Firebase) ==========
+    if (db) {
+        // --- Sync Tournament ---
+        onValue(ref(db, 'tournaments/current'), (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const isNew = !tournamentState.tournamentCode;
+                tournamentState = { ...tournamentState, ...data };
+                
+                // If it's the first load, populate inputs
+                if (isNew || document.activeElement.tagName !== 'INPUT') {
+                    if (document.getElementById('tourney-name')) document.getElementById('tourney-name').value = tournamentState.name || '';
+                    if (participantsInput) participantsInput.value = tournamentState.participants || 8;
+                    if (formatSelect) formatSelect.value = tournamentState.format || 'grupos-mata-mata';
+                    if (document.getElementById('tourney-home-away')) document.getElementById('tourney-home-away').checked = !!tournamentState.homeAway;
+                    
+                    const n = tournamentState.participants || 8;
+                    const phaseMap = { 8: 3, 16: 4, 32: 5, 64: 6 };
+                    if (phasesInfo) phasesInfo.textContent = `${phaseMap[n] || 3} fases`;
+                }
+
+                // If not in preview or if visitor, render real data
+                if (tournamentState.status !== 'aguardando' || role !== 'organizador') {
+                    renderTournamentFromState(false);
+                    updateStatus(tournamentState.status);
+                    
+                    // Hide/Show Group Tab based on format
+                    const tabBtnGrupos = document.querySelector('.tab[data-tab="grupos"]');
+                    if (tabBtnGrupos) {
+                        const isKnockoutOnly = tournamentState.format === 'eliminatoria';
+                        tabBtnGrupos.style.display = isKnockoutOnly ? 'none' : 'flex';
+                        
+                        // If it's knockout only and we were in groups, switch to mata-mata
+                        if (isKnockoutOnly && tabBtnGrupos.classList.contains('active')) {
+                            document.querySelector('.tab[data-tab="mata-mata"]')?.click();
+                        }
+                    }
+
+                    if (prizeTitle) prizeTitle.textContent = tournamentState.prize || 'A definir';
+                    if (prizeBanner) prizeBanner.style.display = tournamentState.prize ? 'flex' : 'none';
                 } else if (role === 'organizador') {
                     updatePreview();
                 }
-            } else {
-                if (role !== 'organizador') {
-                    groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Aguarde o organizador iniciar a partida.</p></div>`;
-                    updateStatus('aguardando');
-                    prizeBanner.style.display = 'none';
-                } else {
-                    updatePreview();
-                }
+            } else if (role !== 'organizador') {
+                groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Aguarde o organizador iniciar a partida.</p></div>`;
+                updateStatus('aguardando');
+                if (prizeBanner) prizeBanner.style.display = 'none';
             }
         });
 
-        // --- Listener dos Códigos (persiste ao recarregar) ---
-        onValue(ref(db, 'codes/pool'), (snap) => {
-            if (snap.exists()) {
-                const data = snap.val();
-                const codesArray = data.codes || [];
-                tournamentState.codes = codesArray;
-                renderCodes(codesArray);
-                console.log(`🔑 ${codesArray.length} códigos carregados do Firebase`);
+        // --- Sync Codes ---
+        onValue(ref(db, 'codes/pool'), (snapshot) => {
+            const data = snapshot.val();
+            if (data && data.codes) {
+                tournamentState.codes = data.codes;
+                renderCodes(data.codes);
             }
         });
     } else {
@@ -228,7 +469,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let G = N <= 5 ? 1 : Math.ceil(N / 4);
         
         const showGroups = format === 'grupos' || format === 'grupos-mata-mata';
-        const showMataMata = format === 'mata-mata' || format === 'grupos-mata-mata';
+        const showMataMata = format === 'mata-mata' || format === 'grupos-mata-mata' || format === 'eliminatoria';
 
         tournamentState.groups = [];
         tournamentState.knockout = null;
@@ -274,10 +515,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             let knockoutPlayers = [];
-            for (let i=0; i<G; i++) knockoutPlayers.push(showGroups ? `1º Grupo ${String.fromCharCode(65 + i)}` : `Classificado ${i+1}`);
-            if (showGroups) knockoutPlayers = knockoutPlayers.concat(repechagePlayers);
-            else {
-                while(knockoutPlayers.length < K) knockoutPlayers.push(`A definir`);
+            if (showGroups) {
+                for (let i=0; i<G; i++) knockoutPlayers.push(`1º Grupo ${String.fromCharCode(65 + i)}`);
+                knockoutPlayers = knockoutPlayers.concat(repechagePlayers);
+            } else {
+                // Mata-mata apenas: Usar jogadores reais da lista
+                for (let i = 0; i < K; i++) {
+                    const pName = participantsArray[i] ? participantsArray[i].name : `A definir (Slot ${i+1})`;
+                    knockoutPlayers.push(pName);
+                }
             }
 
             let rounds = [];
@@ -303,39 +549,101 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function formatName(fullName) {
+        if (!fullName) return '';
+        const parts = fullName.trim().split(/\s+/);
+        if (parts.length <= 1) return fullName;
+        return `${parts[0]} ${parts[parts.length - 1]}`;
+    }
+
     function renderTournamentFromState(isPreview = false) {
         // Groups
         groupsContainer.innerHTML = '';
         if (tournamentState.groups && tournamentState.groups.length > 0) {
-            tournamentState.groups.forEach(group => {
+            tournamentState.groups.forEach((group, index) => {
                 let rows = '';
-                group.players.forEach((player, i) => {
-                    const statusClass = i < 2 ? 'classified' : (i === 2 ? 'playoff' : 'possible-3rd');
+                
+                // Sort players by pts, then sg, then gp
+                const sortedPlayers = [...group.players].sort((a, b) => {
+                    if (b.pts !== a.pts) return b.pts - a.pts;
+                    if (b.sg !== a.sg) return b.sg - a.sg;
+                    return b.gp - a.gp;
+                });
+
+                // Calculate if group is finished
+                const totalJ = Math.floor(group.players.reduce((acc, p) => acc + p.j, 0) / 2);
+                const numPlayers = group.players.length;
+                const totalPlanned = (numPlayers * (numPlayers - 1)) / 2;
+                const isGroupFinished = totalJ >= totalPlanned || tournamentState.status === 'encerrado';
+
+                sortedPlayers.forEach((player, i) => {
+                    // Get extra data from registeredPlayers
+                    const regP = (tournamentState.registeredPlayers || []).find(p => p.name === player.name);
+                    const photo = regP ? regP.photo : null;
+                    const countryCode = regP ? regP.countryCode : 'br';
+                    
+                    const statusLabel = i === 0 ? 'CLASSIFICADO' : (i === 1 ? 'REPESCAGEM' : (i === 2 ? 'POSSÍVEL 3º' : ''));
+                    const statusClass = i === 0 ? 'status-classified' : (i === 1 ? 'status-playoff' : (i === 2 ? 'status-possible' : ''));
+                    const leftBorderClass = isGroupFinished ? (i === 0 ? 'border-green' : (i === 1 ? 'border-gold' : (i === 2 ? 'border-orange' : ''))) : '';
+
                     const isMe = participantName && player.name === participantName;
-                    const nameStyle = isMe ? 'color: #16A34A; font-weight: 800;' : '';
+                    const nameStyle = isMe ? 'color: #16A34A; font-weight: 800;' : 'color: #042D15; font-weight: 600;';
+                    
                     rows += `
-                        <tr class="${statusClass}">
-                            <td style="${nameStyle}">${isMe ? '✅ ' : ''}${player.name}</td>
-                            <td>${player.j}</td><td>${player.v}</td><td>${player.e}</td><td>${player.d}</td>
-                            <td>${player.gp}</td><td>${player.gc}</td><td>${player.sg}</td><td>${player.pts}</td>
+                        <tr class="${leftBorderClass}">
+                            <td class="rank-col">${i + 1}º</td>
+                            <td class="player-col">
+                                <div class="player-info-cell">
+                                    <div class="player-avatar">
+                                        ${photo ? `<img src="${photo}" alt="">` : `<img src="https://flagcdn.com/w80/${countryCode || 'br'}.png" alt="" class="flag-avatar">`}
+                                    </div>
+                                    <span style="${nameStyle}">${formatName(player.name)}</span>
+                                    ${(isGroupFinished && statusLabel) ? `<span class="player-status-badge ${statusClass}">${statusLabel}</span>` : ''}
+                                </div>
+                            </td>
+                            <td class="stat-col">${player.j}</td>
+                            <td class="stat-col">${player.v}</td>
+                            <td class="stat-col">${player.e}</td>
+                            <td class="stat-col">${player.d}</td>
+                            <td class="stat-col">${player.gp}</td>
+                            <td class="stat-col">${player.gc}</td>
+                            <td class="stat-col sg-col">${player.sg > 0 ? '+' + player.sg : player.sg}</td>
+                            <td class="pts-col">${player.pts}</td>
                         </tr>`;
                 });
 
                 const card = document.createElement('div');
-                card.className = 'group-card' + (isPreview ? ' preview-mode' : '');
+                card.className = 'group-card-modern' + (isPreview ? ' preview-mode' : '');
                 card.innerHTML = `
-                    ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}
-                    <div class="group-title">${group.name}</div>
-                    <table class="group-table">
-                        <thead>
-                            <tr>
-                                <th>Jogador</th>
-                                <th>J</th><th>V</th><th>E</th><th>D</th>
-                                <th>GP</th><th>GC</th><th>SG</th><th>PTS</th>
-                            </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                    </table>`;
+                    <div class="group-header">
+                        <div class="group-header-left">
+                            <h3 class="group-title">${group.name}</h3>
+                            <span class="group-status-tag" style="${isGroupFinished ? 'background: rgba(34, 197, 94, 0.15); color: #22C55E;' : 'background: rgba(59, 130, 246, 0.15); color: #3B82F6;'}">
+                                <i class="${isGroupFinished ? 'ph-fill ph-check-circle' : 'ph-fill ph-clock'}"></i> 
+                                ${isGroupFinished ? 'Finalizado' : 'Em andamento'}
+                            </span>
+                        </div>
+                        <div class="group-header-right">
+                            <span class="games-count">${totalJ}/${totalPlanned} jogos</span>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="modern-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th style="text-align:left;">JOGADOR</th>
+                                    <th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th>PTS</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                    <div class="group-footer">
+                        <button class="btn-group-games" data-index="${index}">Ver jogos do grupo <i class="ph ph-caret-right"></i></button>
+                    </div>`;
+                
+                card.querySelector('.btn-group-games').addEventListener('click', () => openGroupMatches(index));
                 groupsContainer.appendChild(card);
             });
         } else {
@@ -591,9 +899,75 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             console.log('[Action] Bracket shuffled');
         },
-        'btn-atualizar': () => {
-            console.log('[Action] Bracket refreshed');
-            // Firebase: onSnapshot — will auto-update when connected
+        'btn-atualizar': async () => {
+            if (!tournamentState.groups || tournamentState.groups.length === 0) {
+                alert('Nenhum grupo ativo para atualizar.');
+                return;
+            }
+
+            console.log('[Action] Resolving Knockout names from Groups...');
+            
+            // 1. Get Top Players from each group
+            const groupLeaders = {}; // { 'Grupo A': [p1, p2, p3], ... }
+            
+            tournamentState.groups.forEach(g => {
+                const sorted = [...g.players].sort((a, b) => {
+                    if (b.pts !== a.pts) return b.pts - a.pts;
+                    if (b.sg !== a.sg) return b.sg - a.sg;
+                    return b.gp - a.gp;
+                });
+                groupLeaders[g.name] = sorted;
+            });
+
+            // 2. Helper to replace placeholders
+            const resolveName = (str) => {
+                if (!str) return 'A definir';
+                // Pattern: "1º Grupo A" or "2º Grupo B"
+                const match = str.match(/(\d)º (Grupo [A-Z])/);
+                if (match) {
+                    const pos = parseInt(match[1]) - 1;
+                    const gName = match[2];
+                    if (groupLeaders[gName] && groupLeaders[gName][pos]) {
+                        return groupLeaders[gName][pos].name;
+                    }
+                }
+                return str;
+            };
+
+            // 3. Update Knockout Rounds
+            if (tournamentState.knockout) {
+                // Repechage
+                if (tournamentState.knockout.repechage) {
+                    tournamentState.knockout.repechage.forEach(m => {
+                        m.p1 = resolveName(m.p1);
+                        m.p2 = resolveName(m.p2);
+                    });
+                }
+                // Regular Rounds
+                if (tournamentState.knockout.rounds) {
+                    tournamentState.knockout.rounds.forEach(round => {
+                        round.matches.forEach(m => {
+                            m.p1 = resolveName(m.p1);
+                            m.p2 = resolveName(m.p2);
+                        });
+                    });
+                }
+            }
+
+            // 4. Save to Firebase
+            if (db) {
+                try {
+                    await update(ref(db, 'tournaments/current'), { 
+                        knockout: tournamentState.knockout,
+                        updatedAt: new Date().toISOString()
+                    });
+                    renderTournamentFromState();
+                    alert('Chaveamento atualizado com os classificados dos grupos!');
+                } catch (e) {
+                    console.error('Erro ao atualizar chaveamento:', e);
+                    alert('Erro ao salvar no Firebase.');
+                }
+            }
         },
         'btn-encerrar': () => {
             if (confirm('Deseja encerrar e salvar o torneio?')) {
@@ -639,6 +1013,75 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 } else {
                     location.reload();
+                }
+            }
+        },
+        'btn-resetar-codigos': async () => {
+            if (confirm('Deseja resetar todos os códigos? Todos voltarão a ficar disponíveis.')) {
+                if (!db) return;
+                try {
+                    const docRef = ref(db, 'codes/pool');
+                    const snap = await get(docRef);
+                    if (snap.exists()) {
+                        const data = snap.val();
+                        const resetCodes = (data.codes || []).map(c => ({ ...c, used: false, usedBy: null }));
+                        await update(docRef, { codes: resetCodes });
+                        alert('Códigos resetados com sucesso!');
+                    }
+                } catch (e) {
+                    console.error('Erro ao resetar códigos:', e);
+                    alert('Erro ao resetar códigos no Firebase.');
+                }
+            }
+        },
+        'btn-apagar-cadastro': async () => {
+            const cpf = prompt('Informe o CPF do participante que deseja apagar (somente números):');
+            if (!cpf) return;
+
+            const cpfRaw = cpf.replace(/\D/g, '');
+            if (cpfRaw.length !== 11) {
+                alert('CPF inválido. Deve conter 11 dígitos.');
+                return;
+            }
+
+            if (confirm(`Tem certeza que deseja apagar o cadastro do CPF ${cpfRaw}?`)) {
+                if (!db) return;
+                try {
+                    // 1. Remover da lista de participantes geral
+                    await remove(ref(db, 'participants/' + cpfRaw));
+
+                    // 2. Remover do torneio atual (se estiver lá)
+                    const tRef = ref(db, 'tournaments/current');
+                    const tSnap = await get(tRef);
+                    if (tSnap.exists()) {
+                        const tData = tSnap.val();
+                        const regPlayers = tData.registeredPlayers || [];
+                        const filteredPlayers = regPlayers.filter(p => p.id !== cpfRaw);
+                        
+                        if (regPlayers.length !== filteredPlayers.length) {
+                            await update(tRef, { registeredPlayers: filteredPlayers });
+                        }
+                    }
+
+                    // 3. Marcar código como disponível novamente (se houver um código associado)
+                    const cRef = ref(db, 'codes/pool');
+                    const cSnap = await get(cRef);
+                    if (cSnap.exists()) {
+                        const cData = cSnap.val();
+                        const codesArray = cData.codes || [];
+                        const updatedCodes = codesArray.map(c => {
+                            if (c.usedBy === cpfRaw) {
+                                return { ...c, used: false, usedBy: null };
+                            }
+                            return c;
+                        });
+                        await update(cRef, { codes: updatedCodes });
+                    }
+
+                    alert('Cadastro removido com sucesso!');
+                } catch (e) {
+                    console.error('Erro ao apagar cadastro:', e);
+                    alert('Erro ao apagar cadastro no Firebase.');
                 }
             }
         },
@@ -718,4 +1161,62 @@ document.addEventListener('DOMContentLoaded', async () => {
             downloadAnchorNode.remove();
         });
     }
+    // ========== GROUP MATCHES MODAL LISTENERS ==========
+    const chkIdaVolta = document.getElementById('chk-ida-volta');
+    if (chkIdaVolta) {
+        chkIdaVolta.addEventListener('change', (e) => {
+            if (selectedGroupIndex === null) return;
+            const group = tournamentState.groups[selectedGroupIndex];
+            const hasScores = (group.matches || []).some(m => m.gHome !== "" || m.gAway !== "");
+            
+            if (hasScores && !confirm('Isso vai resetar os placares atuais. Continuar?')) {
+                e.target.checked = !e.target.checked;
+                return;
+            }
+
+            const names = group.players.map(p => p.name);
+            group.matches = generateRoundRobin(names, e.target.checked);
+            renderGroupMatchesList();
+        });
+    }
+
+    const btnSalvarJogos = document.getElementById('btn-salvar-jogos-grupo');
+    if (btnSalvarJogos) {
+        btnSalvarJogos.addEventListener('click', async () => {
+            if (selectedGroupIndex === null) return;
+            
+            const btn = btnSalvarJogos;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-circle-notch animate-spin"></i> Salvando...';
+
+            try {
+                // Update stats
+                updateGroupStats(selectedGroupIndex);
+                
+                // Persist
+                if (db) {
+                    await set(ref(db, 'tournaments/current'), tournamentState);
+                }
+
+                renderTournamentFromState();
+                document.getElementById('modal-jogos-grupo').classList.remove('active');
+                alert('Placares salvos com sucesso!');
+            } catch (e) {
+                console.error('Erro ao salvar jogos:', e);
+                alert('Erro ao salvar no Firebase.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+    }
+
+    // Modal Close
+    document.querySelectorAll('.btn-close-modal, #btn-cancelar-jogos').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+        });
+    });
+
 });

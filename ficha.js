@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, get, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, get, onValue, remove, set, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCL2u-oSlw8EWQ96atPI9Tc-0cIl2k9K6M",
@@ -76,6 +76,9 @@ function renderFichas(list) {
                     <img src="https://flagcdn.com/24x18/${flagCode}.png" alt="${flagName}">
                     ${flagName}
                 </div>
+                <button class="btn-delete-ficha" data-cpf="${p.cpf}" title="Apagar Cadastro">
+                    <i class="ph ph-trash"></i>
+                </button>
             </div>
             <div class="ficha-details">
                 <div class="ficha-detail">
@@ -93,6 +96,52 @@ function renderFichas(list) {
                 <div class="ficha-date">Cadastrado em: ${createdDate}</div>
             </div>
         `;
+
+        // Action: Delete Ficha
+        const deleteBtn = card.querySelector('.btn-delete-ficha');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async () => {
+                const cpf = deleteBtn.dataset.cpf;
+                if (!cpf) return;
+
+                if (confirm(`🚨 ATENÇÃO: Deseja apagar permanentemente o cadastro de ${p.nome}?\n\nIsso removerá o jogador do sistema, liberará o código de acesso e o removerá de torneios ativos.`)) {
+                    try {
+                        // 1. Remover de participants/
+                        await remove(ref(db, 'participants/' + cpf));
+
+                        // 2. Liberar código em codes/pool
+                        const poolSnap = await get(ref(db, 'codes/pool'));
+                        if (poolSnap.exists()) {
+                            const poolData = poolSnap.val();
+                            const codes = poolData.codes || [];
+                            const updatedCodes = codes.map(c => {
+                                if (c.usedBy === cpf) return { ...c, used: false, usedBy: null };
+                                return c;
+                            });
+                            await update(ref(db, 'codes/pool'), { codes: updatedCodes });
+                        }
+
+                        // 3. Remover do torneio atual
+                        const tRef = ref(db, 'tournaments/current');
+                        const tSnap = await get(tRef);
+                        if (tSnap.exists()) {
+                            const tData = tSnap.val();
+                            const regPlayers = tData.registeredPlayers || [];
+                            const filtered = regPlayers.filter(pl => pl.id !== cpf);
+                            if (filtered.length !== regPlayers.length) {
+                                await update(tRef, { registeredPlayers: filtered });
+                            }
+                        }
+
+                        alert('Cadastro removido com sucesso!');
+                    } catch (e) {
+                        console.error('Erro ao deletar ficha:', e);
+                        alert('Erro ao processar remoção.');
+                    }
+                }
+            });
+        }
+
         fichasGrid.appendChild(card);
     });
 }
