@@ -116,6 +116,133 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editS1 = document.getElementById('edit-s1');
     const editS2 = document.getElementById('edit-s2');
     const btnSaveKnockout = document.getElementById('btn-save-knockout');
+    const SENSITIVE_PASSWORD = '153090';
+    const SENSITIVE_IDS = new Set(['btn-encerrar', 'btn-resetar', 'btn-resetar-tudo', 'btn-apagar-cadastro', 'btn-resetar-codigos']);
+    const modalSensitivePassword = document.getElementById('modal-sensitive-password');
+    const sensitivePasswordInput = document.getElementById('sensitive-password-input');
+    const sensitivePasswordError = document.getElementById('sensitive-password-error');
+    const btnConfirmSensitivePassword = document.getElementById('btn-confirm-sensitive-password');
+    const modalNextPhase = document.getElementById('modal-next-phase');
+    const nextPhaseOrderInput = document.getElementById('next-phase-order-input');
+    const nextPhasePreview = document.getElementById('next-phase-preview');
+    let pendingSensitiveAction = null;
+    let pendingNextPhaseQualified = [];
+    let repechageModalShown = false;
+
+    function isPlaceholder(name) {
+        if (!name) return true;
+        return /^A definir|^\dº Grupo|^Vencedor |^Classificado/i.test(name);
+    }
+
+    function getGroupLeaders(position = 0) {
+        const leaders = [];
+        (tournamentState.groups || []).forEach(g => {
+            const sorted = [...(g.players || [])].sort((a, b) => {
+                if ((b.pts || 0) !== (a.pts || 0)) return (b.pts || 0) - (a.pts || 0);
+                if ((b.sg || 0) !== (a.sg || 0)) return (b.sg || 0) - (a.sg || 0);
+                return (b.gp || 0) - (a.gp || 0);
+            });
+            if (sorted[position] && !isPlaceholder(sorted[position].name)) leaders.push(sorted[position].name);
+        });
+        return leaders;
+    }
+
+    function getKnockoutMatchWinner(match) {
+        if (!match) return null;
+        const hasResult = match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null;
+        if (!hasResult) return null;
+        const s1 = parseInt(match.s1);
+        const s2 = parseInt(match.s2);
+        if (Number.isNaN(s1) || Number.isNaN(s2)) return null;
+        if (s1 > s2) return match.p1;
+        if (s2 > s1) return match.p2;
+        if (match.pen1 != null && match.pen2 != null && match.pen1 !== '' && match.pen2 !== '') {
+            return parseInt(match.pen1) > parseInt(match.pen2) ? match.p1 : match.p2;
+        }
+        return null;
+    }
+
+    function recalculateGeneralStats() {
+        const stats = {};
+        const ensure = (name) => {
+            if (!name || isPlaceholder(name)) return null;
+            if (!stats[name]) stats[name] = { name, pts: 0, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, avancos: 0 };
+            return stats[name];
+        };
+        const apply = (home, away, gh, ga, knockout = false) => {
+            const pHome = ensure(home);
+            const pAway = ensure(away);
+            if (!pHome || !pAway) return;
+            pHome.j++; pAway.j++;
+            pHome.gp += gh; pHome.gc += ga;
+            pAway.gp += ga; pAway.gc += gh;
+            if (gh > ga) {
+                pHome.v++; pAway.d++;
+                pHome.pts += knockout ? 3 : 3;
+            } else if (ga > gh) {
+                pAway.v++; pHome.d++;
+                pAway.pts += knockout ? 3 : 3;
+            } else {
+                pHome.e++; pAway.e++;
+                pHome.pts += knockout ? 1 : 1;
+                pAway.pts += knockout ? 1 : 1;
+            }
+        };
+
+        (tournamentState.groups || []).forEach(group => {
+            (group.matches || []).forEach(m => {
+                if (m.gHome === '' || m.gAway === '') return;
+                const gh = parseInt(m.gHome);
+                const ga = parseInt(m.gAway);
+                if (!Number.isNaN(gh) && !Number.isNaN(ga)) apply(m.home, m.away, gh, ga, false);
+            });
+        });
+
+        if (tournamentState.knockout) {
+            const allRounds = [
+                ...(tournamentState.knockout.repechage || []).map(m => ({ ...m, roundName: 'Repescagem' })),
+                ...((tournamentState.knockout.rounds || []).flatMap(r => (r.matches || []).map(m => ({ ...m, roundName: r.name }))))
+            ];
+            allRounds.forEach(m => {
+                if (m.s1 === '' || m.s2 === '') return;
+                const s1 = parseInt(m.s1);
+                const s2 = parseInt(m.s2);
+                if (!Number.isNaN(s1) && !Number.isNaN(s2)) apply(m.p1, m.p2, s1, s2, true);
+                const winner = getKnockoutMatchWinner(m);
+                const pWinner = ensure(winner);
+                if (pWinner) pWinner.avancos += 1;
+            });
+        }
+
+        Object.values(stats).forEach(p => p.sg = p.gp - p.gc);
+        tournamentState.generalStats = stats;
+        return stats;
+    }
+
+    function isTournamentFullyCompleted() {
+        const groupsDone = (tournamentState.groups || []).every(group =>
+            (group.matches || []).length > 0 &&
+            group.matches.every(m => m.gHome !== '' && m.gAway !== '')
+        );
+        const knockoutMatches = [];
+        if (tournamentState.knockout) {
+            knockoutMatches.push(...(tournamentState.knockout.repechage || []));
+            (tournamentState.knockout.rounds || []).forEach(r => knockoutMatches.push(...(r.matches || [])));
+        }
+        const knockoutDone = knockoutMatches.length === 0 || knockoutMatches.every(m => m.s1 !== '' && m.s2 !== '' && getKnockoutMatchWinner(m));
+        return groupsDone && knockoutDone;
+    }
+
+    function persistCurrentTournament(extra = {}) {
+        if (!db) return Promise.resolve();
+        const updatedAt = new Date().toISOString();
+        tournamentState.updatedAt = updatedAt;
+        const payload = { ...tournamentState, ...extra, updatedAt };
+        return Promise.all([
+            set(ref(db, 'tournaments/current'), payload),
+            tournamentState.tournamentCode ? set(ref(db, `tournaments/${tournamentState.tournamentCode}`), payload) : Promise.resolve()
+        ]);
+    }
 
     function openKnockoutEdit(type, rIdx, mIdx) {
         selectedKnockoutMatch = { type, rIdx, mIdx };
@@ -211,6 +338,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (modalMataMata) modalMataMata.classList.add('active');
+    }
+
+    function renderNextPhasePreview(lines) {
+        if (!nextPhasePreview) return;
+        const pairs = [];
+        for (let i = 0; i < lines.length; i += 2) {
+            const p1 = lines[i] || 'BYE';
+            const p2 = lines[i + 1] || 'BYE';
+            pairs.push({ p1, p2 });
+        }
+        nextPhasePreview.innerHTML = pairs.map((m, idx) => `
+            <div style="padding:8px 10px; margin-bottom:6px; border-radius:10px; background: rgba(255,255,255,0.45); border:1px solid rgba(255,255,255,0.75);">
+                <strong>Jogo ${idx + 1}:</strong> ${formatName(m.p1)} <span style="opacity:0.6;">vs</span> ${formatName(m.p2)}
+            </div>
+        `).join('');
+    }
+
+    function checkAndOpenNextPhaseModal() {
+        if (role !== 'organizador' || !tournamentState.knockout || repechageModalShown) return;
+        const rep = tournamentState.knockout.repechage || [];
+        if (!rep.length) return;
+        const done = rep.every(m => getKnockoutMatchWinner(m));
+        if (!done) return;
+
+        const firstPlaced = getGroupLeaders(0);
+        const repWinners = rep.map(m => getKnockoutMatchWinner(m)).filter(Boolean);
+        const qualified = [...firstPlaced, ...repWinners];
+        if (!qualified.length) return;
+
+        pendingNextPhaseQualified = qualified;
+        if (nextPhaseOrderInput) nextPhaseOrderInput.value = qualified.join('\n');
+        renderNextPhasePreview(qualified);
+        modalNextPhase?.classList.add('active');
+        repechageModalShown = true;
     }
 
     if (btnSaveKnockout) {
@@ -317,19 +478,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tournamentState.top3.second = (winner === match.p1) ? match.p2 : match.p1;
             }
 
-            if (db) {
-                try {
-                    await set(ref(db, 'tournaments/current'), tournamentState);
-                    renderTournamentFromState();
-                    modalMataMata.classList.remove('active');
-                    if (type === 'repechage') {
-                        alert(`${winner} venceu e avança! (Repescagem — sem impacto nas estatísticas gerais)`);
-                    } else {
-                        alert('Placar salvo e vencedor avançado!');
-                    }
-                } catch (e) {
-                    console.error('Erro ao salvar mata-mata:', e);
-                }
+            try {
+                recalculateGeneralStats();
+                await persistCurrentTournament({ knockout: tournamentState.knockout, top3: tournamentState.top3, generalStats: tournamentState.generalStats });
+                renderTournamentFromState();
+                modalMataMata.classList.remove('active');
+                if (type === 'repechage') alert(`${winner} venceu e avança!`);
+                else alert('Placar salvo e vencedor avançado!');
+            } catch (e) {
+                console.error('Erro ao salvar mata-mata:', e);
+                alert('Erro ao salvar mata-mata no Firebase.');
             }
         });
     }
@@ -501,33 +659,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             const resetBtn = item.querySelector('.code-reset-btn');
             if (resetBtn) {
                 resetBtn.addEventListener('click', async () => {
-                    const cpfToRemove = c.usedBy;
-                    if (confirm(`Deseja liberar o código ${c.code} e APAGAR o cadastro do jogador associado?`)) {
-                        if (!db) return;
-                        try {
-                            // 1. Reset code in pool
-                            const newCodes = [...codesArray];
-                            newCodes[idx] = { ...newCodes[idx], used: false, usedBy: null };
-                            await set(ref(db, 'codes/pool'), { codes: newCodes });
+                    askSensitivePassword(async () => {
+                        const cpfToRemove = c.usedBy;
+                        if (confirm(`Deseja liberar o código ${c.code} e APAGAR o cadastro do jogador associado?`)) {
+                            if (!db) return;
+                            try {
+                                const newCodes = [...codesArray];
+                                newCodes[idx] = { ...newCodes[idx], used: false, usedBy: null };
+                                await set(ref(db, 'codes/pool'), { codes: newCodes });
 
-                            if (cpfToRemove) {
-                                // 2. Remove from participants
-                                await remove(ref(db, 'participants/' + cpfToRemove));
-
-                                // 3. Remove from current tournament registeredPlayers
-                                if (tournamentState && tournamentState.registeredPlayers) {
-                                    const filtered = tournamentState.registeredPlayers.filter(p => p.id !== cpfToRemove);
-                                    if (filtered.length !== tournamentState.registeredPlayers.length) {
-                                        await update(ref(db, 'tournaments/current'), { registeredPlayers: filtered });
+                                if (cpfToRemove) {
+                                    await remove(ref(db, 'participants/' + cpfToRemove));
+                                    if (tournamentState && tournamentState.registeredPlayers) {
+                                        const filtered = tournamentState.registeredPlayers.filter(p => p.id !== cpfToRemove);
+                                        if (filtered.length !== tournamentState.registeredPlayers.length) {
+                                            await update(ref(db, 'tournaments/current'), { registeredPlayers: filtered });
+                                        }
                                     }
                                 }
+                                alert('Código liberado e cadastro removido!');
+                            } catch (e) {
+                                console.error('Erro ao resetar código e apagar cadastro:', e);
+                                alert('Erro ao processar remoção completa.');
                             }
-                            alert('Código liberado e cadastro removido!');
-                        } catch (e) {
-                            console.error('Erro ao resetar código e apagar cadastro:', e);
-                            alert('Erro ao processar remoção completa.');
                         }
-                    }
+                    });
                 });
             }
 
@@ -674,6 +830,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (data) {
                 const isNew = !tournamentState.tournamentCode;
                 tournamentState = { ...tournamentState, ...data };
+                if (!(tournamentState.knockout?.repechage || []).length) repechageModalShown = false;
                 
                 // If it's the first load, populate inputs
                 if (isNew || document.activeElement.tagName !== 'INPUT') {
@@ -730,6 +887,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function buildTournamentState(participantsArray, format) {
+        repechageModalShown = false;
         const N = participantsArray.length || 8;
         let G = N <= 5 ? 1 : Math.ceil(N / 4);
         
@@ -919,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const mataMataContainer = document.getElementById('tab-mata-mata');
         if (mataMataContainer) {
             if (tournamentState.knockout) {
-                let bracketHTML = `<div class="bracket-container${isPreview ? ' preview-mode' : ''}">
+                let bracketHTML = `<div class="bracket-scroll-shell"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
                                     ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
                 
                 // Helper: render a single bracket match card
@@ -986,7 +1144,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 }
                 
-                bracketHTML += `</div>`;
+                bracketHTML += `</div></div>`;
                 mataMataContainer.innerHTML = bracketHTML;
 
                 // Add Listeners
@@ -1001,6 +1159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 mataMataContainer.innerHTML = `<div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div>`;
             }
+            checkAndOpenNextPhaseModal();
         }
     }
 
@@ -1346,6 +1505,102 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     window.openPlayerProfile = openPlayerProfile; // Torna global para o onclick
 
+    function askSensitivePassword(actionFn) {
+        if (role !== 'organizador') return;
+        pendingSensitiveAction = actionFn;
+        if (sensitivePasswordInput) sensitivePasswordInput.value = '';
+        if (sensitivePasswordError) sensitivePasswordError.style.display = 'none';
+        modalSensitivePassword?.classList.add('active');
+        setTimeout(() => sensitivePasswordInput?.focus(), 30);
+    }
+
+    btnConfirmSensitivePassword?.addEventListener('click', async () => {
+        if (!pendingSensitiveAction) {
+            modalSensitivePassword?.classList.remove('active');
+            return;
+        }
+        if ((sensitivePasswordInput?.value || '').trim() !== SENSITIVE_PASSWORD) {
+            if (sensitivePasswordError) sensitivePasswordError.style.display = 'block';
+            return;
+        }
+        modalSensitivePassword?.classList.remove('active');
+        const action = pendingSensitiveAction;
+        pendingSensitiveAction = null;
+        await action();
+    });
+
+    document.getElementById('btn-close-sensitive-password')?.addEventListener('click', () => modalSensitivePassword?.classList.remove('active'));
+
+    function shuffleArray(arr) {
+        const c = [...arr];
+        for (let i = c.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [c[i], c[j]] = [c[j], c[i]];
+        }
+        return c;
+    }
+
+    document.getElementById('btn-shuffle-next-phase')?.addEventListener('click', () => {
+        pendingNextPhaseQualified = shuffleArray(pendingNextPhaseQualified);
+        if (nextPhaseOrderInput) nextPhaseOrderInput.value = pendingNextPhaseQualified.join('\n');
+        renderNextPhasePreview(pendingNextPhaseQualified);
+    });
+
+    nextPhaseOrderInput?.addEventListener('input', () => {
+        const lines = nextPhaseOrderInput.value.split('\n').map(n => n.trim()).filter(Boolean);
+        renderNextPhasePreview(lines);
+    });
+
+    document.getElementById('btn-confirm-next-phase')?.addEventListener('click', async () => {
+        const names = (nextPhaseOrderInput?.value || '').split('\n').map(n => n.trim()).filter(Boolean);
+        if (!names.length) {
+            alert('Informe ao menos um classificado.');
+            return;
+        }
+        if (!tournamentState.knockout?.rounds?.length) return;
+        const firstRound = tournamentState.knockout.rounds[0];
+        const matches = [];
+        for (let i = 0; i < names.length; i += 2) {
+            const p1 = names[i];
+            const p2 = names[i + 1] || 'BYE';
+            if (p2 === 'BYE') {
+                matches.push({ p1, p2: 'BYE', s1: '1', s2: '0', autoAdvance: true });
+            } else {
+                matches.push({ p1, p2, s1: '', s2: '' });
+            }
+        }
+        firstRound.matches = matches;
+        const nextRound = tournamentState.knockout.rounds[1];
+        if (nextRound) {
+            nextRound.matches.forEach(m => {
+                if (m.p1?.startsWith('Vencedor')) m.p1 = 'A definir';
+                if (m.p2?.startsWith('Vencedor')) m.p2 = 'A definir';
+            });
+            matches.forEach((m, idx) => {
+                if (!m.autoAdvance) return;
+                const winnerSlot = m.p1;
+                nextRound.matches.forEach(nm => {
+                    const placeholder = `Vencedor ${firstRound.name} ${idx + 1}`;
+                    if (nm.p1 === placeholder || nm.p1 === 'A definir') nm.p1 = winnerSlot;
+                    else if (nm.p2 === placeholder || nm.p2 === 'A definir') nm.p2 = winnerSlot;
+                });
+            });
+        }
+        recalculateGeneralStats();
+        await persistCurrentTournament();
+        renderTournamentFromState();
+        modalNextPhase?.classList.remove('active');
+        alert('Próxima fase definida com sucesso.');
+    });
+
+    document.getElementById('btn-close-next-phase')?.addEventListener('click', () => modalNextPhase?.classList.remove('active'));
+
+    document.getElementById('btn-logout-organizer')?.addEventListener('click', () => {
+        ['organizerAuth', 'organizerRole', 'copaAuth', 'adminSession'].forEach(k => localStorage.removeItem(k));
+        sessionStorage.clear();
+        window.location.href = '../index.html';
+    });
+
     // ========== ACTION BUTTONS ==========
     const actions = {
         'btn-embaralhar': () => {
@@ -1360,13 +1615,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             buildTournamentState(allPlayers, tournamentState.format);
             renderTournamentFromState(false);
-            if (db) {
-                update(ref(db, 'tournaments/current'), { 
-                    groups: tournamentState.groups, 
-                    knockout: tournamentState.knockout,
-                    updatedAt: new Date().toISOString()
-                }).catch(e => console.error('Erro ao embaralhar:', e));
-            }
+            persistCurrentTournament({ groups: tournamentState.groups, knockout: tournamentState.knockout })
+                .catch(e => console.error('Erro ao embaralhar:', e));
         },
         'btn-atualizar': async () => {
             if (!tournamentState.groups || tournamentState.groups.length === 0) {
@@ -1424,65 +1674,116 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             // 4. Save to Firebase
-            if (db) {
-                try {
-                    await update(ref(db, 'tournaments/current'), { 
-                        knockout: tournamentState.knockout,
-                        updatedAt: new Date().toISOString()
-                    });
-                    renderTournamentFromState();
-                    alert('Chaveamento atualizado com os classificados dos grupos!');
-                } catch (e) {
-                    console.error('Erro ao atualizar chaveamento:', e);
-                    alert('Erro ao salvar no Firebase.');
-                }
+            try {
+                await persistCurrentTournament({ knockout: tournamentState.knockout });
+                renderTournamentFromState();
+                alert('Chaveamento atualizado com os classificados dos grupos!');
+            } catch (e) {
+                console.error('Erro ao atualizar chaveamento:', e);
+                alert('Erro ao salvar no Firebase.');
             }
         },
-        'btn-encerrar': () => {
-            if (confirm('Deseja encerrar e salvar o torneio?')) {
-                tournamentState.status = 'encerrado';
-                tournamentState.updatedAt = new Date().toISOString();
-                updateStatus('encerrado');
-                top3Container.style.display = 'flex';
-                
-                if (db) {
-                    update(ref(db, 'tournaments/current'), { status: 'encerrado', updatedAt: tournamentState.updatedAt });
-                    if (tournamentState.tournamentCode) {
-                        update(ref(db, 'tournaments/' + tournamentState.tournamentCode), { status: 'encerrado', updatedAt: tournamentState.updatedAt });
-                    }
-                }
+        'btn-encerrar': async () => {
+            if (!isTournamentFullyCompleted()) {
+                alert('Não é possível encerrar. Existem jogos pendentes.');
+                return;
+            }
+            recalculateGeneralStats();
+            const finishedAt = new Date().toISOString();
+            tournamentState.status = 'encerrado';
+            tournamentState.finishedAt = finishedAt;
+            tournamentState.updatedAt = finishedAt;
+            updateStatus('encerrado');
+            top3Container.style.display = 'flex';
+
+            const rankingFinal = Object.values(tournamentState.generalStats || {}).sort((a, b) => {
+                if (b.pts !== a.pts) return b.pts - a.pts;
+                if (b.v !== a.v) return b.v - a.v;
+                if (b.sg !== a.sg) return b.sg - a.sg;
+                return b.gp - a.gp;
+            });
+            const historyPayload = {
+                id: `hist_${Date.now()}`,
+                type: 'tournament-history',
+                name: tournamentState.name || 'Torneio sem nome',
+                tournamentType: 'fifa',
+                createdAt: tournamentState.createdAt || new Date().toISOString(),
+                finishedAt,
+                participants: tournamentState.registeredPlayers || [],
+                groups: tournamentState.groups || [],
+                repechage: tournamentState.knockout?.repechage || [],
+                knockout: tournamentState.knockout || null,
+                champion: tournamentState.top3?.first || '—',
+                vice: tournamentState.top3?.second || '—',
+                generalStats: tournamentState.generalStats || {},
+                rankingFinal,
+                results: {
+                    groups: (tournamentState.groups || []).flatMap(g => g.matches || []),
+                    knockout: tournamentState.knockout || null
+                },
+                importedAt: finishedAt
+            };
+
+            try {
+                await persistCurrentTournament({ status: 'encerrado', generalStats: tournamentState.generalStats, finishedAt });
+                if (db) await set(ref(db, `imports/${historyPayload.id}`), historyPayload);
+                alert('Torneio encerrado e salvo no histórico.');
+            } catch (e) {
+                console.error('Erro ao encerrar torneio:', e);
+                alert('Erro ao encerrar e salvar o torneio.');
             }
         },
-        'btn-resetar': () => {
-            if (confirm('⚠️ Resetar o torneio atual? Os dados serão perdidos.')) {
-                groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Configure e gere o chaveamento para começar.</p></div>`;
+        'btn-resetar': async () => {
+            if (!confirm('Resetar apenas os resultados do torneio atual?')) return;
+            (tournamentState.groups || []).forEach(g => {
+                (g.matches || []).forEach(m => {
+                    m.gHome = '';
+                    m.gAway = '';
+                });
+                g.players.forEach(p => { p.j = 0; p.v = 0; p.e = 0; p.d = 0; p.gp = 0; p.gc = 0; p.sg = 0; p.pts = 0; });
+            });
+            if (tournamentState.knockout) {
+                (tournamentState.knockout.repechage || []).forEach(m => { m.s1 = ''; m.s2 = ''; m.pen1 = ''; m.pen2 = ''; });
+                (tournamentState.knockout.rounds || []).forEach(r => (r.matches || []).forEach(m => { m.s1 = ''; m.s2 = ''; m.pen1 = ''; m.pen2 = ''; }));
+            }
+            tournamentState.top3 = { first: '—', second: '—', third: '—' };
+            tournamentState.status = 'ativo';
+            tournamentState.generalStats = {};
+            repechageModalShown = false;
+            try {
+                await persistCurrentTournament();
+                renderTournamentFromState();
+                alert('Resultados do torneio resetados com sucesso.');
+            } catch (e) {
+                console.error('Erro ao resetar torneio:', e);
+                alert('Erro ao resetar torneio.');
+            }
+        },
+        'btn-resetar-tudo': async () => {
+            if (!confirm('Tem certeza que deseja resetar tudo? Essa ação apagará todos os dados do torneio atual.')) return;
+            try {
+                if (db) await remove(ref(db, 'tournaments/current'));
+                tournamentState = {
+                    name: '',
+                    participants: 8,
+                    format: 'grupos-mata-mata',
+                    homeAway: false,
+                    prize: '',
+                    status: 'aguardando',
+                    groups: [],
+                    codes: tournamentState.codes || [],
+                    tournamentCode: null,
+                    top3: { first: '—', second: '—', third: '—' },
+                    createdAt: null,
+                    generalStats: {}
+                };
+                repechageModalShown = false;
+                renderTournamentFromState();
                 updateStatus('aguardando');
-                prizeBanner.style.display = 'none';
-                top3Container.style.display = 'none';
-                tournamentState.groups = [];
-                tournamentState.knockout = null;
-                tournamentState.status = 'aguardando';
-                tournamentState.tournamentCode = null;
-                
-                if (db) remove(ref(db, 'tournaments/current'));
-            }
-        },
-        'btn-resetar-tudo': () => {
-            if (confirm('🚨 ATENÇÃO: Isso vai apagar TUDO (torneio, códigos, histórico). Tem certeza?')) {
-                if (db) {
-                    Promise.all([
-                        remove(ref(db, 'tournaments/current')),
-                        remove(ref(db, 'codes/pool'))
-                    ]).then(() => {
-                        console.log('[Action] Full site reset — Firebase limpo');
-                        location.reload();
-                    }).catch(e => {
-                        console.error('Erro ao resetar:', e);
-                        location.reload();
-                    });
-                } else {
-                    location.reload();
-                }
+                alert('Torneio resetado completamente.');
+            } catch (e) {
+                console.error('Erro no reset completo:', e);
+                alert('Erro ao resetar completamente.');
             }
         },
         'btn-resetar-codigos': async () => {
@@ -1558,7 +1859,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     Object.entries(actions).forEach(([id, fn]) => {
         const btn = document.getElementById(id);
-        if (btn) btn.addEventListener('click', fn);
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            if (SENSITIVE_IDS.has(id)) {
+                askSensitivePassword(fn);
+            } else {
+                fn();
+            }
+        });
     });
 
     // ========== MOBILE SIDEBAR TOGGLE ==========
@@ -1913,11 +2221,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 // Update stats
                 updateGroupStats(selectedGroupIndex);
+                recalculateGeneralStats();
                 
                 // Persist
-                if (db) {
-                    await set(ref(db, 'tournaments/current'), tournamentState);
-                }
+                await persistCurrentTournament({ generalStats: tournamentState.generalStats });
 
                 renderTournamentFromState();
                 document.getElementById('modal-jogos-grupo').classList.remove('active');
