@@ -168,6 +168,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         return null;
     }
 
+    function isDoubleByeMatch(match) {
+        return isBye(match?.p1) && isBye(match?.p2);
+    }
+
+    function resolveByeMatchOutcome(match) {
+        if (!match) return { resolved: false, winner: null };
+        const byeWinner = getByeAutoWinner(match);
+        if (byeWinner) {
+            match.winner = byeWinner;
+            match.completed = true;
+            match.walkover = true;
+            match.status = 'walkover';
+            match.s1 = match.p1 === byeWinner ? '1' : '0';
+            match.s2 = match.p2 === byeWinner ? '1' : '0';
+            return { resolved: true, winner: byeWinner };
+        }
+        if (isDoubleByeMatch(match)) {
+            match.winner = null;
+            match.completed = true;
+            match.walkover = false;
+            match.status = 'void';
+            match.s1 = '';
+            match.s2 = '';
+            return { resolved: true, winner: null };
+        }
+        return { resolved: false, winner: null };
+    }
+
     function clearMatchResultFields(match) {
         if (!match) return;
         ['s1', 's2', 'pen', 'pen1', 'pen2', 'winner', 'status', 'finished', 'completed', 'walkover', 'autoAdvance', 'idaS1', 'idaS2', 'voltaS1', 'voltaS2'].forEach(key => {
@@ -290,6 +318,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         return stats;
     }
 
+    function isMatchResolvedForProgression(match) {
+        return !!getKnockoutMatchWinner(match) || isDoubleByeMatch(match);
+    }
+
     function isTournamentFullyCompleted() {
         const groupsDone = (tournamentState.groups || []).every(group =>
             (group.matches || []).length > 0 &&
@@ -300,7 +332,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             knockoutMatches.push(...(tournamentState.knockout.repechage || []));
             (tournamentState.knockout.rounds || []).forEach(r => knockoutMatches.push(...(r.matches || [])));
         }
-        const knockoutDone = knockoutMatches.length === 0 || knockoutMatches.every(m => m.s1 !== '' && m.s2 !== '' && getKnockoutMatchWinner(m));
+        const knockoutDone = knockoutMatches.length === 0 || knockoutMatches.every(m => {
+            if (isDoubleByeMatch(m)) return true;
+            return m.s1 !== '' && m.s2 !== '' && getKnockoutMatchWinner(m);
+        });
         return groupsDone && knockoutDone;
     }
 
@@ -479,18 +514,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const allSelectedPlayers = pendingNextPhaseMatches.flatMap(m => [m.p1, m.p2]).filter(isRealPlayer);
         const duplicates = getDuplicatePlayersFromMatches(pendingNextPhaseMatches);
+        const totalSlots = pendingNextPhaseMatches.length * 2;
+        const requiredByeSlots = Math.max(0, totalSlots - pendingNextPhaseQualified.length);
+        const selectedByeCount = pendingNextPhaseMatches.flatMap(m => [m.p1, m.p2]).filter(isBye).length;
 
         nextPhaseMatchEditor.innerHTML = `
             ${pendingNextPhaseMatches.map((match, idx) => `
                 <div class="next-phase-match-card">
                     <select class="form-control next-phase-select-a" data-match-index="${idx}">
                         <option value="">Selecionar jogador</option>
-                        <option value="BYE">BYE</option>
                     </select>
                     <span class="next-phase-match-vs">Jogo ${idx + 1} • VS</span>
                     <select class="form-control next-phase-select-b" data-match-index="${idx}">
                         <option value="">Selecionar jogador</option>
-                        <option value="BYE">BYE</option>
                     </select>
                 </div>
             `).join('')}
@@ -498,6 +534,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
 
         function populateSelect(select, currentValue) {
+            const canUseBye = currentValue === 'BYE' || selectedByeCount < requiredByeSlots;
+            if (canUseBye) {
+                const byeOpt = document.createElement('option');
+                byeOpt.value = 'BYE';
+                byeOpt.textContent = 'BYE';
+                select.appendChild(byeOpt);
+            }
             const available = pendingNextPhaseQualified.filter(name => name === currentValue || !allSelectedPlayers.includes(name));
             available.forEach(name => {
                 const opt = document.createElement('option');
@@ -560,7 +603,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (role !== 'organizador' || !tournamentState.knockout || repechageModalShown) return;
         const rep = tournamentState.knockout.repechage || [];
         if (!rep.length) return;
-        const done = rep.every(m => getKnockoutMatchWinner(m));
+        const done = rep.every(m => isMatchResolvedForProgression(m));
         if (!done) return;
         const qualified = getNextPhaseQualifiersFromBracket(tournamentState);
         if (!qualified.length) return;
@@ -600,15 +643,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             let winner = null;
             let totalS1 = 0, totalS2 = 0;
-            const byeWinner = getByeAutoWinner(match);
-            if (byeWinner) {
-                match.winner = byeWinner;
-                match.completed = true;
-                match.walkover = true;
-                match.status = 'walkover';
-                match.s1 = match.p1 === byeWinner ? '1' : '0';
-                match.s2 = match.p2 === byeWinner ? '1' : '0';
-                winner = byeWinner;
+            const byeResolution = resolveByeMatchOutcome(match);
+            if (byeResolution.resolved) {
+                winner = byeResolution.winner;
             }
 
             if (!winner && isHomeAway) {
@@ -1205,15 +1242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 clearMatchResultFields(match);
                 if (idx === 0) {
-                    const byeWinner = getByeAutoWinner(match);
-                    if (byeWinner) {
-                        match.winner = byeWinner;
-                        match.completed = true;
-                        match.walkover = true;
-                        match.status = 'walkover';
-                        match.s1 = match.p1 === byeWinner ? '1' : '0';
-                        match.s2 = match.p2 === byeWinner ? '1' : '0';
-                    }
+                    resolveByeMatchOutcome(match);
                 }
             });
         });
@@ -1833,15 +1862,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const p2 = matchesFromEditor[i].p2 || 'BYE';
             const winnerToken = firstRound.matches?.[i]?.winnerToken || `Vencedor ${firstRound.name} ${i + 1}`;
             const newMatch = createMatchData(p1, p2, winnerToken);
-            const byeWinner = getByeAutoWinner(newMatch);
-            if (byeWinner) {
-                newMatch.winner = byeWinner;
-                newMatch.completed = true;
-                newMatch.walkover = true;
-                newMatch.status = 'walkover';
-                newMatch.s1 = newMatch.p1 === byeWinner ? '1' : '0';
-                newMatch.s2 = newMatch.p2 === byeWinner ? '1' : '0';
-            }
+            resolveByeMatchOutcome(newMatch);
             matches.push(newMatch);
         }
         firstRound.matches = matches;
