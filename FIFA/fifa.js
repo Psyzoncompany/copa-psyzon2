@@ -3,14 +3,33 @@
    Logic Controller (Firebase-Ready)
    ================================================ */
 
-// ========== FIREBASE PLACEHOLDER ==========
-// import { initializeApp } from "firebase/app";
-// import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "firebase/firestore";
-// const firebaseConfig = { /* your config */ };
-// const app = initializeApp(firebaseConfig);
-// const db = getFirestore(app);
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-document.addEventListener('DOMContentLoaded', () => {
+const firebaseConfig = {
+    // PREENCHER COM SEUS DADOS DO FIREBASE AQUI:
+    apiKey: "SUA_API_KEY",
+    authDomain: "seu-projeto.firebaseapp.com",
+    projectId: "seu-projeto",
+    storageBucket: "seu-projeto.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef"
+};
+
+let db = null;
+try {
+    if (firebaseConfig.apiKey !== "SUA_API_KEY") {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        console.log("🔥 Firebase inicializado!");
+    } else {
+        console.warn("⚠️ Firebase: Configure sua API Key no fifa.js para ativar a nuvem.");
+    }
+} catch (e) {
+    console.error("Erro ao inicializar Firebase", e);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
 
     // ========== ROLE DETECTION ==========
     const urlParams = new URLSearchParams(window.location.search);
@@ -72,11 +91,72 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Inicializar a pré-visualização ao carregar
+        // Inicializar a pré-visualização ao carregar (Apenas se visitante/apostador não puxar do banco)
         const initialN = parseInt(participantsInput.value) || 8;
-        if (initialN >= 2) {
+        if (initialN >= 2 && !db) {
             generateGroups(initialN);
         }
+    }
+
+    // ========== FIREBASE REAL-TIME SYNC ==========
+    if (db) {
+        onSnapshot(doc(db, 'tournaments', 'current'), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                tournamentState = data;
+                
+                // Se não for organizador, usamos a tela gerada pelo DB
+                if (role !== 'organizador') {
+                    renderGroupsFromState();
+                    updateStatus(data.status);
+                    
+                    if(data.prize) {
+                        prizeTitle.textContent = data.prize;
+                        prizeBanner.style.display = 'flex';
+                    } else {
+                        prizeBanner.style.display = 'none';
+                    }
+                }
+            } else if (role !== 'organizador') {
+                groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Aguarde o organizador iniciar a partida.</p></div>`;
+                updateStatus('aguardando');
+                prizeBanner.style.display = 'none';
+            }
+        });
+    }
+
+    function renderGroupsFromState() {
+        groupsContainer.innerHTML = '';
+        if (!tournamentState.groups || tournamentState.groups.length === 0) return;
+
+        tournamentState.groups.forEach(group => {
+            let rows = '';
+            group.players.forEach((player, i) => {
+                const statusClass = i < 2 ? 'classified' : (i === 2 ? 'playoff' : 'possible-3rd');
+                rows += `
+                    <tr class="${statusClass}">
+                        <td>${player.name}</td>
+                        <td>${player.j}</td><td>${player.v}</td><td>${player.e}</td><td>${player.d}</td>
+                        <td>${player.gp}</td><td>${player.gc}</td><td>${player.sg}</td><td>${player.pts}</td>
+                    </tr>`;
+            });
+
+            const card = document.createElement('div');
+            card.className = 'group-card';
+            card.innerHTML = `
+                <div class="group-title">${group.name}</div>
+                <table class="group-table">
+                    <thead>
+                        <tr>
+                            <th>Jogador</th>
+                            <th>J</th><th>V</th><th>E</th><th>D</th>
+                            <th>GP</th><th>GC</th><th>SG</th><th>PTS</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+            groupsContainer.appendChild(card);
+        });
     }
 
     // ========== TABS NAVIGATION ==========
@@ -119,8 +199,14 @@ document.addEventListener('DOMContentLoaded', () => {
             generateGroups(participants);
             updateStatus('ativo');
 
-            // Firebase: await setDoc(doc(db, 'tournaments', 'current'), tournamentState);
-            console.log('[Firebase Ready] Tournament Data:', tournamentState);
+            // Sincronizar com Firebase
+            if (db) {
+                setDoc(doc(db, 'tournaments', 'current'), tournamentState)
+                    .then(() => console.log('Torneio salvo no Firebase!'))
+                    .catch(e => console.error("Erro ao salvar:", e));
+            } else {
+                console.log('[Local] Tournament Data:', tournamentState);
+            }
         });
     }
 
@@ -187,8 +273,11 @@ document.addEventListener('DOMContentLoaded', () => {
             prizeTitle.textContent = text;
             prizeBanner.style.display = 'flex';
 
-            // Firebase: await updateDoc(doc(db, 'tournaments', 'current'), { prize: text });
-            console.log('[Firebase Ready] Prize saved:', text);
+            // Firebase Update
+            if (db) {
+                updateDoc(doc(db, 'tournaments', 'current'), { prize: text })
+                    .catch(e => console.error("Erro Prêmio:", e));
+            }
         });
     }
 
@@ -218,8 +307,11 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelector('.status-available').textContent = '32 disponíveis';
             document.querySelector('.status-used').textContent = '0 utilizados';
 
-            // Firebase: await setDoc(doc(db, 'codes', 'pool'), { codes: tournamentState.codes });
-            console.log('[Firebase Ready] Codes generated:', tournamentState.codes);
+            // Sincronizar códigos
+            if (db) {
+                setDoc(doc(db, 'codes', 'pool'), { codes: tournamentState.codes })
+                    .catch(e => console.error("Erro Códigos:", e));
+            }
         });
     }
 
@@ -239,8 +331,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 tournamentState.status = 'encerrado';
                 updateStatus('encerrado');
                 top3Container.style.display = 'flex';
-                // Firebase: await updateDoc(doc(db, 'tournaments', 'current'), { status: 'encerrado' });
-                console.log('[Action] Tournament ended and saved');
+                
+                if (db) updateDoc(doc(db, 'tournaments', 'current'), { status: 'encerrado' });
             }
         },
         'btn-resetar': () => {
@@ -251,8 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 top3Container.style.display = 'none';
                 tournamentState.groups = [];
                 tournamentState.status = 'aguardando';
-                // Firebase: await deleteDoc(doc(db, 'tournaments', 'current'));
-                console.log('[Action] Tournament reset');
+                
+                if (db) deleteDoc(doc(db, 'tournaments', 'current'));
             }
         },
         'btn-resetar-tudo': () => {
