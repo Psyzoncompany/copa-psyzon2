@@ -10,6 +10,11 @@
     font-family: 'Inter', sans-serif;
 }
 
+html, body {
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
 body {
     /* Fundo dinâmico com a nova imagem */
     background-color: #F0F4F2;
@@ -31,6 +36,10 @@ body {
 @media (max-width: 768px) {
     body {
         background-image: url('imgs/imagem de fundo-mobile.png');
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
     }
 
     .hero-logos img {
@@ -61,6 +70,14 @@ body {
     .main-content {
         padding: 0.5rem;
         margin-top: 5px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+        scrollbar-width: none; /* Firefox */
+    }
+    
+    .main-content::-webkit-scrollbar {
+        display: none; /* Safari and Chrome */
     }
 }
 
