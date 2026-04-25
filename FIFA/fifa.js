@@ -44,12 +44,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const badge = document.getElementById('user-role-badge');
     const organizerPanel = document.getElementById('organizer-panel');
+    const btnExitTopbar = document.getElementById('btn-exit-topbar');
+    const btnToggleOrganizer = document.getElementById('btn-toggle-organizer');
+
+    if (role === 'organizador') {
+        if (organizerPanel) organizerPanel.style.display = 'flex';
+        if (btnExitTopbar) btnExitTopbar.style.display = 'none';
+        if (btnToggleOrganizer) btnToggleOrganizer.style.display = 'flex';
+    } else {
+        if (organizerPanel) organizerPanel.style.display = 'none';
+        if (btnExitTopbar) btnExitTopbar.style.display = 'flex';
+        if (btnToggleOrganizer) btnToggleOrganizer.style.display = 'none';
+    }
 
     if (role === 'participante' && participantName) {
         badge.textContent = participantName;
     } else {
         badge.textContent = role.toUpperCase();
     }
+
+    // ========== MODAL CLOSE ON OUTSIDE CLICK ==========
+    window.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) {
+            e.target.classList.remove('active');
+            // Especial para o modal-perfil que usa style.display
+            if (e.target.id === 'modal-perfil') {
+                e.target.style.display = 'none';
+            }
+        }
+    });
 
     const roleStyles = {
         organizador: { bg: 'rgba(250,204,21,0.2)', color: '#FACC15' },
@@ -100,15 +123,92 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (type === 'repechage') {
             match = tournamentState.knockout.repechage[mIdx];
             document.getElementById('modal-mata-mata-title').textContent = 'Resultado Repescagem';
+            document.getElementById('modal-mata-mata-subtitle').textContent = 'Empate vai para pênaltis';
         } else {
             match = tournamentState.knockout.rounds[rIdx].matches[mIdx];
             document.getElementById('modal-mata-mata-title').textContent = 'Resultado ' + tournamentState.knockout.rounds[rIdx].name;
+            document.getElementById('modal-mata-mata-subtitle').textContent = 'Insira o placar do confronto';
         }
 
-        if (editP1Name) editP1Name.textContent = match.p1;
-        if (editP2Name) editP2Name.textContent = match.p2;
-        if (editS1) editS1.value = match.s1 || '';
-        if (editS2) editS2.value = match.s2 || '';
+        const isHomeAway = tournamentState.homeAway || false;
+        const singleEl = document.getElementById('knockout-single-score');
+        const legsEl = document.getElementById('knockout-legs-score');
+        const penaltyEl = document.getElementById('knockout-penalty-section');
+
+        // Reset penalty section
+        penaltyEl.style.display = 'none';
+        document.getElementById('edit-pen1').value = '';
+        document.getElementById('edit-pen2').value = '';
+
+        if (isHomeAway) {
+            // Modo Ida e Volta
+            singleEl.style.display = 'none';
+            legsEl.style.display = 'block';
+
+            document.getElementById('edit-legs-p1').textContent = formatName(match.p1);
+            document.getElementById('edit-legs-p2').textContent = formatName(match.p2);
+
+            document.getElementById('edit-ida-s1').value = match.idaS1 || '';
+            document.getElementById('edit-ida-s2').value = match.idaS2 || '';
+            document.getElementById('edit-volta-s1').value = match.voltaS1 || '';
+            document.getElementById('edit-volta-s2').value = match.voltaS2 || '';
+
+            // Aggregate calculator
+            function updateAggregate() {
+                const ida1 = parseInt(document.getElementById('edit-ida-s1').value) || 0;
+                const ida2 = parseInt(document.getElementById('edit-ida-s2').value) || 0;
+                const volta1 = parseInt(document.getElementById('edit-volta-s1').value) || 0;
+                const volta2 = parseInt(document.getElementById('edit-volta-s2').value) || 0;
+                document.getElementById('agg-p1').textContent = ida1 + volta1;
+                document.getElementById('agg-p2').textContent = ida2 + volta2;
+
+                // Check if repechage tie → show penalty
+                const agg1 = ida1 + volta1;
+                const agg2 = ida2 + volta2;
+                if (type === 'repechage' && agg1 === agg2 && (document.getElementById('edit-ida-s1').value !== '' || document.getElementById('edit-volta-s1').value !== '')) {
+                    penaltyEl.style.display = 'block';
+                    document.getElementById('pen-p1-name').textContent = formatName(match.p1);
+                    document.getElementById('pen-p2-name').textContent = formatName(match.p2);
+                } else {
+                    penaltyEl.style.display = 'none';
+                }
+            }
+
+            ['edit-ida-s1', 'edit-ida-s2', 'edit-volta-s1', 'edit-volta-s2'].forEach(id => {
+                const el = document.getElementById(id);
+                el.removeEventListener('input', updateAggregate);
+                el.addEventListener('input', updateAggregate);
+            });
+            updateAggregate();
+        } else {
+            // Modo Placar Único
+            singleEl.style.display = 'flex';
+            legsEl.style.display = 'none';
+
+            if (editP1Name) editP1Name.textContent = match.p1;
+            if (editP2Name) editP2Name.textContent = match.p2;
+            if (editS1) editS1.value = match.s1 || '';
+            if (editS2) editS2.value = match.s2 || '';
+
+            // Listen for tie on repechage single mode
+            function checkSinglePenalty() {
+                const v1 = parseInt(editS1.value);
+                const v2 = parseInt(editS2.value);
+                if (type === 'repechage' && !isNaN(v1) && !isNaN(v2) && v1 === v2 && editS1.value !== '') {
+                    penaltyEl.style.display = 'block';
+                    document.getElementById('pen-p1-name').textContent = formatName(match.p1);
+                    document.getElementById('pen-p2-name').textContent = formatName(match.p2);
+                } else {
+                    penaltyEl.style.display = 'none';
+                }
+            }
+
+            editS1.removeEventListener('input', checkSinglePenalty);
+            editS2.removeEventListener('input', checkSinglePenalty);
+            editS1.addEventListener('input', checkSinglePenalty);
+            editS2.addEventListener('input', checkSinglePenalty);
+            checkSinglePenalty();
+        }
 
         if (modalMataMata) modalMataMata.classList.add('active');
     }
@@ -117,21 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnSaveKnockout.addEventListener('click', async () => {
             if (!selectedKnockoutMatch) return;
             const { type, rIdx, mIdx } = selectedKnockoutMatch;
-            const s1Val = editS1.value;
-            const s2Val = editS2.value;
-
-            if (s1Val === '' || s2Val === '') {
-                alert('Preencha os dois placares.');
-                return;
-            }
-
-            const s1 = parseInt(s1Val);
-            const s2 = parseInt(s2Val);
-
-            if (s1 === s2) {
-                alert('Mata-mata não pode terminar em empate. Use o placar agregado ou pênaltis.');
-                return;
-            }
+            const isHomeAway = tournamentState.homeAway || false;
 
             let match;
             if (type === 'repechage') {
@@ -140,12 +226,77 @@ document.addEventListener('DOMContentLoaded', async () => {
                 match = tournamentState.knockout.rounds[rIdx].matches[mIdx];
             }
 
-            match.s1 = s1Val;
-            match.s2 = s2Val;
+            let winner = null;
+            let totalS1 = 0, totalS2 = 0;
 
-            const winner = s1 > s2 ? match.p1 : match.p2;
+            if (isHomeAway) {
+                // Ida e Volta
+                const ida1 = document.getElementById('edit-ida-s1').value;
+                const ida2 = document.getElementById('edit-ida-s2').value;
+                const volta1 = document.getElementById('edit-volta-s1').value;
+                const volta2 = document.getElementById('edit-volta-s2').value;
 
-            // Avançar vencedor
+                if (ida1 === '' || ida2 === '' || volta1 === '' || volta2 === '') {
+                    alert('Preencha todos os placares (ida e volta).');
+                    return;
+                }
+
+                match.idaS1 = ida1;
+                match.idaS2 = ida2;
+                match.voltaS1 = volta1;
+                match.voltaS2 = volta2;
+
+                totalS1 = parseInt(ida1) + parseInt(volta1);
+                totalS2 = parseInt(ida2) + parseInt(volta2);
+                match.s1 = String(totalS1);
+                match.s2 = String(totalS2);
+
+            } else {
+                // Placar único
+                const s1Val = editS1.value;
+                const s2Val = editS2.value;
+                if (s1Val === '' || s2Val === '') {
+                    alert('Preencha os dois placares.');
+                    return;
+                }
+                totalS1 = parseInt(s1Val);
+                totalS2 = parseInt(s2Val);
+                match.s1 = s1Val;
+                match.s2 = s2Val;
+            }
+
+            // Determine winner
+            if (totalS1 > totalS2) {
+                winner = match.p1;
+            } else if (totalS2 > totalS1) {
+                winner = match.p2;
+            } else {
+                // EMPATE
+                if (type === 'repechage') {
+                    // Repescagem: empate vai pra pênaltis
+                    const pen1 = document.getElementById('edit-pen1').value;
+                    const pen2 = document.getElementById('edit-pen2').value;
+                    if (pen1 === '' || pen2 === '') {
+                        alert('Empate na repescagem! Preencha os pênaltis.');
+                        return;
+                    }
+                    const p1Pen = parseInt(pen1);
+                    const p2Pen = parseInt(pen2);
+                    if (p1Pen === p2Pen) {
+                        alert('Pênaltis não podem empatar. Insira um vencedor.');
+                        return;
+                    }
+                    match.pen1 = pen1;
+                    match.pen2 = pen2;
+                    winner = p1Pen > p2Pen ? match.p1 : match.p2;
+                } else {
+                    // Mata-mata normal: não pode empatar
+                    alert('Mata-mata não pode terminar em empate. Defina um vencedor.');
+                    return;
+                }
+            }
+
+            // Advance winner
             if (type === 'repechage') {
                 const firstRound = tournamentState.knockout.rounds[0];
                 const placeholder = `Vencedor Rep. ${mIdx + 1}`;
@@ -171,7 +322,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await set(ref(db, 'tournaments/current'), tournamentState);
                     renderTournamentFromState();
                     modalMataMata.classList.remove('active');
-                    alert('Placar salvo e vencedor avançado!');
+                    if (type === 'repechage') {
+                        alert(`${winner} venceu e avança! (Repescagem — sem impacto nas estatísticas gerais)`);
+                    } else {
+                        alert('Placar salvo e vencedor avançado!');
+                    }
                 } catch (e) {
                     console.error('Erro ao salvar mata-mata:', e);
                 }
@@ -767,22 +922,56 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let bracketHTML = `<div class="bracket-container${isPreview ? ' preview-mode' : ''}">
                                     ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
                 
+                // Helper: render a single bracket match card
+                function renderBracketMatch(match, type, rIdx, mIdx) {
+                    const showBtn = role === 'organizador' && !isPreview;
+                    const hasResult = match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null;
+                    
+                    let winner = null;
+                    if (hasResult) {
+                        const ms1 = parseInt(match.s1);
+                        const ms2 = parseInt(match.s2);
+                        if (ms1 > ms2) winner = match.p1;
+                        else if (ms2 > ms1) winner = match.p2;
+                        else if (match.pen1 && match.pen2) {
+                            winner = parseInt(match.pen1) > parseInt(match.pen2) ? match.p1 : match.p2;
+                        }
+                    }
+
+                    const p1Win = winner === match.p1;
+                    const p2Win = winner === match.p2;
+                    const p1Class = p1Win ? 'bracket-slot winner' : (p2Win ? 'bracket-slot loser' : 'bracket-slot');
+                    const p2Class = p2Win ? 'bracket-slot winner' : (p1Win ? 'bracket-slot loser' : 'bracket-slot');
+
+                    // Score display
+                    let score1 = match.s1 || '—';
+                    let score2 = match.s2 || '—';
+                    
+                    // Penalty indicator
+                    let penaltyBadge = '';
+                    if (match.pen1 && match.pen2) {
+                        penaltyBadge = `<div class="penalty-badge"><i class="ph-fill ph-soccer-ball"></i> Pên: ${match.pen1} x ${match.pen2}</div>`;
+                    }
+
+                    return `
+                        <div class="bracket-match ${hasResult ? 'has-result' : ''}">
+                            <div class="${p1Class}">
+                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${formatName(match.p1)}</span>
+                                <span class="slot-score">${score1}</span>
+                            </div>
+                            <div class="${p2Class}">
+                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${formatName(match.p2)}</span>
+                                <span class="slot-score">${score2}</span>
+                            </div>
+                            ${penaltyBadge}
+                            ${showBtn ? `<button class="btn-edit-knockout" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar Resultado"><i class="ph ph-pencil-simple"></i></button>` : ''}
+                        </div>`;
+                }
+
                 if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
                     bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">Repescagem</div>`;
                     tournamentState.knockout.repechage.forEach((match, mIdx) => {
-                        const showBtn = role === 'organizador' && !isPreview;
-                        bracketHTML += `
-                            <div class="bracket-match">
-                                <div class="bracket-slot">
-                                    <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${match.p1}</span>
-                                    <span class="slot-score">${match.s1 || '—'}</span>
-                                </div>
-                                <div class="bracket-slot">
-                                    <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${match.p2}</span>
-                                    <span class="slot-score">${match.s2 || '—'}</span>
-                                </div>
-                                ${showBtn ? `<button class="btn-edit-knockout" data-type="repechage" data-m="${mIdx}" title="Editar Resultado"><i class="ph ph-pencil-simple"></i></button>` : ''}
-                            </div>`;
+                        bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx);
                     });
                     bracketHTML += `</div>`;
                 }
@@ -791,19 +980,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     tournamentState.knockout.rounds.forEach((round, rIdx) => {
                         bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">${round.name}</div>`;
                         round.matches.forEach((match, mIdx) => {
-                            const showBtn = role === 'organizador' && !isPreview;
-                            bracketHTML += `
-                                <div class="bracket-match">
-                                    <div class="bracket-slot">
-                                        <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${match.p1}</span>
-                                        <span class="slot-score">${match.s1 || '—'}</span>
-                                    </div>
-                                    <div class="bracket-slot">
-                                        <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${match.p2}</span>
-                                        <span class="slot-score">${match.s2 || '—'}</span>
-                                    </div>
-                                    ${showBtn ? `<button class="btn-edit-knockout" data-type="round" data-r="${rIdx}" data-m="${mIdx}" title="Editar Resultado"><i class="ph ph-pencil-simple"></i></button>` : ''}
-                                </div>`;
+                            bracketHTML += renderBracketMatch(match, 'round', rIdx, mIdx);
                         });
                         bracketHTML += `</div>`;
                     });
@@ -1082,10 +1259,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-            // Loop no mata-mata
+            // Loop no mata-mata (EXCLUINDO repescagem — sem impacto nas estatísticas gerais)
             if (tournamentState.knockout) {
                 const allKMatches = [];
-                if (tournamentState.knockout.repechage) allKMatches.push(...tournamentState.knockout.repechage);
+                // NÃO incluir repechage — stats de repescagem não contam
                 (tournamentState.knockout.rounds || []).forEach(r => allKMatches.push(...r.matches));
 
                 allKMatches.forEach(m => {
@@ -1385,19 +1562,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ========== MOBILE SIDEBAR TOGGLE ==========
-    const btnToggleOrganizer = document.getElementById('btn-toggle-organizer');
-    const sidebar = document.getElementById('organizer-panel');
-    
-    if (btnToggleOrganizer && sidebar) {
+    if (btnToggleOrganizer && organizerPanel) {
         btnToggleOrganizer.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
+            organizerPanel.classList.toggle('active');
         });
         
         // Fechar ao clicar fora no mobile
         document.addEventListener('click', (e) => {
-            if (window.innerWidth <= 1100 && sidebar.classList.contains('active')) {
-                if (!sidebar.contains(e.target) && !btnToggleOrganizer.contains(e.target)) {
-                    sidebar.classList.remove('active');
+            if (window.innerWidth <= 1100 && organizerPanel.classList.contains('active')) {
+                if (!organizerPanel.contains(e.target) && !btnToggleOrganizer.contains(e.target)) {
+                    organizerPanel.classList.remove('active');
                 }
             }
         });

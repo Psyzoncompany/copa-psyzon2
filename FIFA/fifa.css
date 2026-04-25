@@ -1099,19 +1099,6 @@ body {
         color: #16A34A !important;
         background: rgba(34, 197, 94, 0.05); /* Destaque para os pontos */
     }
-
-    /* Knockout Scroll */
-    #tab-mata-mata {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch;
-        display: block !important;
-        padding: 1rem;
-    }
-
-    .bracket-container {
-        min-width: 1000px !important;
-        padding: 4rem 20px 20px 20px !important;
-    }
 }
 
 /* ========================
@@ -1513,12 +1500,13 @@ body {
    ======================== */
 .bracket-container {
     display: flex;
-    gap: 0; /* Removing gap to handle lines better */
+    gap: 0;
     padding: 2rem 1rem;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     min-height: 400px;
     align-items: flex-start;
+    scroll-behavior: smooth;
 }
 
 .bracket-round {
@@ -1527,7 +1515,7 @@ body {
     justify-content: space-around;
     min-width: 240px;
     position: relative;
-    padding: 0 40px; /* Space for connectors */
+    padding: 0 40px;
 }
 
 .bracket-round-title {
@@ -1555,11 +1543,21 @@ body {
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0, 45, 21, 0.05);
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     width: 200px;
     position: relative;
     z-index: 2;
     margin: 1.5rem 0;
+}
+
+.bracket-match.has-result {
+    border-color: rgba(34, 197, 94, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 45, 21, 0.08);
+}
+
+.bracket-match:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 35px rgba(0, 45, 21, 0.1);
 }
 
 /* Connectors Logic */
@@ -1593,13 +1591,32 @@ body {
     color: #042D15;
     background: rgba(255,255,255,0.1);
     border-bottom: 1px solid rgba(0,0,0,0.03);
+    transition: background 0.2s;
 }
 
-.bracket-slot:last-child {
+.bracket-slot:last-of-type {
     border-bottom: none;
 }
 
-.bracket-slot span:last-child {
+.bracket-slot.winner {
+    background: rgba(34, 197, 94, 0.08);
+}
+
+.bracket-slot.winner span:first-child {
+    color: #16A34A;
+    font-weight: 900;
+}
+
+.bracket-slot.loser {
+    opacity: 0.5;
+}
+
+.bracket-slot.loser span:first-child {
+    text-decoration: line-through;
+    text-decoration-color: rgba(239, 68, 68, 0.4);
+}
+
+.slot-score {
     font-weight: 900;
     color: #16A34A;
     background: rgba(22, 163, 74, 0.08);
@@ -1609,34 +1626,220 @@ body {
     text-align: center;
 }
 
+/* Penalty Badge */
+.penalty-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 4px 8px;
+    background: rgba(250, 204, 21, 0.1);
+    border-top: 1px solid rgba(250, 204, 21, 0.2);
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #b45309;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.penalty-badge i {
+    font-size: 0.7rem;
+    color: #FACC15;
+}
+
+/* Edit Knockout Button */
+.btn-edit-knockout {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #16A34A;
+    color: #fff;
+    border: 2px solid #fff;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+    transition: all 0.2s;
+}
+
+.btn-edit-knockout:hover {
+    transform: scale(1.15);
+    background: #15803d;
+}
+
+/* ========================
+   KNOCKOUT MODAL: LEGS UI
+   ======================== */
+.legs-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    padding: 0 0 10px;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.legs-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.legs-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #51715C;
+}
+
+.legs-aggregate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(22, 163, 74, 0.08);
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #042D15;
+}
+
+.legs-aggregate strong {
+    font-size: 1.3rem;
+    color: #16A34A;
+}
+
+/* ========================
+   KNOCKOUT MATCH EDIT (modal)
+   ======================== */
+.knockout-match-edit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+}
+
+.edit-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.edit-player span {
+    font-weight: 800;
+    color: #042D15;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.edit-player input {
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
+    border: 2px solid #e2e8f0;
+    background: #f8fafc;
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: #042D15;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.edit-player input:focus {
+    border-color: #22C55E;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+}
+
+.edit-vs {
+    font-size: 0.9rem;
+    font-weight: 900;
+    color: #8A9E8F;
+}
+
 /* MOBILE SCROLL */
 @media (max-width: 768px) {
     #tab-mata-mata {
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
         padding-bottom: 2rem;
+        position: relative;
+    }
+
+    /* Scroll shadow indicators */
+    #tab-mata-mata::after {
+        content: '';
+        position: sticky;
+        right: 0;
+        top: 0;
+        height: 100%;
+        width: 30px;
+        pointer-events: none;
+        background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
+        z-index: 5;
     }
     
     .bracket-container {
-        padding-top: 5rem; /* Space for titles */
+        padding-top: 5rem;
+        min-width: max-content;
     }
 
     .bracket-round {
-        min-width: 200px;
-        padding: 0 30px;
+        min-width: 180px;
+        padding: 0 25px;
     }
 
     .bracket-match {
-        width: 160px;
+        width: 155px;
+    }
+
+    .bracket-slot {
+        padding: 0.6rem 0.7rem;
+        font-size: 0.7rem;
     }
 
     .bracket-round:not(:last-child) .bracket-match::after {
-        right: -30px;
-        width: 30px;
+        right: -25px;
+        width: 25px;
     }
 
     .bracket-round:not(:first-child) .bracket-match::before {
-        left: -30px;
-        width: 30px;
+        left: -25px;
+        width: 25px;
+    }
+
+    .knockout-match-edit {
+        gap: 0.8rem;
+    }
+
+    .edit-player input {
+        width: 50px;
+        height: 50px;
+        font-size: 1.1rem;
+    }
+
+    .legs-row, .legs-header {
+        font-size: 0.75rem;
+    }
+
+    .legs-row input {
+        width: 45px !important;
+        height: 45px !important;
     }
 }
 

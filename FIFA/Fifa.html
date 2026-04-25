@@ -30,7 +30,8 @@
                 <i class="ph ph-list"></i>
             </button>
             <span id="user-role-badge" class="role-badge">VISITANTE</span>
-            <a href="../index.html" class="topbar-exit">
+            <!-- Visível apenas para Visitantes/Participantes -->
+            <a href="../index.html" id="btn-exit-topbar" class="topbar-exit">
                 <i class="ph ph-sign-out"></i>
             </a>
         </div>
@@ -48,7 +49,7 @@
     <main class="dashboard">
 
         <!-- LEFT COLUMN: ORGANIZER CONTROLS -->
-        <aside class="sidebar" id="organizer-panel" style="display:none;">
+        <aside class="sidebar" id="organizer-panel">
 
             <!-- 1. CONFIG DO TORNEIO -->
             <div class="card" id="card-config">
@@ -191,6 +192,13 @@
                         <i class="ph-fill ph-trash"></i> Resetar Tudo
                     </button>
                 </div>
+            </div>
+
+            <!-- SAIR (Somente Organizador) -->
+            <div style="margin-top: auto; padding-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); width: 100%;">
+                <a href="../index.html" class="btn btn-red-outline" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; border-color: rgba(255,255,255,0.2); color: #fff; background: rgba(255,255,255,0.05);">
+                    <i class="ph ph-sign-out"></i> Sair do Painel
+                </a>
             </div>
         </aside>
 
@@ -358,12 +366,13 @@
             <div class="modal-header">
                 <div class="header-info">
                     <h2 id="modal-mata-mata-title">Resultado Mata-Mata</h2>
-                    <p>Insira o placar do confronto</p>
+                    <p id="modal-mata-mata-subtitle">Insira o placar do confronto</p>
                 </div>
                 <button class="btn-close-modal"><i class="ph ph-x"></i></button>
             </div>
             <div class="modal-body">
-                <div class="knockout-match-edit">
+                <!-- Placar Único (padrão) -->
+                <div id="knockout-single-score" class="knockout-match-edit">
                     <div class="edit-player">
                         <span id="edit-p1-name">Jogador 1</span>
                         <input type="number" id="edit-s1" min="0" placeholder="0">
@@ -374,7 +383,52 @@
                         <span id="edit-p2-name">Jogador 2</span>
                     </div>
                 </div>
-                <div style="margin-top: 20px; text-align: center; color: #51715C; font-size: 0.9rem;">
+
+                <!-- Placar Ida e Volta (Casa e Fora) -->
+                <div id="knockout-legs-score" style="display: none;">
+                    <div class="legs-header">
+                        <span></span>
+                        <span id="edit-legs-p1" style="font-weight: 800; color: #042D15;">Jogador 1</span>
+                        <span id="edit-legs-p2" style="font-weight: 800; color: #042D15;">Jogador 2</span>
+                    </div>
+                    <div class="legs-row">
+                        <span class="legs-label"><i class="ph-fill ph-house"></i> Jogo de Ida</span>
+                        <input type="number" id="edit-ida-s1" min="0" placeholder="0" class="match-score-input">
+                        <input type="number" id="edit-ida-s2" min="0" placeholder="0" class="match-score-input">
+                    </div>
+                    <div class="legs-row">
+                        <span class="legs-label"><i class="ph-fill ph-airplane-takeoff"></i> Jogo de Volta</span>
+                        <input type="number" id="edit-volta-s1" min="0" placeholder="0" class="match-score-input">
+                        <input type="number" id="edit-volta-s2" min="0" placeholder="0" class="match-score-input">
+                    </div>
+                    <div class="legs-aggregate" id="legs-aggregate-display">
+                        <span>Agregado:</span>
+                        <strong id="agg-p1">0</strong>
+                        <span>x</span>
+                        <strong id="agg-p2">0</strong>
+                    </div>
+                </div>
+
+                <!-- Pênaltis (Repescagem) -->
+                <div id="knockout-penalty-section" style="display: none; margin-top: 15px;">
+                    <div style="text-align: center; padding: 10px; background: rgba(250,204,21,0.1); border-radius: 12px; border: 1px solid rgba(250,204,21,0.3);">
+                        <i class="ph-fill ph-warning" style="color: #FACC15; font-size: 1.2rem;"></i>
+                        <p style="font-weight: 700; color: #042D15; margin: 5px 0 10px;">Empate! Disputa de Pênaltis</p>
+                        <div class="knockout-match-edit" style="margin-top: 10px;">
+                            <div class="edit-player">
+                                <span id="pen-p1-name">J1</span>
+                                <input type="number" id="edit-pen1" min="0" placeholder="0">
+                            </div>
+                            <div class="edit-vs" style="font-size: 0.7rem;">PEN</div>
+                            <div class="edit-player">
+                                <input type="number" id="edit-pen2" min="0" placeholder="0">
+                                <span id="pen-p2-name">J2</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="knockout-info-text" style="margin-top: 20px; text-align: center; color: #51715C; font-size: 0.9rem;">
                     <i class="ph ph-info"></i> O vencedor avançará automaticamente para a próxima fase.
                 </div>
             </div>
