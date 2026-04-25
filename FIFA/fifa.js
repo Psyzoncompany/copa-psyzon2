@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 // Se o torneio estiver rodando OU se for visão de visitante, renderiza
                 if (data.status !== 'aguardando' || role !== 'organizador') {
-                    renderGroupsFromState();
+                    renderTournamentFromState(false);
                     updateStatus(data.status);
                     
                     if(data.prize) {
@@ -139,38 +139,162 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (role === 'organizador') updatePreview();
     }
 
-    function renderGroupsFromState() {
+    function buildTournamentState(participantsArray, format) {
+        const N = participantsArray.length || 8;
+        let G = N <= 5 ? 1 : Math.ceil(N / 4);
+        
+        const showGroups = format === 'grupos' || format === 'grupos-mata-mata';
+        const showMataMata = format === 'mata-mata' || format === 'grupos-mata-mata';
+
+        tournamentState.groups = [];
+        tournamentState.knockout = null;
+
+        if (showGroups) {
+            for (let g = 0; g < G; g++) {
+                const letter = String.fromCharCode(65 + g);
+                let players = [];
+                const groupPlayers = participantsArray.filter((_, i) => i % G === g);
+                const count = groupPlayers.length || Math.min(4, N - g * 4);
+                
+                for (let p = 0; p < count; p++) {
+                    const playerName = groupPlayers[p] ? groupPlayers[p].name : `A definir (Slot ${p + 1})`;
+                    players.push({ name: playerName, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0 });
+                }
+                tournamentState.groups.push({ name: `Grupo ${letter}`, players });
+            }
+        }
+
+        if (showMataMata) {
+            let K;
+            if (G === 1) K = 2;
+            else if (G === 2) K = 4;
+            else {
+                K = Math.pow(2, Math.ceil(Math.log2(G)));
+                if (K === G) K = G * 2; 
+            }
+
+            const W = K - G;
+            const M = G - W; 
+            
+            let repechagePlayers = Array.from({length: G}, (_, i) => `2º Grupo ${String.fromCharCode(65 + i)}`);
+            repechagePlayers.reverse();
+
+            let repechageRound = [];
+            if (M > 0 && showGroups) {
+                for(let i=0; i < M; i++) {
+                    let p1 = repechagePlayers.shift();
+                    let p2 = repechagePlayers.shift();
+                    repechageRound.push({ p1, p2 });
+                    repechagePlayers.push(`Vencedor Rep. ${i+1}`);
+                }
+            }
+
+            let knockoutPlayers = [];
+            for (let i=0; i<G; i++) knockoutPlayers.push(showGroups ? `1º Grupo ${String.fromCharCode(65 + i)}` : `Classificado ${i+1}`);
+            if (showGroups) knockoutPlayers = knockoutPlayers.concat(repechagePlayers);
+            else {
+                while(knockoutPlayers.length < K) knockoutPlayers.push(`A definir`);
+            }
+
+            let rounds = [];
+            let currentRoundPlayers = [...knockoutPlayers];
+
+            while(currentRoundPlayers.length > 1) {
+                let matchesInRound = currentRoundPlayers.length / 2;
+                let roundName = matchesInRound === 1 ? 'Final' : (matchesInRound === 2 ? 'Semifinal' : (matchesInRound === 4 ? 'Quartas de Final' : `Fase de ${matchesInRound*2}`));
+                
+                let roundMatches = [];
+                let nextRoundPlayers = [];
+                for(let m=0; m < currentRoundPlayers.length; m+=2) {
+                    let p1 = currentRoundPlayers[m] || 'A definir';
+                    let p2 = currentRoundPlayers[m+1] || 'A definir';
+                    roundMatches.push({ p1, p2 });
+                    nextRoundPlayers.push(`Vencedor ${roundName} ${m/2 + 1}`);
+                }
+                rounds.push({ name: roundName, matches: roundMatches });
+                currentRoundPlayers = nextRoundPlayers;
+            }
+
+            tournamentState.knockout = { repechage: repechageRound, rounds };
+        }
+    }
+
+    function renderTournamentFromState(isPreview = false) {
+        // Groups
         groupsContainer.innerHTML = '';
-        if (!tournamentState.groups || tournamentState.groups.length === 0) return;
+        if (tournamentState.groups && tournamentState.groups.length > 0) {
+            tournamentState.groups.forEach(group => {
+                let rows = '';
+                group.players.forEach((player, i) => {
+                    const statusClass = i < 2 ? 'classified' : (i === 2 ? 'playoff' : 'possible-3rd');
+                    rows += `
+                        <tr class="${statusClass}">
+                            <td>${player.name}</td>
+                            <td>${player.j}</td><td>${player.v}</td><td>${player.e}</td><td>${player.d}</td>
+                            <td>${player.gp}</td><td>${player.gc}</td><td>${player.sg}</td><td>${player.pts}</td>
+                        </tr>`;
+                });
 
-        tournamentState.groups.forEach(group => {
-            let rows = '';
-            group.players.forEach((player, i) => {
-                const statusClass = i < 2 ? 'classified' : (i === 2 ? 'playoff' : 'possible-3rd');
-                rows += `
-                    <tr class="${statusClass}">
-                        <td>${player.name}</td>
-                        <td>${player.j}</td><td>${player.v}</td><td>${player.e}</td><td>${player.d}</td>
-                        <td>${player.gp}</td><td>${player.gc}</td><td>${player.sg}</td><td>${player.pts}</td>
-                    </tr>`;
+                const card = document.createElement('div');
+                card.className = 'group-card' + (isPreview ? ' preview-mode' : '');
+                card.innerHTML = `
+                    ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}
+                    <div class="group-title">${group.name}</div>
+                    <table class="group-table">
+                        <thead>
+                            <tr>
+                                <th>Jogador</th>
+                                <th>J</th><th>V</th><th>E</th><th>D</th>
+                                <th>GP</th><th>GC</th><th>SG</th><th>PTS</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
+                groupsContainer.appendChild(card);
             });
+        } else {
+            groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Fase de Grupos desativada</h3><p>O formato atual não inclui grupos.</p></div>`;
+        }
 
-            const card = document.createElement('div');
-            card.className = 'group-card';
-            card.innerHTML = `
-                <div class="group-title">${group.name}</div>
-                <table class="group-table">
-                    <thead>
-                        <tr>
-                            <th>Jogador</th>
-                            <th>J</th><th>V</th><th>E</th><th>D</th>
-                            <th>GP</th><th>GC</th><th>SG</th><th>PTS</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>`;
-            groupsContainer.appendChild(card);
-        });
+        // Mata-mata
+        const mataMataContainer = document.getElementById('tab-mata-mata');
+        if (mataMataContainer) {
+            if (tournamentState.knockout) {
+                let bracketHTML = `<div class="bracket-container${isPreview ? ' preview-mode' : ''}">
+                                    ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
+                
+                if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
+                    bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">Repescagem</div>`;
+                    tournamentState.knockout.repechage.forEach(match => {
+                        bracketHTML += `
+                            <div class="bracket-match">
+                                <div class="bracket-slot"><span>${match.p1}</span><span>—</span></div>
+                                <div class="bracket-slot"><span>${match.p2}</span><span>—</span></div>
+                            </div>`;
+                    });
+                    bracketHTML += `</div>`;
+                }
+
+                if (tournamentState.knockout.rounds) {
+                    tournamentState.knockout.rounds.forEach(round => {
+                        bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">${round.name}</div>`;
+                        round.matches.forEach(match => {
+                            bracketHTML += `
+                                <div class="bracket-match">
+                                    <div class="bracket-slot"><span>${match.p1}</span><span>—</span></div>
+                                    <div class="bracket-slot"><span>${match.p2}</span><span>—</span></div>
+                                </div>`;
+                        });
+                        bracketHTML += `</div>`;
+                    });
+                }
+                
+                bracketHTML += `</div>`;
+                mataMataContainer.innerHTML = bracketHTML;
+            } else {
+                mataMataContainer.innerHTML = `<div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div>`;
+            }
+        }
     }
 
     // ========== TABS NAVIGATION ==========
@@ -210,8 +334,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             tournamentState.status = 'ativo';
             tournamentState.createdAt = new Date().toISOString();
 
-            generateGroups(participants);
-            renderGroupsFromState(); // Renderiza visualmente o que gerou
+            // Ao iniciar, gera com participantes mockados (ou reais caso venha do DB)
+            const mockParticipants = Array(participants).fill(null).map((_, i) => ({ name: `Jogador #${i+1}` }));
+            buildTournamentState(mockParticipants, format);
+            renderTournamentFromState(false);
+
             updateStatus('ativo');
 
             // Sincronizar com Firebase
@@ -223,111 +350,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log('[Local] Tournament Data:', tournamentState);
             }
         });
-    }
-
-    // ========== GENERATE GROUPS (STATE ONLY) ==========
-    function generateGroups(total) {
-        const playersPerGroup = 4;
-        const numGroups = Math.max(1, Math.ceil(total / playersPerGroup));
-        tournamentState.groups = [];
-
-        for (let g = 0; g < numGroups; g++) {
-            const letter = String.fromCharCode(65 + g);
-            const count = Math.min(playersPerGroup, total - (g * playersPerGroup));
-            const players = [];
-
-            for (let p = 0; p < count; p++) {
-                const playerNum = p + 1 + (g * playersPerGroup);
-                players.push({ name: `Jogador #${playerNum}`, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0 });
-            }
-
-            tournamentState.groups.push({ name: `Grupo ${letter}`, players });
-        }
-    }
-
-    // ========== GENERATE PREVIEW STRUCTURE ==========
-    function generatePreviewStructure(total, format) {
-        const showGroups = format === 'grupos' || format === 'grupos-mata-mata';
-        const showMataMata = format === 'mata-mata' || format === 'grupos-mata-mata';
-        
-        // --- Grupos Preview ---
-        if (showGroups) {
-            const playersPerGroup = 4;
-            const numGroups = Math.max(1, Math.ceil(total / playersPerGroup));
-            groupsContainer.innerHTML = '';
-            
-            for (let g = 0; g < numGroups; g++) {
-                const letter = String.fromCharCode(65 + g);
-                const count = Math.min(playersPerGroup, total - (g * playersPerGroup));
-                
-                let rows = '';
-                for (let p = 0; p < count; p++) {
-                    const playerNum = p + 1 + (g * playersPerGroup);
-                    rows += `
-                        <tr>
-                            <td>A definir (Slot ${playerNum})</td>
-                            <td>—</td><td>—</td><td>—</td><td>—</td>
-                            <td>—</td><td>—</td><td>—</td><td>—</td>
-                        </tr>`;
-                }
-
-                const card = document.createElement('div');
-                card.className = 'group-card preview-mode';
-                card.innerHTML = `
-                    <div class="preview-badge">PREVIEW</div>
-                    <div class="group-title">Grupo ${letter}</div>
-                    <table class="group-table">
-                        <thead>
-                            <tr>
-                                <th>Jogador</th>
-                                <th>J</th><th>V</th><th>E</th><th>D</th>
-                                <th>GP</th><th>GC</th><th>SG</th><th>PTS</th>
-                            </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                    </table>`;
-                groupsContainer.appendChild(card);
-            }
-        } else {
-            groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Fase de Grupos desativada</h3><p>O formato atual não inclui grupos.</p></div>`;
-        }
-
-        // --- Mata-Mata Preview ---
-        const mataMataContainer = document.getElementById('tab-mata-mata');
-        if (mataMataContainer) {
-            if (showMataMata) {
-                let power = Math.pow(2, Math.ceil(Math.log2(total)));
-                if (power < 2) power = 2;
-                let roundsCount = Math.log2(power);
-                
-                let bracketHTML = `<div class="bracket-container preview-mode">
-                                    <div class="preview-badge">PREVIEW</div>`;
-                                    
-                for (let r = 0; r < roundsCount; r++) {
-                    let matchesInRound = power / Math.pow(2, r + 1);
-                    let roundName = matchesInRound === 1 ? 'Final' : (matchesInRound === 2 ? 'Semifinal' : (matchesInRound === 4 ? 'Quartas de Final' : `Fase de ${matchesInRound*2}`));
-                    
-                    let matchesHTML = '';
-                    for (let m = 0; m < matchesInRound; m++) {
-                        matchesHTML += `
-                            <div class="bracket-match">
-                                <div class="bracket-slot"><span>A definir</span><span>—</span></div>
-                                <div class="bracket-slot"><span>A definir</span><span>—</span></div>
-                            </div>`;
-                    }
-                    
-                    bracketHTML += `
-                        <div class="bracket-round">
-                            <div class="bracket-round-title">${roundName}</div>
-                            ${matchesHTML}
-                        </div>`;
-                }
-                bracketHTML += `</div>`;
-                mataMataContainer.innerHTML = bracketHTML;
-            } else {
-                mataMataContainer.innerHTML = `<div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div>`;
-            }
-        }
     }
 
     // ========== STATUS UPDATE ==========
@@ -433,6 +455,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 top3Container.style.display = 'none';
                 tournamentState.groups = [];
                 tournamentState.status = 'aguardando';
+                
+                if (tournamentState.status === 'aguardando') {
+                    generateTournamentStructure(Array(tournamentState.participants).fill(null), tournamentState.format);
+                }
                 
                 if (db) deleteDoc(doc(db, 'tournaments', 'current'));
             }
