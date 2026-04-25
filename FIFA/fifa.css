@@ -1465,3 +1465,105 @@ body {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+
+/* ========================
+   BRACKET STYLES
+   ======================== */
+.bracket-container {
+    display: flex;
+    gap: 2rem;
+    padding: 1.5rem 0.5rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,0,0,0.1) transparent;
+}
+
+.bracket-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+.bracket-container::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.1);
+    border-radius: 10px;
+}
+
+.bracket-round {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-width: 220px;
+    justify-content: space-around;
+}
+
+.bracket-round-title {
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #51715C;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(255,255,255,0.4);
+    border-radius: 8px;
+}
+
+.bracket-match {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    transition: all 0.2s;
+}
+
+.bracket-match:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+    border-color: #16A34A;
+}
+
+.bracket-slot {
+    padding: 0.6rem 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #042D15;
+    background: rgba(255,255,255,0.2);
+}
+
+.bracket-slot:first-child {
+    border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+
+.bracket-slot span:last-child {
+    font-weight: 800;
+    color: #16A34A;
+}
+
+/* MOBILE ADJUSTMENTS FOR BRACKET */
+@media (max-width: 768px) {
+    #tab-mata-mata {
+        height: calc(100vh - 250px);
+        overflow-y: auto;
+        padding-bottom: 2rem;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .bracket-container {
+        padding: 1rem 0;
+        align-items: flex-start;
+    }
+
+    .bracket-round {
+        min-width: 180px;
+        gap: 1rem;
+        justify-content: flex-start;
+    }
+}
