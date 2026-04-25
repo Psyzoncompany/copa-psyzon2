@@ -1,4 +1,4 @@
-import { getFirestore, doc, setDoc, getDoc, getDocs, collection, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 export function initRankingSystem(db, role) {
     if (!db) {
@@ -136,8 +136,8 @@ export function initRankingSystem(db, role) {
         
         try {
             // Check if already imported
-            const importRef = doc(db, 'imports', importId);
-            const importSnap = await getDoc(importRef);
+            const importRef = ref(db, 'imports/' + importId);
+            const importSnap = await get(importRef);
             if (importSnap.exists()) {
                 alert("Este torneio já foi importado anteriormente.");
                 btn.disabled = false;
@@ -148,8 +148,8 @@ export function initRankingSystem(db, role) {
             // Process players
             for (const p of currentParsedData.players) {
                 const playerId = p.id || p.playerName.replace(/\s+/g, '').toLowerCase();
-                const playerRef = doc(db, 'players', playerId);
-                const pSnap = await getDoc(playerRef);
+                const playerRef = ref(db, 'players/' + playerId);
+                const pSnap = await get(playerRef);
 
                 let pd = {
                     id: playerId,
@@ -160,7 +160,7 @@ export function initRankingSystem(db, role) {
                 };
 
                 if (pSnap.exists()) {
-                    pd = pSnap.data();
+                    pd = pSnap.val();
                     if(!pd.stats) pd.stats = {};
                 }
 
@@ -197,11 +197,11 @@ export function initRankingSystem(db, role) {
                     s.semifinals = (s.semifinals || 0) + 1;
                 }
                 
-                await setDoc(playerRef, pd);
+                await set(playerRef, pd);
             }
 
             // Save import record
-            await setDoc(importRef, {
+            await set(importRef, {
                 id: importId,
                 name: currentParsedData.name,
                 modality: currentParsedData.modality,
@@ -230,12 +230,13 @@ export function initRankingSystem(db, role) {
         rankingTbody.innerHTML = `<tr><td colspan="12" style="text-align:center;">Carregando ranking...</td></tr>`;
         
         try {
-            const snap = await getDocs(collection(db, 'players'));
+            const snap = await get(ref(db, 'players'));
             let playersList = [];
             
-            snap.forEach(doc => {
-                let p = doc.data();
-                if (!p.stats) return;
+            if (snap.exists()) {
+                snap.forEach(childSnap => {
+                    let p = childSnap.val();
+                    if (!p.stats) return;
 
                 let statsToUse = { j:0, v:0, e:0, d:0, gp:0, gc:0, sg:0, pts:0, titles:0, finals:0 };
                 
@@ -268,7 +269,8 @@ export function initRankingSystem(db, role) {
                         aprov: statsToUse.j > 0 ? ((statsToUse.pts / (statsToUse.j * 3)) * 100).toFixed(1) : 0
                     });
                 }
-            });
+                });
+            }
 
             // Ordenação: 1.Títulos, 2.Pontos, 3.Vitórias, 4.SG, 5.GM
             playersList.sort((a, b) => {
@@ -301,23 +303,23 @@ export function initRankingSystem(db, role) {
             
             html += `
                 <tr>
-                    <td style="font-weight:bold; color: #fff;">${medal}</td>
+                    <td style="font-weight:bold; color: #042D15;">${medal}</td>
                     <td style="text-align:left; display:flex; align-items:center; gap:8px;">
                         <img src="https://flagcdn.com/24x18/${p.flagId || 'br'}.png" alt="flag" style="border-radius:2px;">
                         <div style="display:flex; flex-direction:column;">
-                            <span style="font-weight:500; color:#fff;">${p.name}</span>
-                            <span style="font-size:11px; color:rgba(255,255,255,0.5);">${p.nick || 'Sem Time'}</span>
+                            <span style="font-weight:600; color:#042D15;">${p.name}</span>
+                            <span style="font-size:11px; color:#8A9E8F;">${p.nick || 'Sem Time'}</span>
                         </div>
                     </td>
-                    <td style="color:#facc15; font-weight:bold;">${s.titles > 0 ? s.titles : '-'}</td>
-                    <td style="font-weight:bold; color:#fff;">${s.pts}</td>
+                    <td style="color:#D97706; font-weight:bold;">${s.titles > 0 ? s.titles : '-'}</td>
+                    <td style="font-weight:bold; color:#042D15;">${s.pts}</td>
                     <td>${s.j}</td>
                     <td>${s.v}</td>
                     <td>${s.e}</td>
                     <td>${s.d}</td>
                     <td>${s.gp}</td>
                     <td>${s.gc}</td>
-                    <td style="color:${s.sg > 0 ? '#4ade80' : (s.sg < 0 ? '#ef4444' : '#fff')}">${s.sg > 0 ? '+'+s.sg : s.sg}</td>
+                    <td style="color:${s.sg > 0 ? '#16A34A' : (s.sg < 0 ? '#E63946' : '#042D15')}">${s.sg > 0 ? '+'+s.sg : s.sg}</td>
                     <td>${p.aprov}%</td>
                 </tr>
             `;
@@ -330,20 +332,20 @@ export function initRankingSystem(db, role) {
         
         rankingHighlights.innerHTML = `
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
-                <div style="background: rgba(250, 204, 21, 0.1); padding: 15px; border-radius: 12px; border: 1px solid rgba(250, 204, 21, 0.2);">
-                    <div style="font-size:12px; color:#facc15; font-weight:bold; margin-bottom:5px;">MAIOR CAMPEÃO</div>
-                    <div style="color:#fff; font-size:18px; font-weight:bold;">${list[0].name}</div>
-                    <div style="color:rgba(255,255,255,0.7); font-size:13px;">${list[0].currentStats.titles} Títulos / ${list[0].currentStats.pts} PTS</div>
+                <div style="background: rgba(217,119,6,0.1); padding: 15px; border-radius: 16px; border: 1px solid rgba(217,119,6,0.15); backdrop-filter: blur(8px);">
+                    <div style="font-size:12px; color:#D97706; font-weight:bold; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">MAIOR CAMPEÃO</div>
+                    <div style="color:#042D15; font-size:18px; font-weight:800;">${list[0].name}</div>
+                    <div style="color:#51715C; font-size:13px;">${list[0].currentStats.titles} Títulos / ${list[0].currentStats.pts} PTS</div>
                 </div>
-                <div style="background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.2);">
-                    <div style="font-size:12px; color:#3b82f6; font-weight:bold; margin-bottom:5px;">MÁQUINA DE GOLS</div>
-                    <div style="color:#fff; font-size:18px; font-weight:bold;">${topScorer.name}</div>
-                    <div style="color:rgba(255,255,255,0.7); font-size:13px;">${topScorer.currentStats.gp} Gols Marcados</div>
+                <div style="background: rgba(13,110,253,0.08); padding: 15px; border-radius: 16px; border: 1px solid rgba(13,110,253,0.12); backdrop-filter: blur(8px);">
+                    <div style="font-size:12px; color:#0D6EFD; font-weight:bold; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">MÁQUINA DE GOLS</div>
+                    <div style="color:#042D15; font-size:18px; font-weight:800;">${topScorer.name}</div>
+                    <div style="color:#51715C; font-size:13px;">${topScorer.currentStats.gp} Gols Marcados</div>
                 </div>
-                <div style="background: rgba(34, 197, 94, 0.1); padding: 15px; border-radius: 12px; border: 1px solid rgba(34, 197, 94, 0.2);">
-                    <div style="font-size:12px; color:#22c55e; font-weight:bold; margin-bottom:5px;">MELHOR DEFESA</div>
-                    <div style="color:#fff; font-size:18px; font-weight:bold;">${topDefense.name}</div>
-                    <div style="color:rgba(255,255,255,0.7); font-size:13px;">Apenas ${topDefense.currentStats.gc} Gols Sofridos</div>
+                <div style="background: rgba(22,163,74,0.08); padding: 15px; border-radius: 16px; border: 1px solid rgba(22,163,74,0.12); backdrop-filter: blur(8px);">
+                    <div style="font-size:12px; color:#16A34A; font-weight:bold; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">MELHOR DEFESA</div>
+                    <div style="color:#042D15; font-size:18px; font-weight:800;">${topDefense.name}</div>
+                    <div style="color:#51715C; font-size:13px;">Apenas ${topDefense.currentStats.gc} Gols Sofridos</div>
                 </div>
             </div>
         `;
@@ -361,8 +363,8 @@ export function initRankingSystem(db, role) {
         if(!container) return;
 
         try {
-            const snap = await getDocs(collection(db, 'imports'));
-            if(snap.empty) {
+            const snap = await get(ref(db, 'imports'));
+            if(!snap.exists()) {
                 container.innerHTML = `
                     <div class="empty-state">
                         <i class="ph ph-clock-counter-clockwise"></i>
@@ -373,8 +375,8 @@ export function initRankingSystem(db, role) {
             }
 
             let html = '';
-            snap.forEach(doc => {
-                const d = doc.data();
+            snap.forEach(childSnap => {
+                const d = childSnap.val();
                 html += `
                     <div class="group-card" style="display:flex; justify-content:space-between; align-items:center; padding: 15px;">
                         <div>

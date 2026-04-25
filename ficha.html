@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fichas dos Participantes - Copa Psyzon</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ficha-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255,255,255,0.8);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .ficha-topbar h1 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #042D15;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .ficha-topbar h1 i {
+            color: #16A34A;
+        }
+
+        .ficha-topbar a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: #51715C;
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 0.6rem 1.2rem;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.5);
+            border: 1px solid rgba(255,255,255,0.8);
+            transition: all 0.2s;
+        }
+
+        .ficha-topbar a:hover {
+            background: rgba(255,255,255,0.9);
+            color: #042D15;
+            transform: translateY(-1px);
+        }
+
+        .ficha-stats-bar {
+            display: flex;
+            gap: 1rem;
+            padding: 1.2rem 2rem;
+            flex-wrap: wrap;
+        }
+
+        .ficha-stat {
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.8);
+            border-radius: 16px;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .ficha-stat i {
+            font-size: 1.8rem;
+            color: #16A34A;
+        }
+
+        .ficha-stat-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ficha-stat-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #042D15;
+        }
+
+        .ficha-stat-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #51715C;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .fichas-container {
+            padding: 0 2rem 2rem;
+            flex: 1;
+        }
+
+        .fichas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.2rem;
+        }
+
+        .ficha-card {
+            background: rgba(255,255,255,0.55);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.8);
+            border-radius: 24px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 32px rgba(0,60,20,0.05);
+        }
+
+        .ficha-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 40px rgba(0,60,20,0.1);
+            border-color: rgba(22,163,74,0.3);
+        }
+
+        .ficha-card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .ficha-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(22,163,74,0.15), rgba(13,110,253,0.1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: #16A34A;
+            border: 2px solid rgba(255,255,255,0.9);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .ficha-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .ficha-name-block {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .ficha-name {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #042D15;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .ficha-nick {
+            font-size: 0.85rem;
+            color: #51715C;
+            font-weight: 500;
+        }
+
+        .ficha-flag-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: rgba(22,163,74,0.1);
+            padding: 0.3rem 0.7rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #16A34A;
+            text-transform: uppercase;
+        }
+
+        .ficha-flag-badge img {
+            width: 20px;
+            height: 15px;
+            border-radius: 2px;
+        }
+
+        .ficha-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            padding-top: 0.8rem;
+            border-top: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .ficha-detail {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+            font-size: 0.85rem;
+            color: #51715C;
+        }
+
+        .ficha-detail i {
+            font-size: 1.1rem;
+            color: #16A34A;
+            width: 20px;
+            text-align: center;
+        }
+
+        .ficha-detail strong {
+            color: #042D15;
+            font-weight: 600;
+        }
+
+        .ficha-date {
+            font-size: 0.7rem;
+            color: #8A9E8F;
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .ficha-empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #8A9E8F;
+        }
+
+        .ficha-empty i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            display: block;
+            color: #c5d4c9;
+        }
+
+        .ficha-empty h3 {
+            font-size: 1.3rem;
+            color: #51715C;
+            margin-bottom: 0.5rem;
+        }
+
+        .ficha-search {
+            padding: 0 2rem 1rem;
+        }
+
+        .ficha-search-input {
+            width: 100%;
+            max-width: 400px;
+            padding: 0.8rem 1.2rem 0.8rem 2.8rem;
+            background: rgba(255,255,255,0.6);
+            border: 1.5px solid rgba(255,255,255,0.9);
+            border-radius: 16px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #042D15;
+            outline: none;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        .ficha-search-input:focus {
+            background: rgba(255,255,255,0.9);
+            border-color: #16A34A;
+            box-shadow: 0 0 0 4px rgba(22,163,74,0.12);
+        }
+
+        .ficha-search-wrapper {
+            position: relative;
+            max-width: 400px;
+        }
+
+        .ficha-search-wrapper i {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #8A9E8F;
+            font-size: 1.1rem;
+        }
+
+        @media (max-width: 768px) {
+            .ficha-topbar {
+                padding: 0.8rem 1rem;
+            }
+            .ficha-stats-bar {
+                padding: 1rem;
+            }
+            .fichas-container, .ficha-search {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+            .fichas-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="background-container"></div>
+
+    <nav class="ficha-topbar">
+        <h1><i class="ph-fill ph-address-book"></i> Fichas dos Participantes</h1>
+        <a href="FIFA/Fifa.html?role=organizador">
+            <i class="ph ph-arrow-left"></i> Voltar ao Painel
+        </a>
+    </nav>
+
+    <div class="ficha-stats-bar">
+        <div class="ficha-stat">
+            <i class="ph-fill ph-users-three"></i>
+            <div class="ficha-stat-info">
+                <span class="ficha-stat-value" id="stat-total">0</span>
+                <span class="ficha-stat-label">Total Cadastrados</span>
+            </div>
+        </div>
+        <div class="ficha-stat">
+            <i class="ph-fill ph-check-circle"></i>
+            <div class="ficha-stat-info">
+                <span class="ficha-stat-value" id="stat-codes-used">0</span>
+                <span class="ficha-stat-label">Códigos Usados</span>
+            </div>
+        </div>
+        <div class="ficha-stat">
+            <i class="ph-fill ph-ticket"></i>
+            <div class="ficha-stat-info">
+                <span class="ficha-stat-value" id="stat-codes-avail">0</span>
+                <span class="ficha-stat-label">Códigos Disponíveis</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="ficha-search">
+        <div class="ficha-search-wrapper">
+            <i class="ph ph-magnifying-glass"></i>
+            <input type="text" class="ficha-search-input" id="search-input" placeholder="Buscar por nome, nick ou CPF...">
+        </div>
+    </div>
+
+    <div class="fichas-container">
+        <div class="fichas-grid" id="fichas-grid">
+            <div class="ficha-empty">
+                <i class="ph ph-spinner"></i>
+                <h3>Carregando...</h3>
+                <p>Buscando participantes cadastrados.</p>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <i class="ph-fill ph-shield-check"></i>
+        <p>Área exclusiva do <span>organizador.</span></p>
+    </footer>
+
+    <script type="module" src="ficha.js"></script>
+</body>
+</html>

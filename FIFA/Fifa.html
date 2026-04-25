@@ -240,43 +240,45 @@
 
             <!-- TAB 3: RANKING -->
             <div id="tab-ranking" class="tab-content" style="display: none;">
-                <div class="bracket-bar">
-                    <h2>Ranking Oficial</h2>
-                    <select id="ranking-modality-filter" class="form-control" style="max-width: 200px;">
-                        <option value="fifa" selected>FIFA</option>
-                        <option value="geral">Geral (Todos)</option>
-                        <option value="sinuca">Sinuca</option>
-                        <option value="cs">Counter-Strike</option>
-                    </select>
-                </div>
+                <div class="card" style="background: rgba(255,255,255,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.8); border-radius: 20px; padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,60,20,0.05);">
+                    <div class="bracket-bar" style="margin-bottom: 1rem;">
+                        <h2 style="color: #042D15;">Ranking Oficial</h2>
+                        <select id="ranking-modality-filter" class="form-control" style="max-width: 200px; background: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.9); border-radius: 12px; padding: 0.6rem 1rem; color: #042D15; font-weight: 600; font-size: 0.85rem;">
+                            <option value="fifa" selected>FIFA</option>
+                            <option value="geral">Geral (Todos)</option>
+                            <option value="sinuca">Sinuca</option>
+                            <option value="cs">Counter-Strike</option>
+                        </select>
+                    </div>
 
-                <div class="ranking-highlights" id="ranking-highlights">
-                    <!-- Cards de destaque: Maior Campeão, Artilheiro, Melhor Defesa -->
-                </div>
+                    <div class="ranking-highlights" id="ranking-highlights">
+                        <!-- Cards de destaque: Maior Campeão, Artilheiro, Melhor Defesa -->
+                    </div>
 
-                <div class="table-responsive" style="overflow-x: auto;">
-                    <table class="group-table ranking-table" style="min-width: 800px;">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th style="text-align:left;">Jogador</th>
-                                <th>🏆 Títulos</th>
-                                <th>PTS</th>
-                                <th>J</th>
-                                <th>V</th>
-                                <th>E</th>
-                                <th>D</th>
-                                <th>GM</th>
-                                <th>GS</th>
-                                <th>SG</th>
-                                <th>% Aprov</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ranking-tbody">
-                            <!-- Tabela Injetada -->
-                            <tr><td colspan="12" style="text-align:center;">Carregando ranking...</td></tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive" style="overflow-x: auto;">
+                        <table class="group-table ranking-table" style="min-width: 800px;">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th style="text-align:left;">Jogador</th>
+                                    <th>🏆 Títulos</th>
+                                    <th>PTS</th>
+                                    <th>J</th>
+                                    <th>V</th>
+                                    <th>E</th>
+                                    <th>D</th>
+                                    <th>GM</th>
+                                    <th>GS</th>
+                                    <th>SG</th>
+                                    <th>% Aprov</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ranking-tbody">
+                                <!-- Tabela Injetada -->
+                                <tr><td colspan="12" style="text-align:center;">Carregando ranking...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 

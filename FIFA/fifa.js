@@ -4,7 +4,7 @@
    ================================================ */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
 import { initRankingSystem } from './ranking.js';
 
@@ -15,7 +15,8 @@ const firebaseConfig = {
   storageBucket: "copa-psyzon2.firebasestorage.app",
   messagingSenderId: "934292793843",
   appId: "1:934292793843:web:2f67fc6d314e1185f6ca86",
-  measurementId: "G-G9Q14JE533"
+  measurementId: "G-G9Q14JE533",
+  databaseURL: "https://copa-psyzon2-default-rtdb.firebaseio.com"
 };
 
 let db = null;
@@ -24,7 +25,7 @@ try {
     if (firebaseConfig.apiKey !== "SUA_API_KEY") {
         const app = initializeApp(firebaseConfig);
         analytics = getAnalytics(app);
-        db = getFirestore(app);
+        db = getDatabase(app);
         console.log("🔥 Firebase inicializado!");
     } else {
         console.warn("⚠️ Firebase: Configure sua API Key no fifa.js para ativar a nuvem.");
@@ -38,11 +39,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ========== ROLE DETECTION ==========
     const urlParams = new URLSearchParams(window.location.search);
     const role = urlParams.get('role') || 'visitante';
+    const participantId = urlParams.get('id') || null;
+    const participantName = urlParams.get('name') ? decodeURIComponent(urlParams.get('name')) : null;
 
     const badge = document.getElementById('user-role-badge');
     const organizerPanel = document.getElementById('organizer-panel');
 
-    badge.textContent = role.toUpperCase();
+    if (role === 'participante' && participantName) {
+        badge.textContent = participantName;
+    } else {
+        badge.textContent = role.toUpperCase();
+    }
 
     const roleStyles = {
         organizador: { bg: 'rgba(250,204,21,0.2)', color: '#FACC15' },
@@ -72,9 +79,55 @@ document.addEventListener('DOMContentLoaded', async () => {
         status: 'aguardando', // aguardando | ativo | encerrado
         groups: [],
         codes: [],
+        tournamentCode: null, // Ex: F1234
         top3: { first: '—', second: '—', third: '—' },
         createdAt: null,
     };
+
+    // ========== RENDER CODES (reusable) ==========
+    function renderCodes(codesArray) {
+        const codesList = document.getElementById('codes-list');
+        if (!codesList) return;
+        codesList.innerHTML = '';
+
+        if (!codesArray || codesArray.length === 0) return;
+
+        codesArray.forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'code-item';
+            item.innerHTML = `
+                <span class="code-value">${c.code}</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span class="${c.used ? 'code-used' : 'code-available'}">${c.used ? 'Utilizado' : 'Disponível'}</span>
+                    ${!c.used ? `<button class="code-copy-btn" data-code="${c.code}" title="Copiar código" style="background:none; border:1px solid rgba(22,163,74,0.2); border-radius:6px; padding:3px 6px; cursor:pointer; color:#16A34A; font-size:0.8rem; display:flex; align-items:center; transition:all 0.2s;"><i class="ph ph-copy"></i></button>` : ''}
+                </div>
+            `;
+            // Copiar ao clicar
+            const copyBtn = item.querySelector('.code-copy-btn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(c.code).then(() => {
+                        copyBtn.innerHTML = '<i class="ph-fill ph-check"></i>';
+                        copyBtn.style.color = '#fff';
+                        copyBtn.style.background = '#16A34A';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = '<i class="ph ph-copy"></i>';
+                            copyBtn.style.color = '#16A34A';
+                            copyBtn.style.background = 'none';
+                        }, 1500);
+                    });
+                });
+            }
+            codesList.appendChild(item);
+        });
+
+        const availCount = codesArray.filter(c => !c.used).length;
+        const usedCount = codesArray.filter(c => c.used).length;
+        const elAvail = document.querySelector('.status-available');
+        const elUsed = document.querySelector('.status-used');
+        if (elAvail) elAvail.textContent = `${availCount} disponíveis`;
+        if (elUsed) elUsed.textContent = `${usedCount} utilizados`;
+    }
 
     // ========== DOM REFERENCES ==========
     const participantsInput = document.getElementById('tourney-participants');
@@ -124,9 +177,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ========== FIREBASE REAL-TIME SYNC ==========
     if (db) {
-        onSnapshot(doc(db, 'tournaments', 'current'), (docSnap) => {
+        // --- Listener do Torneio ---
+        onValue(ref(db, 'tournaments/current'), (docSnap) => {
             if (docSnap.exists()) {
-                const data = docSnap.data();
+                const data = docSnap.val();
                 tournamentState = data;
                 
                 // Se o torneio estiver rodando OU se for visão de visitante, renderiza
@@ -151,6 +205,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     updatePreview();
                 }
+            }
+        });
+
+        // --- Listener dos Códigos (persiste ao recarregar) ---
+        onValue(ref(db, 'codes/pool'), (snap) => {
+            if (snap.exists()) {
+                const data = snap.val();
+                const codesArray = data.codes || [];
+                tournamentState.codes = codesArray;
+                renderCodes(codesArray);
+                console.log(`🔑 ${codesArray.length} códigos carregados do Firebase`);
             }
         });
     } else {
@@ -246,9 +311,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let rows = '';
                 group.players.forEach((player, i) => {
                     const statusClass = i < 2 ? 'classified' : (i === 2 ? 'playoff' : 'possible-3rd');
+                    const isMe = participantName && player.name === participantName;
+                    const nameStyle = isMe ? 'color: #16A34A; font-weight: 800;' : '';
                     rows += `
                         <tr class="${statusClass}">
-                            <td>${player.name}</td>
+                            <td style="${nameStyle}">${isMe ? '✅ ' : ''}${player.name}</td>
                             <td>${player.j}</td><td>${player.v}</td><td>${player.e}</td><td>${player.d}</td>
                             <td>${player.gp}</td><td>${player.gc}</td><td>${player.sg}</td><td>${player.pts}</td>
                         </tr>`;
@@ -337,21 +404,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
+    // ========== GENERATE TOURNAMENT CODE ==========
+    async function generateTournamentCode(type = 'fifa') {
+        const prefixMap = { fifa: 'F', sinuca: 'S', cs: 'C' };
+        const prefix = prefixMap[type] || 'F';
+        let code = '';
+        let exists = true;
+        let attempts = 0;
+
+        while (exists && attempts < 20) {
+            const num = String(Math.floor(1000 + Math.random() * 9000)); // 4 dígitos
+            code = prefix + num;
+            if (db) {
+                const snap = await get(ref(db, 'tournaments/' + code));
+                exists = snap.exists();
+            } else {
+                exists = false;
+            }
+            attempts++;
+        }
+        return code;
+    }
+
     // ========== GENERATE BRACKET ==========
     const btnGerar = document.getElementById('btn-gerar-chaveamento');
     if (btnGerar) {
-        btnGerar.addEventListener('click', () => {
+        btnGerar.addEventListener('click', async () => {
             const name = document.getElementById('tourney-name').value || 'Copa Psyzon FIFA';
             const participants = parseInt(participantsInput.value) || 8;
             const format = document.getElementById('tourney-format').value;
             const homeAway = document.getElementById('tourney-home-away').checked;
+
+            // Gera código único do torneio
+            const tourneyCode = await generateTournamentCode('fifa');
 
             tournamentState.name = name;
             tournamentState.participants = participants;
             tournamentState.format = format;
             tournamentState.homeAway = homeAway;
             tournamentState.status = 'ativo';
+            tournamentState.tournamentCode = tourneyCode;
             tournamentState.createdAt = new Date().toISOString();
+            tournamentState.updatedAt = new Date().toISOString();
 
             // Ao iniciar, gera com participantes mockados (ou reais caso venha do DB)
             const mockParticipants = Array(participants).fill(null).map((_, i) => ({ name: `Jogador #${i+1}` }));
@@ -362,9 +456,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Sincronizar com Firebase
             if (db) {
-                setDoc(doc(db, 'tournaments', 'current'), tournamentState)
-                    .then(() => console.log('Torneio salvo no Firebase!'))
-                    .catch(e => console.error("Erro ao salvar:", e));
+                try {
+                    // Salva como torneio atual
+                    await set(ref(db, 'tournaments/current'), tournamentState);
+                    // Salva também indexado pelo código
+                    await set(ref(db, 'tournaments/' + tourneyCode), tournamentState);
+                    console.log(`✅ Torneio ${tourneyCode} salvo no Firebase!`);
+                } catch(e) {
+                    console.error("Erro ao salvar:", e);
+                    alert('Erro ao salvar o torneio no Firebase.');
+                }
             } else {
                 console.log('[Local] Tournament Data:', tournamentState);
             }
@@ -390,7 +491,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Firebase Update
             if (db) {
-                updateDoc(doc(db, 'tournaments', 'current'), { prize: text })
+                update(ref(db, 'tournaments/current'), { prize: text })
                     .catch(e => console.error("Erro Prêmio:", e));
             }
         });
@@ -398,43 +499,62 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ========== GENERATE CODES ==========
     const btnGerarCodigos = document.getElementById('btn-gerar-codigos');
-    const codesList = document.getElementById('codes-list');
 
     if (btnGerarCodigos) {
-        btnGerarCodigos.addEventListener('click', () => {
-            codesList.innerHTML = '';
-            // Gerar códigos aleatórios
-            tournamentState.codes = [];
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        btnGerarCodigos.addEventListener('click', async () => {
+            // ===== 1. ATIVAR TORNEIO AUTOMATICAMENTE =====
+            const name = document.getElementById('tourney-name').value || 'Copa Psyzon FIFA';
+            const participants = parseInt(participantsInput.value) || 8;
+            const format = formatSelect ? formatSelect.value : 'grupos-mata-mata';
+            const homeAway = document.getElementById('tourney-home-away').checked;
+
+            // Gera código único do torneio
+            const tourneyCode = await generateTournamentCode('fifa');
+
+            tournamentState.name = name;
+            tournamentState.participants = participants;
+            tournamentState.format = format;
+            tournamentState.homeAway = homeAway;
+            tournamentState.status = 'ativo';
+            tournamentState.tournamentCode = tourneyCode;
+            tournamentState.createdAt = new Date().toISOString();
+            tournamentState.updatedAt = new Date().toISOString();
+            tournamentState.registeredPlayers = [];
+
+            // Monta chaveamento com slots "A definir"
+            const mockParticipants = Array(participants).fill(null).map((_, i) => ({ name: `A definir (Slot ${i+1})` }));
+            buildTournamentState(mockParticipants, format);
+            renderTournamentFromState(false);
+            updateStatus('ativo');
+
+            // ===== 2. GERAR 32 CÓDIGOS =====
+            const newCodes = [];
+            const existingSet = new Set();
+
             for (let i = 0; i < 32; i++) {
-                let randomPart = '';
-                for (let j = 0; j < 5; j++) {
-                    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
-                }
-                const code = `F-${randomPart}`; // F para FIFA
-                tournamentState.codes.push({ code, used: false });
+                let code;
+                do {
+                    const num = String(Math.floor(1000 + Math.random() * 9000));
+                    code = 'F' + num;
+                } while (existingSet.has(code));
+                existingSet.add(code);
+                newCodes.push({ code, used: false });
             }
-            
-            // Render codes list
-            tournamentState.codes.forEach(c => {
-                const item = document.createElement('div');
-                item.className = 'code-item';
-                item.innerHTML = `
-                    <span class="code-value">${c.code}</span>
-                    <span class="${c.used ? 'code-used' : 'code-available'}">${c.used ? 'Utilizado' : 'Disponível'}</span>
-                `;
-                codesList.appendChild(item);
-            });
 
-            const availCount = tournamentState.codes.filter(c => !c.used).length;
-            const usedCount = tournamentState.codes.filter(c => c.used).length;
-            document.querySelector('.status-available').textContent = `${availCount} disponíveis`;
-            document.querySelector('.status-used').textContent = `${usedCount} utilizados`;
+            tournamentState.codes = newCodes;
+            renderCodes(newCodes);
 
-            // Sincronizar códigos
+            // ===== 3. SALVAR TUDO NO FIREBASE =====
             if (db) {
-                setDoc(doc(db, 'codes', 'pool'), { codes: tournamentState.codes })
-                    .catch(e => console.error("Erro Códigos:", e));
+                try {
+                    await set(ref(db, 'tournaments/current'), tournamentState);
+                    await set(ref(db, 'tournaments/' + tourneyCode), tournamentState);
+                    await set(ref(db, 'codes/pool'), { codes: newCodes });
+                    console.log(`✅ Torneio ${tourneyCode} ATIVADO com 32 códigos!`);
+                } catch(e) {
+                    console.error("Erro ao salvar:", e);
+                    alert('Erro ao salvar no Firebase.');
+                }
             }
         });
     }
@@ -442,9 +562,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ========== ACTION BUTTONS ==========
     const actions = {
         'btn-embaralhar': () => {
-            if (tournamentState.groups.length === 0 && tournamentState.status === 'aguardando') return;
-            generateGroups(tournamentState.participants);
-            renderGroupsFromState();
+            if (!tournamentState.groups || tournamentState.groups.length === 0) return;
+            
+            // Coletar todos os jogadores atuais dos grupos
+            let allPlayers = [];
+            tournamentState.groups.forEach(g => {
+                g.players.forEach(p => allPlayers.push({ name: p.name }));
+            });
+            
+            // Embaralhar (Fisher-Yates)
+            for (let i = allPlayers.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [allPlayers[i], allPlayers[j]] = [allPlayers[j], allPlayers[i]];
+            }
+            
+            // Reconstruir o chaveamento
+            buildTournamentState(allPlayers, tournamentState.format);
+            renderTournamentFromState(false);
+            
+            // Salvar no Firebase
+            if (db) {
+                update(ref(db, 'tournaments/current'), { 
+                    groups: tournamentState.groups, 
+                    knockout: tournamentState.knockout,
+                    updatedAt: new Date().toISOString()
+                }).catch(e => console.error('Erro ao embaralhar:', e));
+            }
+            
             console.log('[Action] Bracket shuffled');
         },
         'btn-atualizar': () => {
@@ -454,10 +598,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         'btn-encerrar': () => {
             if (confirm('Deseja encerrar e salvar o torneio?')) {
                 tournamentState.status = 'encerrado';
+                tournamentState.updatedAt = new Date().toISOString();
                 updateStatus('encerrado');
                 top3Container.style.display = 'flex';
                 
-                if (db) updateDoc(doc(db, 'tournaments', 'current'), { status: 'encerrado' });
+                if (db) {
+                    update(ref(db, 'tournaments/current'), { status: 'encerrado', updatedAt: tournamentState.updatedAt });
+                    if (tournamentState.tournamentCode) {
+                        update(ref(db, 'tournaments/' + tournamentState.tournamentCode), { status: 'encerrado', updatedAt: tournamentState.updatedAt });
+                    }
+                }
             }
         },
         'btn-resetar': () => {
@@ -467,20 +617,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                 prizeBanner.style.display = 'none';
                 top3Container.style.display = 'none';
                 tournamentState.groups = [];
+                tournamentState.knockout = null;
                 tournamentState.status = 'aguardando';
+                tournamentState.tournamentCode = null;
                 
-                if (tournamentState.status === 'aguardando') {
-                    generateTournamentStructure(Array(tournamentState.participants).fill(null), tournamentState.format);
-                }
-                
-                if (db) deleteDoc(doc(db, 'tournaments', 'current'));
+                if (db) remove(ref(db, 'tournaments/current'));
             }
         },
         'btn-resetar-tudo': () => {
             if (confirm('🚨 ATENÇÃO: Isso vai apagar TUDO (torneio, códigos, histórico). Tem certeza?')) {
-                location.reload();
-                // Firebase: batch delete all collections
-                console.log('[Action] Full site reset');
+                if (db) {
+                    Promise.all([
+                        remove(ref(db, 'tournaments/current')),
+                        remove(ref(db, 'codes/pool'))
+                    ]).then(() => {
+                        console.log('[Action] Full site reset — Firebase limpo');
+                        location.reload();
+                    }).catch(e => {
+                        console.error('Erro ao resetar:', e);
+                        location.reload();
+                    });
+                } else {
+                    location.reload();
+                }
             }
         },
     };
@@ -527,8 +686,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnClientes = document.getElementById('btn-ver-clientes');
     if (btnClientes) {
         btnClientes.addEventListener('click', () => {
-            alert('Módulo de fichas dos clientes em desenvolvimento.');
-            // Future: open modal or navigate to clients page
+            window.location.href = '../ficha.html';
         });
     }
 

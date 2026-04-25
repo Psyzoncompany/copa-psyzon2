@@ -38,10 +38,21 @@
                 </form>
 
                 <div class="divider"><span>OU</span></div>
-                
-                <a href="index.html" class="btn btn-role" style="text-decoration: none;">
-                    <i class="ph ph-arrow-left"></i> VOLTAR AO LOGIN
-                </a>
+
+                <p class="card-subtitle" style="margin-bottom: 0.8rem; font-size: 0.85rem;">Já cadastrado? Entre pelo CPF:</p>
+                <form class="login-form" id="form-cpf-direto">
+                    <div class="input-group">
+                        <i class="ph ph-identification-card"></i>
+                        <input type="text" id="cpf-direto" placeholder="CPF" maxlength="14" required>
+                    </div>
+                    <button type="submit" class="btn btn-blue">ENTRAR COM CPF</button>
+                </form>
+
+                <div style="margin-top: 1.2rem; width: 100%;">
+                    <a href="index.html" class="btn btn-role" style="text-decoration: none;">
+                        <i class="ph ph-arrow-left"></i> VOLTAR AO LOGIN
+                    </a>
+                </div>
             </div>
 
             <!-- TELA 1: ESCOLHA DO PARTICIPANTE -->
@@ -87,22 +98,35 @@
                             <i class="ph ph-camera"></i>
                             <input type="file" id="reg-foto" accept="image/*" style="padding-top: 0.8rem;">
                         </div>
+
+                        <!-- SELETOR DE ESCUDO POR PAÍS -->
                         <div class="input-group">
-                            <i class="ph ph-flag"></i>
-                            <select id="reg-bandeira" required style="width: 100%; border: none; background: transparent; outline: none; font-size: 1rem; color: var(--text-dark);">
-                                <option value="">Selecione uma Bandeira</option>
-                                <option value="br">🇧🇷 Brasil</option>
-                                <option value="ar">🇦🇷 Argentina</option>
-                                <option value="fr">🇫🇷 França</option>
-                                <option value="de">🇩🇪 Alemanha</option>
-                                <option value="es">🇪🇸 Espanha</option>
-                                <option value="en">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra</option>
-                                <option value="it">🇮🇹 Itália</option>
-                                <option value="pt">🇵🇹 Portugal</option>
-                                <option value="nl">🇳🇱 Holanda</option>
-                                <option value="uy">🇺🇾 Uruguai</option>
+                            <i class="ph ph-globe"></i>
+                            <select id="reg-pais" style="width: 100%; border: none; background: transparent; outline: none; font-size: 1rem; color: #042D15;">
+                                <option value="">Selecione o País da Liga</option>
+                                <option value="BRAZIL">🇧🇷 Brasil</option>
+                                <option value="ENGLAND">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra</option>
+                                <option value="SPAIN">🇪🇸 Espanha</option>
+                                <option value="ITALY">🇮🇹 Itália</option>
+                                <option value="GERMANY">🇩🇪 Alemanha</option>
+                                <option value="FRANCE">🇫🇷 França</option>
+                                <option value="PORTUGAL">🇵🇹 Portugal</option>
                             </select>
                         </div>
+
+                        <!-- Preview + Seletor de time -->
+                        <div id="shield-section" style="display: none;">
+                            <div id="shield-preview" style="text-align:center; margin-bottom:10px;">
+                                <img id="shield-preview-img" src="" alt="Escudo" style="width:80px; height:80px; object-fit:contain; border-radius:12px; border:2px solid rgba(22,163,74,0.2); padding:8px; background:rgba(255,255,255,0.7); display:none;">
+                            </div>
+                            <div class="input-group">
+                                <i class="ph ph-shield"></i>
+                                <select id="reg-bandeira" required style="width: 100%; border: none; background: transparent; outline: none; font-size: 1rem; color: #042D15;">
+                                    <option value="">Selecione o Time</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div class="input-group">
                             <i class="ph ph-user"></i>
                             <input type="text" id="reg-nome" placeholder="Nome Completo" required>
