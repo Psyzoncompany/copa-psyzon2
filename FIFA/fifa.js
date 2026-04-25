@@ -1570,7 +1570,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const homeName = m.team1 ? (m.team1.playerName || m.team1.teamName) : '?';
                         const awayName = m.team2 ? (m.team2.playerName || m.team2.teamName) : '?';
                         
-                        if (m.twoLegged && m.ida && m.volta) {
+                        if ((m.twoLegged || data.twoLegged) && m.ida && m.volta) {
                             return {
                                 home: homeName,
                                 away: awayName,
@@ -1678,10 +1678,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const nameInput = document.getElementById('tourney-name');
                 if (nameInput) nameInput.value = newState.name;
                 if (participantsInput) participantsInput.value = newState.participants;
+                const homeAwayInput = document.getElementById('tourney-home-away');
+                if (homeAwayInput) homeAwayInput.checked = newState.homeAway;
+                if (formatSelect) formatSelect.value = newState.format;
+                updatePreview();
                 if (formatSelect) formatSelect.value = newState.format;
 
-                const haInput = document.getElementById('tourney-home-away');
-                if (haInput) haInput.checked = newState.homeAway;
 
                 // Esconder preview
                 if (importPreviewArea) importPreviewArea.style.display = 'none';
