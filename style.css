@@ -18,7 +18,7 @@ html, body {
 body {
     /* Fundo dinâmico com a nova imagem */
     background-color: #F0F4F2;
-    background-image: url('imgs/imagem de fundo-pc.png');
+    background-image: url('imgs/imagem de fundo-pc.webp');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -35,7 +35,7 @@ body {
 
 @media (max-width: 768px) {
     body {
-        background-image: url('imgs/imagem de fundo-mobile.png');
+        background-image: url('imgs/imagem de fundo-mobile.webp');
         position: fixed;
         width: 100%;
         height: 100%;

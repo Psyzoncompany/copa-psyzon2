@@ -60,10 +60,21 @@ html {
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: transparent;
+    background-image: url('IMG/imagem de fundo pc FIFA.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
     color: var(--text-primary);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+    body {
+        background-image: url('IMG/Iimagem de fundo mobile FIFA.png');
+    }
 }
 
 /* ========================
