@@ -50,11 +50,96 @@
                 </button>
             </form>
 
+            <!-- TELA 1: ESCOLHA DO PARTICIPANTE -->
+            <div id="participante-choice" class="card-actions" style="display: none;">
+                <button type="button" class="btn btn-primary" id="btn-ja-participei">
+                    <i class="ph-fill ph-check-circle"></i> Já participei
+                </button>
+                <button type="button" class="btn btn-blue" id="btn-sou-novo">
+                    <i class="ph-fill ph-star"></i> Sou novo
+                </button>
+                <button type="button" class="btn btn-role" id="btn-voltar-choice" style="margin-top: 10px;">
+                    <i class="ph ph-arrow-left"></i> Voltar
+                </button>
+            </div>
+
+            <!-- TELA 2: LOGIN POR CPF -->
+            <form class="login-form" id="participante-login" style="display: none;">
+                <div class="input-group">
+                    <i class="ph ph-identification-card"></i>
+                    <input type="text" id="login-cpf" placeholder="CPF" maxlength="14" required>
+                </div>
+                <button type="submit" class="btn btn-primary" id="btn-continuar-login">Continuar</button>
+                <button type="button" class="btn btn-role" id="btn-voltar-login" style="margin-top: 10px;">
+                    <i class="ph ph-arrow-left"></i> Voltar
+                </button>
+            </form>
+
+            <!-- TELA 3: CADASTRO -->
+            <form class="login-form" id="participante-register" style="display: none;">
+                <!-- O scroll precisa funcionar aqui caso a tela seja menor que o form -->
+                <div class="scroll-container" style="max-height: 50vh; overflow-y: auto; padding-right: 8px; display: flex; flex-direction: column; gap: 1rem;">
+                    
+                    <div class="input-group">
+                        <i class="ph ph-camera"></i>
+                        <input type="file" id="reg-foto" accept="image/*" style="padding-top: 0.8rem;">
+                    </div>
+                    
+                    <div class="input-group">
+                        <i class="ph ph-flag"></i>
+                        <select id="reg-bandeira" required style="width: 100%; border: none; background: transparent; outline: none; font-size: 1rem; color: var(--text-dark);">
+                            <option value="">Selecione uma Bandeira</option>
+                            <option value="br">🇧🇷 Brasil</option>
+                            <option value="ar">🇦🇷 Argentina</option>
+                            <option value="fr">🇫🇷 França</option>
+                            <option value="de">🇩🇪 Alemanha</option>
+                            <option value="es">🇪🇸 Espanha</option>
+                            <option value="en">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra</option>
+                            <option value="it">🇮🇹 Itália</option>
+                            <option value="pt">🇵🇹 Portugal</option>
+                            <option value="nl">🇳🇱 Holanda</option>
+                            <option value="uy">🇺🇾 Uruguai</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <i class="ph ph-user"></i>
+                        <input type="text" id="reg-nome" placeholder="Nome Completo" required>
+                    </div>
+
+                    <div class="input-group">
+                        <i class="ph ph-identification-card"></i>
+                        <input type="text" id="reg-cpf" placeholder="CPF" maxlength="14" required>
+                    </div>
+
+                    <div class="input-group">
+                        <i class="ph ph-instagram-logo"></i>
+                        <input type="text" id="reg-insta" placeholder="Instagram (Opcional)">
+                    </div>
+
+                    <div class="input-group">
+                        <i class="ph ph-whatsapp-logo"></i>
+                        <input type="text" id="reg-whats" placeholder="WhatsApp" maxlength="15" required>
+                    </div>
+
+                    <div class="input-group">
+                        <i class="ph ph-game-controller"></i>
+                        <input type="text" id="reg-nick" placeholder="Nick exibido na tabela" required>
+                    </div>
+
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Enviar cadastro</button>
+                <button type="button" class="btn btn-role" id="btn-voltar-register" style="margin-top: 10px;">
+                    <i class="ph ph-arrow-left"></i> Voltar
+                </button>
+            </form>
+
             <div class="card-actions" id="role-actions">
                 <!-- Principal -->
-                <a href="participante.html" target="_blank" class="btn btn-primary" style="margin-top: 0; text-decoration: none;">
+                <button class="btn btn-primary" id="btn-participante" style="margin-top: 0;">
                     <i class="ph-fill ph-user"></i> Participante
-                </a>
+                </button>
                 
                 <!-- Público Secundário -->
                 <div class="btn-row" style="display: flex; gap: 0.6rem; margin-top: 0.4rem;">
