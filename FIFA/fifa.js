@@ -117,7 +117,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editS2 = document.getElementById('edit-s2');
     const btnSaveKnockout = document.getElementById('btn-save-knockout');
     const SENSITIVE_PASSWORD = '153090';
-    const SENSITIVE_IDS = new Set(['btn-encerrar', 'btn-resetar', 'btn-resetar-tudo', 'btn-apagar-cadastro', 'btn-resetar-codigos']);
+    const SENSITIVE_IDS = new Set([
+        'btn-encerrar', 'btn-resetar', 'btn-resetar-tudo', 'btn-apagar-cadastro', 'btn-resetar-codigos',
+        'btn-toggle-test-mode', 'btn-test-sim-full', 'btn-test-reset-all', 'btn-test-save-firebase',
+        'btn-test-remove-firebase', 'btn-test-history', 'btn-test-ranking'
+    ]);
     const modalSensitivePassword = document.getElementById('modal-sensitive-password');
     const sensitivePasswordInput = document.getElementById('sensitive-password-input');
     const sensitivePasswordError = document.getElementById('sensitive-password-error');
@@ -131,13 +135,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         'btn-resetar': 'Resetar torneio (somente resultados)',
         'btn-resetar-tudo': 'Resetar tudo no torneio atual',
         'btn-apagar-cadastro': 'Apagar cadastro de participante',
-        'btn-resetar-codigos': 'Resetar códigos de acesso'
+        'btn-resetar-codigos': 'Resetar códigos de acesso',
+        'btn-toggle-test-mode': 'Alternar modo teste',
+        'btn-test-sim-full': 'Simular torneio completo (teste)',
+        'btn-test-reset-all': 'Resetar teste completo',
+        'btn-test-save-firebase': 'Testar salvamento no Firebase',
+        'btn-test-remove-firebase': 'Remover teste do Firebase',
+        'btn-test-history': 'Testar histórico',
+        'btn-test-ranking': 'Testar ranking geral'
     };
     let pendingSensitiveAction = null;
     let pendingNextPhaseQualified = [];
     let pendingNextPhaseMatches = [];
     let pendingNextPhaseSignature = '';
     let repechageModalShown = false;
+    let testModeActive = false;
+    let testModeBackupState = null;
+    let testModeLogEntries = [];
 
     function isBye(value) {
         return typeof value === 'string' && value.trim().toUpperCase() === 'BYE';
@@ -340,6 +354,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function persistCurrentTournament(extra = {}) {
+        if (testModeActive && !extra.__allowPersistInTestMode) {
+            return Promise.resolve();
+        }
+        if (extra && Object.prototype.hasOwnProperty.call(extra, '__allowPersistInTestMode')) {
+            delete extra.__allowPersistInTestMode;
+        }
         if (!db) return Promise.resolve();
         const updatedAt = new Date().toISOString();
         tournamentState.updatedAt = updatedAt;
@@ -1074,6 +1094,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (db) {
         // --- Sync Tournament ---
         onValue(ref(db, 'tournaments/current'), (snapshot) => {
+            if (testModeActive) return;
             const data = snapshot.val();
             if (data) {
                 const isNew = !tournamentState.tournamentCode;
@@ -1522,6 +1543,431 @@ document.addEventListener('DOMContentLoaded', async () => {
         statusBadge.textContent = status === 'ativo' ? 'EM ANDAMENTO' : status === 'encerrado' ? 'FINALIZADO' : 'AGUARDANDO';
         statusBadge.className = 'live-badge' + (status === 'ativo' ? ' live' : '');
     }
+
+    // ========== TEST MODE ==========
+    const btnToggleTestMode = document.getElementById('btn-toggle-test-mode');
+    const cardTestTools = document.getElementById('card-test-tools');
+    const testModeIndicator = document.getElementById('test-mode-indicator');
+    const testModeLog = document.getElementById('test-mode-log');
+    const TEST_NAMES_POOL = ['Lucas', 'Mateus', 'Pedro', 'Rafael', 'João', 'Bruno', 'Caio', 'Felipe', 'Gustavo', 'André', 'Thiago', 'Vitor', 'Diego', 'Henrique', 'Daniel', 'Eduardo'];
+
+    function addTestModeLog(message) {
+        const stamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        testModeLogEntries.unshift(`[${stamp}] ${message}`);
+        if (testModeLogEntries.length > 100) testModeLogEntries = testModeLogEntries.slice(0, 100);
+        if (!testModeLog) return;
+        testModeLog.innerHTML = testModeLogEntries.length
+            ? testModeLogEntries.map(entry => `<p class="test-log-item">${entry}</p>`).join('')
+            : '<p class="test-log-empty">Sem ações de teste ainda.</p>';
+    }
+
+    function renderTestModeUI() {
+        if (role !== 'organizador') return;
+        if (btnToggleTestMode) {
+            btnToggleTestMode.innerHTML = testModeActive
+                ? '<i class="ph-fill ph-flask"></i> Sair do modo teste'
+                : '<i class="ph-fill ph-flask"></i> Entrar em modo teste';
+        }
+        if (cardTestTools) cardTestTools.style.display = testModeActive ? 'block' : 'none';
+        if (testModeIndicator) testModeIndicator.style.display = testModeActive ? 'flex' : 'none';
+    }
+
+    function randomScore(max = 5) {
+        return Math.floor(Math.random() * (max + 1));
+    }
+
+    function randomWinnerScore() {
+        let a = randomScore(5);
+        let b = randomScore(5);
+        while (a === b) {
+            a = randomScore(5);
+            b = randomScore(5);
+        }
+        return [a, b];
+    }
+
+    function makeRandomTestPlayers(count) {
+        return Array.from({ length: count }, (_, i) => {
+            const label = i + 1;
+            const natural = TEST_NAMES_POOL[i % TEST_NAMES_POOL.length];
+            return { name: `${natural} (Teste ${String(label).padStart(2, '0')})`, isTestMode: true };
+        });
+    }
+
+    async function setTestModeActive(active) {
+        if (active === testModeActive) return;
+        if (active) {
+            testModeBackupState = JSON.parse(JSON.stringify(tournamentState));
+            testModeActive = true;
+            testModeLogEntries = [];
+            addTestModeLog('Modo teste ativado');
+            renderTestModeUI();
+            renderTournamentFromState();
+            return;
+        }
+
+        const shouldClear = confirm('Deseja limpar os dados de teste?\n\nOK = Sim, limpar tudo\nCancelar = Não, manter dados de teste locais');
+        if (shouldClear && testModeBackupState) {
+            tournamentState = JSON.parse(JSON.stringify(testModeBackupState));
+            renderTournamentFromState();
+            updateStatus(tournamentState.status || 'aguardando');
+            addTestModeLog('Dados de teste removidos e estado real restaurado');
+        } else {
+            addTestModeLog('Modo teste desativado mantendo dados apenas localmente');
+        }
+        testModeActive = false;
+        testModeBackupState = null;
+        renderTestModeUI();
+    }
+
+    async function withSensitiveGuard(actionId, fn) {
+        if (!SENSITIVE_IDS.has(actionId)) {
+            await fn();
+            return;
+        }
+        fn.actionId = actionId;
+        askSensitivePassword(fn);
+    }
+
+    async function addRandomPlayersForTest(count, askConfirm = true) {
+        if (!testModeActive) return;
+        const existing = tournamentState.registeredPlayers || [];
+        if (askConfirm && existing.length && !confirm('Já existem jogadores cadastrados. Deseja substituir pelos jogadores de teste?')) return;
+        const players = makeRandomTestPlayers(count);
+        tournamentState.registeredPlayers = players;
+        tournamentState.participants = count;
+        tournamentState.status = 'ativo';
+        tournamentState.isTestMode = true;
+        if (participantsInput) participantsInput.value = String(count);
+        buildTournamentState(players, tournamentState.format || 'grupos-mata-mata');
+        renderTournamentFromState();
+        updateStatus('ativo');
+        addTestModeLog(`${count} jogadores adicionados para teste`);
+    }
+
+    async function simulateGroupPhaseTest() {
+        if (!testModeActive || !tournamentState.groups?.length) return;
+        tournamentState.groups.forEach((group, gIdx) => {
+            (group.matches || []).forEach(match => {
+                match.gHome = String(randomScore(5));
+                match.gAway = String(randomScore(5));
+            });
+            updateGroupStats(gIdx);
+        });
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        addTestModeLog('Fase de grupos simulada');
+    }
+
+    function resolveGroupPlaceholderName(name, groupsTable) {
+        const match = typeof name === 'string' ? name.match(/(\d)º (Grupo [A-Z])/i) : null;
+        if (!match) return name;
+        const pos = Number(match[1]) - 1;
+        const groupName = match[2];
+        return groupsTable[groupName]?.[pos]?.name || name;
+    }
+
+    async function seedKnockoutWithGroupResults() {
+        if (!tournamentState.knockout) return;
+        const groupsTable = {};
+        (tournamentState.groups || []).forEach(group => {
+            groupsTable[group.name] = [...(group.players || [])].sort((a, b) => {
+                if ((b.pts || 0) !== (a.pts || 0)) return (b.pts || 0) - (a.pts || 0);
+                if ((b.sg || 0) !== (a.sg || 0)) return (b.sg || 0) - (a.sg || 0);
+                return (b.gp || 0) - (a.gp || 0);
+            });
+        });
+        (tournamentState.knockout.repechage || []).forEach(match => {
+            match.p1 = resolveGroupPlaceholderName(match.p1Source || match.p1, groupsTable);
+            match.p2 = resolveGroupPlaceholderName(match.p2Source || match.p2, groupsTable);
+            resolveByeMatchOutcome(match);
+        });
+        (tournamentState.knockout.rounds || []).forEach((round, idx) => {
+            (round.matches || []).forEach(match => {
+                if (idx === 0) {
+                    match.p1 = resolveGroupPlaceholderName(match.p1Source || match.p1, groupsTable);
+                    match.p2 = resolveGroupPlaceholderName(match.p2Source || match.p2, groupsTable);
+                }
+                resolveByeMatchOutcome(match);
+            });
+        });
+    }
+
+    async function simulateRepechageTest() {
+        if (!testModeActive || !tournamentState.knockout) return;
+        await seedKnockoutWithGroupResults();
+        (tournamentState.knockout.repechage || []).forEach(match => {
+            const bye = resolveByeMatchOutcome(match);
+            if (bye.resolved) return;
+            const [s1, s2] = randomWinnerScore();
+            match.s1 = String(s1);
+            match.s2 = String(s2);
+            match.winner = s1 > s2 ? match.p1 : match.p2;
+            match.completed = true;
+            match.status = 'completed';
+            propagateWinnerToNextRound(tournamentState.knockout, match.winnerToken, match.winner, -1);
+        });
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        addTestModeLog('Repescagem simulada');
+    }
+
+    async function simulateKnockoutTest() {
+        if (!testModeActive || !tournamentState.knockout) return;
+        await seedKnockoutWithGroupResults();
+        for (let r = 0; r < (tournamentState.knockout.rounds || []).length; r++) {
+            const round = tournamentState.knockout.rounds[r];
+            for (const match of (round.matches || [])) {
+                const bye = resolveByeMatchOutcome(match);
+                if (!bye.resolved) {
+                    const [s1, s2] = randomWinnerScore();
+                    match.s1 = String(s1);
+                    match.s2 = String(s2);
+                    match.winner = s1 > s2 ? match.p1 : match.p2;
+                    match.completed = true;
+                    match.status = 'completed';
+                }
+                if (match.winner) {
+                    propagateWinnerToNextRound(tournamentState.knockout, match.winnerToken, match.winner, r);
+                }
+            }
+        }
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        const finalRound = tournamentState.knockout.rounds?.[tournamentState.knockout.rounds.length - 1];
+        const champion = finalRound?.matches?.[0]?.winner || 'A definir';
+        tournamentState.top3 = { ...tournamentState.top3, first: champion };
+        addTestModeLog(`Mata-mata simulado. Campeão: ${champion}`);
+    }
+
+    async function simulateCompleteTournamentTest() {
+        if (!testModeActive) return;
+        if (!(tournamentState.registeredPlayers || []).length) {
+            await addRandomPlayersForTest(parseInt(participantsInput?.value, 10) || 16, false);
+        }
+        await simulateGroupPhaseTest();
+        await simulateRepechageTest();
+        await simulateKnockoutTest();
+        addTestModeLog('Simulação completa concluída');
+    }
+
+    async function clearTestResultsOnly() {
+        if (!testModeActive) return;
+        (tournamentState.groups || []).forEach((group, idx) => {
+            (group.matches || []).forEach(match => {
+                match.gHome = '';
+                match.gAway = '';
+            });
+            updateGroupStats(idx);
+        });
+        if (tournamentState.knockout) resetKnockoutResults(tournamentState.knockout);
+        tournamentState.generalStats = {};
+        tournamentState.top3 = { first: '—', second: '—', third: '—' };
+        renderTournamentFromState();
+        addTestModeLog('Resultados de teste limpos');
+    }
+
+    async function resetTestCompletely() {
+        if (!testModeActive) return;
+        tournamentState.registeredPlayers = [];
+        tournamentState.groups = [];
+        tournamentState.knockout = null;
+        tournamentState.generalStats = {};
+        tournamentState.top3 = { first: '—', second: '—', third: '—' };
+        tournamentState.status = 'aguardando';
+        if (participantsInput) participantsInput.value = '8';
+        updateStatus('aguardando');
+        renderTournamentFromState();
+        addTestModeLog('Reset de teste completo executado');
+    }
+
+    async function generateTestCodeOnly() {
+        if (!testModeActive) return;
+        const code = await generateTournamentCode('fifa');
+        tournamentState.tournamentCode = code;
+        addTestModeLog(`Código de teste gerado: ${code}`);
+        alert(`Código de teste: ${code}`);
+    }
+
+    async function testFirebaseSave() {
+        if (!db) {
+            alert('Firebase indisponível neste ambiente.');
+            return;
+        }
+        const payload = {
+            id: `test_${Date.now()}`,
+            isTestMode: true,
+            label: 'TORNEIO TESTE',
+            createdAt: new Date().toISOString(),
+            tournament: JSON.parse(JSON.stringify(tournamentState))
+        };
+        try {
+            await set(ref(db, `tests/fifa/${payload.id}`), payload);
+            localStorage.setItem('lastFifaTestSaveId', payload.id);
+            addTestModeLog(`Teste salvo no Firebase (${payload.id})`);
+            alert('Teste salvo com sucesso no Firebase');
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao salvar teste no Firebase');
+        }
+    }
+
+    async function removeFirebaseTestData() {
+        if (!db) return;
+        const lastId = localStorage.getItem('lastFifaTestSaveId');
+        if (!lastId) {
+            alert('Nenhum teste salvo anteriormente para remover.');
+            return;
+        }
+        try {
+            await remove(ref(db, `tests/fifa/${lastId}`));
+            addTestModeLog(`Teste removido do Firebase (${lastId})`);
+            alert('Teste removido do Firebase');
+            localStorage.removeItem('lastFifaTestSaveId');
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao remover teste do Firebase');
+        }
+    }
+
+    async function testHistoryInsert() {
+        if (!db) {
+            alert('Firebase indisponível.');
+            return;
+        }
+        const fakeHistory = {
+            id: `hist_test_${Date.now()}`,
+            type: 'tournament-history',
+            isTestMode: true,
+            status: 'finalizado',
+            name: 'TORNEIO TESTE',
+            tournamentType: 'fifa',
+            importedAt: new Date().toISOString(),
+            champion: tournamentState.top3?.first || 'Jogador Teste'
+        };
+        await set(ref(db, `imports/${fakeHistory.id}`), fakeHistory);
+        addTestModeLog('Histórico de teste criado');
+        alert('Histórico de teste criado com sucesso.');
+    }
+
+    async function testRankingData() {
+        if (!db) {
+            alert('Firebase indisponível.');
+            return;
+        }
+        const rankingPayload = {
+            isTestMode: true,
+            updatedAt: new Date().toISOString(),
+            players: makeRandomTestPlayers(8).map((p, idx) => ({
+                name: p.name,
+                titulos: Math.floor(Math.random() * 5),
+                finais: Math.floor(Math.random() * 8),
+                semifinais: Math.floor(Math.random() * 12),
+                vitorias: 10 + idx * 2,
+                jogos: 15 + idx * 2,
+                gols: 20 + idx * 3,
+                golsContra: 9 + idx,
+                saldo: 11 + idx * 2,
+                pontos: 40 + idx * 3,
+                aproveitamento: `${Math.floor(55 + Math.random() * 40)}%`
+            }))
+        };
+        await set(ref(db, 'ranking/test/fifa'), rankingPayload);
+        addTestModeLog('Ranking de teste gerado');
+        alert('Dados de teste de ranking gerados.');
+    }
+
+    async function advanceTestPhase() {
+        if (!testModeActive || !tournamentState.knockout) return;
+        const firstPendingRound = (tournamentState.knockout.rounds || []).find(r => (r.matches || []).some(m => !getKnockoutMatchWinner(m)));
+        if (!firstPendingRound) {
+            addTestModeLog('Não há fase pendente para avançar');
+            return;
+        }
+        for (const match of (firstPendingRound.matches || [])) {
+            if (getKnockoutMatchWinner(match)) continue;
+            const bye = resolveByeMatchOutcome(match);
+            if (bye.resolved && bye.winner) {
+                propagateWinnerToNextRound(tournamentState.knockout, match.winnerToken, bye.winner);
+                continue;
+            }
+            const [s1, s2] = randomWinnerScore();
+            match.s1 = String(s1);
+            match.s2 = String(s2);
+            match.winner = s1 > s2 ? match.p1 : match.p2;
+            match.completed = true;
+            match.status = 'completed';
+            propagateWinnerToNextRound(tournamentState.knockout, match.winnerToken, match.winner);
+        }
+        renderTournamentFromState();
+        addTestModeLog(`Fase avançada manualmente (${firstPendingRound.name})`);
+    }
+
+    async function rollbackTestPhase() {
+        if (!testModeActive || !tournamentState.knockout?.rounds?.length) return;
+        const rounds = tournamentState.knockout.rounds;
+        const lastCompletedIdx = rounds.map((r, idx) => ({ r, idx })).reverse().find(({ r }) => (r.matches || []).every(m => !!getKnockoutMatchWinner(m)))?.idx;
+        if (lastCompletedIdx == null || lastCompletedIdx <= 0) {
+            addTestModeLog('Não há fase válida para voltar');
+            return;
+        }
+        rounds[lastCompletedIdx].matches.forEach(clearMatchResultFields);
+        rounds[lastCompletedIdx - 1].matches.forEach(m => {
+            if (m.winnerToken) propagateWinnerToNextRound(tournamentState.knockout, m.winnerToken, m.winnerToken, lastCompletedIdx - 1);
+        });
+        renderTournamentFromState();
+        addTestModeLog(`Fase de teste retornada para ${rounds[lastCompletedIdx - 1].name}`);
+    }
+
+    function bindTestModeButtons() {
+        const handlers = {
+            'btn-test-add-random': () => addRandomPlayersForTest(parseInt(participantsInput?.value, 10) || 16),
+            'btn-test-add-8': () => addRandomPlayersForTest(8),
+            'btn-test-add-16': () => addRandomPlayersForTest(16),
+            'btn-test-add-32': () => addRandomPlayersForTest(32),
+            'btn-test-add-64': () => addRandomPlayersForTest(64),
+            'btn-test-generate-bracket': async () => {
+                if (!(tournamentState.registeredPlayers || []).length) await addRandomPlayersForTest(parseInt(participantsInput?.value, 10) || 16, false);
+                buildTournamentState(tournamentState.registeredPlayers, tournamentState.format || 'grupos-mata-mata');
+                renderTournamentFromState();
+                addTestModeLog('Chaveamento de teste gerado');
+            },
+            'btn-test-sim-groups': simulateGroupPhaseTest,
+            'btn-test-sim-repechage': simulateRepechageTest,
+            'btn-test-sim-knockout': simulateKnockoutTest,
+            'btn-test-sim-full': simulateCompleteTournamentTest,
+            'btn-test-clear-results': clearTestResultsOnly,
+            'btn-test-reset-all': resetTestCompletely,
+            'btn-test-generate-code': generateTestCodeOnly,
+            'btn-test-save-firebase': testFirebaseSave,
+            'btn-test-remove-firebase': removeFirebaseTestData,
+            'btn-test-history': testHistoryInsert,
+            'btn-test-ranking': testRankingData,
+            'btn-test-next-phase': advanceTestPhase,
+            'btn-test-prev-phase': rollbackTestPhase
+        };
+
+        Object.entries(handlers).forEach(([id, fn]) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.addEventListener('click', async () => {
+                if (!testModeActive) {
+                    alert('Ative o modo teste para usar essa ferramenta.');
+                    return;
+                }
+                await withSensitiveGuard(id, async () => fn());
+            });
+        });
+    }
+
+    if (btnToggleTestMode) {
+        btnToggleTestMode.addEventListener('click', async () => {
+            await withSensitiveGuard('btn-toggle-test-mode', async () => setTestModeActive(!testModeActive));
+        });
+    }
+    bindTestModeButtons();
+    renderTestModeUI();
+
 
     // ========== SAVE PRIZE ==========
     const btnSalvarPremio = document.getElementById('btn-salvar-premio');

@@ -508,6 +508,89 @@ body {
     background: var(--red-dim);
 }
 
+.btn-test-toggle {
+    background: rgba(250, 204, 21, 0.12);
+    color: #facc15;
+    border: 1px solid rgba(250, 204, 21, 0.25);
+}
+
+.btn-test-toggle:hover {
+    background: rgba(250, 204, 21, 0.2);
+}
+
+.test-mode-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #facc15;
+    background: rgba(250, 204, 21, 0.12);
+    border: 1px solid rgba(250, 204, 21, 0.25);
+}
+
+.test-tools-card {
+    border: 1px solid rgba(59, 130, 246, 0.28);
+    box-shadow: 0 10px 35px rgba(59, 130, 246, 0.1);
+}
+
+.test-tools-help {
+    margin-bottom: 10px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.btn-test {
+    background: rgba(99, 102, 241, 0.13);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+}
+
+.btn-test:hover {
+    background: rgba(99, 102, 241, 0.22);
+}
+
+.btn-test-danger {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #fda4af;
+}
+
+.btn-test-danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.test-log-box {
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.35);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.test-log-box h4 {
+    margin: 0 0 8px;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+}
+
+.test-mode-log {
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.test-log-item,
+.test-log-empty {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
 /* ========================
    CODES
    ======================== */

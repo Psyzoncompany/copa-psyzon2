@@ -176,6 +176,12 @@
                     <h3>Ações do Torneio</h3>
                 </div>
                 <div class="card-body actions-grid">
+                    <button class="btn btn-action btn-test-toggle" id="btn-toggle-test-mode">
+                        <i class="ph-fill ph-flask"></i> Entrar em modo teste
+                    </button>
+                    <div id="test-mode-indicator" class="test-mode-indicator" style="display:none;">
+                        <i class="ph-fill ph-beaker"></i> Modo teste ativado
+                    </div>
                     <button class="btn btn-action btn-orange" id="btn-embaralhar">
                         <i class="ph-fill ph-shuffle"></i> Embaralhar Chaveamento
                     </button>
@@ -191,6 +197,43 @@
                     <button class="btn btn-action btn-red-outline" id="btn-resetar-tudo">
                         <i class="ph-fill ph-trash"></i> Resetar Tudo
                     </button>
+                </div>
+            </div>
+
+            <div class="card test-tools-card" id="card-test-tools" style="display:none;">
+                <div class="card-header">
+                    <i class="ph-fill ph-test-tube"></i>
+                    <h3>Ferramentas de Teste</h3>
+                </div>
+                <div class="card-body">
+                    <p class="test-tools-help">Use essas funções apenas para validar o fluxo do torneio sem impactar dados reais.</p>
+                    <div class="actions-grid">
+                        <button class="btn btn-action btn-test" id="btn-test-add-random">Adicionar jogadores aleatórios</button>
+                        <button class="btn btn-action btn-test" id="btn-test-add-8">Adicionar 8 jogadores</button>
+                        <button class="btn btn-action btn-test" id="btn-test-add-16">Adicionar 16 jogadores</button>
+                        <button class="btn btn-action btn-test" id="btn-test-add-32">Adicionar 32 jogadores</button>
+                        <button class="btn btn-action btn-test" id="btn-test-add-64">Adicionar 64 jogadores</button>
+                        <button class="btn btn-action btn-test" id="btn-test-generate-bracket">Gerar chaveamento teste</button>
+                        <button class="btn btn-action btn-test" id="btn-test-sim-groups">Simular fase de grupos</button>
+                        <button class="btn btn-action btn-test" id="btn-test-sim-repechage">Simular repescagem</button>
+                        <button class="btn btn-action btn-test" id="btn-test-sim-knockout">Simular mata-mata</button>
+                        <button class="btn btn-action btn-test" id="btn-test-sim-full">Simular torneio completo</button>
+                        <button class="btn btn-action btn-test" id="btn-test-clear-results">Limpar resultados de teste</button>
+                        <button class="btn btn-action btn-test-danger" id="btn-test-reset-all">Resetar teste completo</button>
+                        <button class="btn btn-action btn-test" id="btn-test-generate-code">Gerar código teste</button>
+                        <button class="btn btn-action btn-test" id="btn-test-save-firebase">Testar salvamento</button>
+                        <button class="btn btn-action btn-test-danger" id="btn-test-remove-firebase">Remover teste do Firebase</button>
+                        <button class="btn btn-action btn-test" id="btn-test-history">Testar histórico</button>
+                        <button class="btn btn-action btn-test" id="btn-test-ranking">Testar ranking geral</button>
+                        <button class="btn btn-action btn-test" id="btn-test-next-phase">Avançar fase teste</button>
+                        <button class="btn btn-action btn-test" id="btn-test-prev-phase">Voltar fase teste</button>
+                    </div>
+                    <div class="test-log-box">
+                        <h4>Log de teste</h4>
+                        <div id="test-mode-log" class="test-mode-log">
+                            <p class="test-log-empty">Sem ações de teste ainda.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
