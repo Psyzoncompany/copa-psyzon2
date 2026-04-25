@@ -362,24 +362,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btnGerarCodigos) {
         btnGerarCodigos.addEventListener('click', () => {
             codesList.innerHTML = '';
-            tournamentState.codes = [];
+            // Check existing codes to find last number
+            let lastNumber = 0;
+            if (tournamentState.codes && tournamentState.codes.length > 0) {
+                const lastCodeObj = tournamentState.codes[tournamentState.codes.length - 1];
+                if (lastCodeObj && lastCodeObj.code) {
+                    const match = lastCodeObj.code.match(/\d+$/);
+                    if (match) lastNumber = parseInt(match[0], 10);
+                }
+            } else {
+                tournamentState.codes = [];
+            }
 
             for (let i = 0; i < 32; i++) {
-                const code = String(Math.floor(1000 + Math.random() * 9000));
+                const nextNumber = (lastNumber + i + 1).toString().padStart(5, "0");
+                const code = `F${nextNumber}`; // F para FIFA
                 tournamentState.codes.push({ code, used: false });
-
+            }
+            
+            // Render codes list
+            tournamentState.codes.forEach(c => {
                 const item = document.createElement('div');
                 item.className = 'code-item';
                 item.innerHTML = `
-                    <span class="code-value">${code}</span>
-                    <span class="code-available">Disponível</span>
-                    <button class="code-regen" title="Regenerar"><i class="ph ph-arrows-clockwise"></i></button>
+                    <span class="code-value">${c.code}</span>
+                    <span class="${c.used ? 'code-used' : 'code-available'}">${c.used ? 'Utilizado' : 'Disponível'}</span>
                 `;
                 codesList.appendChild(item);
-            }
+            });
 
-            document.querySelector('.status-available').textContent = '32 disponíveis';
-            document.querySelector('.status-used').textContent = '0 utilizados';
+            const availCount = tournamentState.codes.filter(c => !c.used).length;
+            const usedCount = tournamentState.codes.filter(c => c.used).length;
+            document.querySelector('.status-available').textContent = `${availCount} disponíveis`;
+            document.querySelector('.status-used').textContent = `${usedCount} utilizados`;
 
             // Sincronizar códigos
             if (db) {
@@ -435,6 +450,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         const btn = document.getElementById(id);
         if (btn) btn.addEventListener('click', fn);
     });
+
+    // ========== MOBILE SIDEBAR TOGGLE ==========
+    const btnToggleOrganizer = document.getElementById('btn-toggle-organizer');
+    const sidebar = document.getElementById('organizer-panel');
+    
+    if (btnToggleOrganizer && sidebar) {
+        btnToggleOrganizer.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+        });
+        
+        // Fechar ao clicar fora no mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 1100 && sidebar.classList.contains('active')) {
+                if (!sidebar.contains(e.target) && !btnToggleOrganizer.contains(e.target)) {
+                    sidebar.classList.remove('active');
+                }
+            }
+        });
+    }
 
     // ========== FAB SHARE ==========
     const fabShare = document.getElementById('fab-share');
