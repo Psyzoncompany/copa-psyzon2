@@ -24,22 +24,112 @@
         </div>
 
         <div class="login-card">
-            <h1 class="card-title">Validar Acesso</h1>
-            <p class="card-subtitle">Insira o código fornecido pelo seu organizador para acessar o chaveamento.</p>
+            <!-- TELA 0: CÓDIGO -->
+            <div id="screen-codigo">
+                <h1 class="card-title">Validar Acesso</h1>
+                <p class="card-subtitle">Insira o código fornecido pelo seu organizador para acessar o chaveamento.</p>
 
-            <form class="login-form">
-                <div class="input-group">
-                    <i class="ph ph-hash"></i>
-                    <input type="text" placeholder="Código de Acesso" id="participante-codigo">
+                <form class="login-form" id="form-codigo">
+                    <div class="input-group">
+                        <i class="ph ph-hash"></i>
+                        <input type="text" placeholder="Código de Acesso" id="participante-codigo" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">VERIFICAR CÓDIGO</button>
+                </form>
+
+                <div class="divider"><span>OU</span></div>
+                
+                <a href="index.html" class="btn btn-role" style="text-decoration: none;">
+                    <i class="ph ph-arrow-left"></i> VOLTAR AO LOGIN
+                </a>
+            </div>
+
+            <!-- TELA 1: ESCOLHA DO PARTICIPANTE -->
+            <div id="screen-choice" style="display: none;">
+                <h1 class="card-title">Participante</h1>
+                <p class="card-subtitle">Você já participou de um torneio anterior?</p>
+                <div class="card-actions" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-primary" id="btn-ja-participei">
+                        <i class="ph-fill ph-check-circle"></i> Já participei
+                    </button>
+                    <button type="button" class="btn btn-blue" id="btn-sou-novo">
+                        <i class="ph-fill ph-star"></i> Sou novo
+                    </button>
+                    <button type="button" class="btn btn-role" id="btn-voltar-choice" style="margin-top: 10px;">
+                        <i class="ph ph-arrow-left"></i> Voltar
+                    </button>
                 </div>
-                <button type="submit" class="btn btn-primary">VERIFICAR CÓDIGO</button>
-            </form>
+            </div>
 
-            <div class="divider"><span>OU</span></div>
-            
-            <a href="index.html" class="btn btn-role" style="text-decoration: none;">
-                <i class="ph ph-arrow-left"></i> VOLTAR AO LOGIN
-            </a>
+            <!-- TELA 2: LOGIN POR CPF -->
+            <div id="screen-login" style="display: none;">
+                <h1 class="card-title">Identificação</h1>
+                <p class="card-subtitle">Insira seu CPF para continuar</p>
+                <form class="login-form" id="form-login" style="margin-top: 20px;">
+                    <div class="input-group">
+                        <i class="ph ph-identification-card"></i>
+                        <input type="text" id="login-cpf" placeholder="CPF" maxlength="14" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="btn-continuar-login">Continuar</button>
+                    <button type="button" class="btn btn-role" id="btn-voltar-login" style="margin-top: 10px;">
+                        <i class="ph ph-arrow-left"></i> Voltar
+                    </button>
+                </form>
+            </div>
+
+            <!-- TELA 3: CADASTRO -->
+            <div id="screen-register" style="display: none;">
+                <h1 class="card-title">Novo Cadastro</h1>
+                <p class="card-subtitle">Preencha seus dados para participar</p>
+                <form class="login-form" id="form-register" style="margin-top: 20px;">
+                    <div class="scroll-container" style="max-height: 50vh; overflow-y: auto; padding-right: 8px; display: flex; flex-direction: column; gap: 1rem;">
+                        <div class="input-group">
+                            <i class="ph ph-camera"></i>
+                            <input type="file" id="reg-foto" accept="image/*" style="padding-top: 0.8rem;">
+                        </div>
+                        <div class="input-group">
+                            <i class="ph ph-flag"></i>
+                            <select id="reg-bandeira" required style="width: 100%; border: none; background: transparent; outline: none; font-size: 1rem; color: var(--text-dark);">
+                                <option value="">Selecione uma Bandeira</option>
+                                <option value="br">🇧🇷 Brasil</option>
+                                <option value="ar">🇦🇷 Argentina</option>
+                                <option value="fr">🇫🇷 França</option>
+                                <option value="de">🇩🇪 Alemanha</option>
+                                <option value="es">🇪🇸 Espanha</option>
+                                <option value="en">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra</option>
+                                <option value="it">🇮🇹 Itália</option>
+                                <option value="pt">🇵🇹 Portugal</option>
+                                <option value="nl">🇳🇱 Holanda</option>
+                                <option value="uy">🇺🇾 Uruguai</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <i class="ph ph-user"></i>
+                            <input type="text" id="reg-nome" placeholder="Nome Completo" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="ph ph-identification-card"></i>
+                            <input type="text" id="reg-cpf" placeholder="CPF" maxlength="14" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="ph ph-instagram-logo"></i>
+                            <input type="text" id="reg-insta" placeholder="Instagram (Opcional)">
+                        </div>
+                        <div class="input-group">
+                            <i class="ph ph-whatsapp-logo"></i>
+                            <input type="text" id="reg-whats" placeholder="WhatsApp" maxlength="15" required>
+                        </div>
+                        <div class="input-group">
+                            <i class="ph ph-game-controller"></i>
+                            <input type="text" id="reg-nick" placeholder="Nick exibido na tabela" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Enviar cadastro</button>
+                    <button type="button" class="btn btn-role" id="btn-voltar-register" style="margin-top: 10px;">
+                        <i class="ph ph-arrow-left"></i> Voltar
+                    </button>
+                </form>
+            </div>
         </div>
     </main>
 
@@ -47,5 +137,7 @@
         <i class="ph-fill ph-shield-check"></i>
         <p>Mais que um jogo. Uma <span>experiência.</span></p>
     </footer>
+
+    <script type="module" src="participante.js"></script>
 </body>
 </html>
