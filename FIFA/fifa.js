@@ -847,33 +847,56 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderTournamentFromState(false);
             updateStatus('ativo');
 
-            // ===== 2. GERAR CÓDIGOS POR PARTICIPANTE =====
-            const newCodes = [];
-            const existingSet = new Set();
-
-            for (let i = 0; i < participants; i++) {
-                let code;
-                do {
-                    const num = String(Math.floor(1000 + Math.random() * 9000));
-                    code = 'F' + num;
-                } while (existingSet.has(code));
-                existingSet.add(code);
-                newCodes.push({ code, used: false });
-            }
-
-            tournamentState.codes = newCodes;
-            renderCodes(newCodes);
-
-            // ===== 3. SALVAR TUDO NO FIREBASE =====
+            // ===== 2. GERAR CÓDIGOS (PRESERVANDO EXISTENTES) =====
             if (db) {
                 try {
+                    const codesRef = ref(db, 'codes/pool');
+                    const snap = await get(codesRef);
+                    let existingCodes = [];
+                    if (snap.exists() && snap.val().codes) {
+                        existingCodes = snap.val().codes;
+                    }
+
+                    const usedCodes = existingCodes.filter(c => c.used);
+                    const unusedCodes = existingCodes.filter(c => !c.used);
+                    
+                    const needed = participants - usedCodes.length;
+                    
+                    let finalCodes = [...usedCodes];
+                    
+                    if (needed > 0) {
+                        const existingSet = new Set(existingCodes.map(c => c.code));
+                        
+                        // Manter os não usados que já existem até completar o necessário
+                        unusedCodes.forEach(c => {
+                            if (finalCodes.length < participants) {
+                                finalCodes.push(c);
+                            }
+                        });
+
+                        // Gerar novos se ainda faltar para atingir o total de participantes
+                        while (finalCodes.length < participants) {
+                            let code;
+                            do {
+                                const num = String(Math.floor(1000 + Math.random() * 9000));
+                                code = 'F' + num;
+                            } while (existingSet.has(code));
+                            
+                            existingSet.add(code);
+                            finalCodes.push({ code, used: false, usedBy: null });
+                        }
+                    }
+
+                    // Sincronizar Tudo no Firebase
+                    await set(codesRef, { codes: finalCodes });
                     await set(ref(db, 'tournaments/current'), tournamentState);
                     await set(ref(db, 'tournaments/' + tourneyCode), tournamentState);
-                    await set(ref(db, 'codes/pool'), { codes: newCodes });
-                    console.log(`✅ Torneio ${tourneyCode} ATIVADO com 32 códigos!`);
-                } catch(e) {
-                    console.error("Erro ao salvar:", e);
-                    alert('Erro ao salvar no Firebase.');
+                    
+                    console.log(`✅ Pool de códigos atualizada para ${finalCodes.length} (Preservados ${usedCodes.length} usados)`);
+                    alert('Torneio iniciado e códigos atualizados preservando os inscritos!');
+                } catch (e) {
+                    console.error("Erro na geração de códigos:", e);
+                    alert('Erro ao processar códigos no Firebase.');
                 }
             }
         });
