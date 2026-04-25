@@ -254,10 +254,14 @@
 
             <!-- TAB 2: MATA-MATA -->
             <div id="tab-mata-mata" class="tab-content" style="display: none;">
-                <div class="empty-state">
-                    <i class="ph ph-tree-structure"></i>
-                    <h3>Mata-Mata</h3>
-                    <p>Fase eliminatória em construção.</p>
+                <div class="mata-mata-tab">
+                    <div class="bracket-scroll-area">
+                        <div class="empty-state">
+                            <i class="ph ph-tree-structure"></i>
+                            <h3>Mata-Mata</h3>
+                            <p>Fase eliminatória em construção.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -302,6 +306,7 @@
                             </tbody>
                         </table>
                     </div>
+                    <div id="ranking-cards" class="ranking-cards-mobile"></div>
                 </div>
             </div>
 
@@ -491,10 +496,26 @@
                 <p style="color:#51715C; font-size:0.9rem;">Ordem dos classificados (um por linha):</p>
                 <textarea id="next-phase-order-input" rows="8" class="form-control" style="resize: vertical;"></textarea>
                 <div id="next-phase-preview" style="margin-top: 12px; font-size: 0.9rem;"></div>
+                <div id="next-phase-match-editor" class="next-phase-match-editor"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline-full" id="btn-shuffle-next-phase"><i class="ph ph-shuffle"></i> Embaralhar</button>
                 <button class="btn btn-primary" id="btn-confirm-next-phase"><i class="ph ph-check-circle"></i> Confirmar confrontos</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-history-details" class="modal">
+        <div class="modal-content glass-modal wide-modal">
+            <div class="modal-header">
+                <div class="header-info">
+                    <h2>Detalhes do torneio finalizado</h2>
+                    <p>Visualização somente leitura</p>
+                </div>
+                <button class="btn-close-modal" id="btn-close-history-details"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="history-details-content"></div>
             </div>
         </div>
     </div>

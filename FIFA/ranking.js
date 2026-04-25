@@ -20,6 +20,7 @@ export function initRankingSystem(db, role) {
     const rankingModalityFilter = document.getElementById('ranking-modality-filter');
     const rankingTbody = document.getElementById('ranking-tbody');
     const rankingHighlights = document.getElementById('ranking-highlights');
+    const rankingCards = document.getElementById('ranking-cards');
 
     let currentParsedData = null;
 
@@ -272,13 +273,14 @@ export function initRankingSystem(db, role) {
                 });
             }
 
-            // Ordenação: 1.Títulos, 2.Pontos, 3.Vitórias, 4.SG, 5.GM
+            // Ordenação: 1.Pontos, 2.Vitórias, 3.Saldo, 4.Gols Pró, 5.Menos Gols Contra, 6.Nome
             playersList.sort((a, b) => {
-                if (b.currentStats.titles !== a.currentStats.titles) return b.currentStats.titles - a.currentStats.titles;
                 if (b.currentStats.pts !== a.currentStats.pts) return b.currentStats.pts - a.currentStats.pts;
                 if (b.currentStats.v !== a.currentStats.v) return b.currentStats.v - a.currentStats.v;
                 if (b.currentStats.sg !== a.currentStats.sg) return b.currentStats.sg - a.currentStats.sg;
-                return b.currentStats.gp - a.currentStats.gp;
+                if (b.currentStats.gp !== a.currentStats.gp) return b.currentStats.gp - a.currentStats.gp;
+                if (a.currentStats.gc !== b.currentStats.gc) return a.currentStats.gc - b.currentStats.gc;
+                return (a.name || '').localeCompare(b.name || '', 'pt-BR');
             });
 
             renderRanking(playersList);
@@ -293,6 +295,7 @@ export function initRankingSystem(db, role) {
         if (list.length === 0) {
             rankingTbody.innerHTML = `<tr><td colspan="12" style="text-align:center;">Nenhum jogador encontrado.</td></tr>`;
             rankingHighlights.innerHTML = '';
+            if (rankingCards) rankingCards.innerHTML = '';
             return;
         }
 
@@ -334,6 +337,29 @@ export function initRankingSystem(db, role) {
     }
         rankingTbody.innerHTML = html;
 
+        if (rankingCards) {
+            rankingCards.innerHTML = list.map((p, i) => {
+                const s = p.currentStats;
+                return `
+                    <article class="ranking-player-card">
+                        <div class="ranking-player-top">
+                            <div class="ranking-player-position">#${i + 1}</div>
+                            <strong>${formatName(p.name)}</strong>
+                            <span>${s.pts} pts</span>
+                        </div>
+                        <div class="ranking-player-stats">
+                            <span class="ranking-chip">J: ${s.j}</span>
+                            <span class="ranking-chip">V: ${s.v}</span>
+                            <span class="ranking-chip">D: ${s.d}</span>
+                            <span class="ranking-chip">GP: ${s.gp}</span>
+                            <span class="ranking-chip">GC: ${s.gc}</span>
+                            <span class="ranking-chip">SG: ${s.sg > 0 ? '+' : ''}${s.sg}</span>
+                        </div>
+                    </article>
+                `;
+            }).join('');
+        }
+
         // Render Highlights
         const topScorer = [...list].sort((a,b) => b.currentStats.gp - a.currentStats.gp)[0];
         const topDefense = [...list].sort((a,b) => a.currentStats.gc - b.currentStats.gc)[0]; // Menos gols sofridos
@@ -368,6 +394,8 @@ export function initRankingSystem(db, role) {
     // ----- IMPORT HISTORY -----
     async function loadImportHistory() {
         const container = document.getElementById('imported-tournaments-list');
+        const historyModal = document.getElementById('modal-history-details');
+        const historyDetailsContent = document.getElementById('history-details-content');
         if(!container) return;
 
         try {
@@ -404,15 +432,51 @@ export function initRankingSystem(db, role) {
                         <div style="font-size:11px; color:#8A9E8F;">
                             ${isHistory ? 'Encerrado em' : 'Importado em'}: ${date ? new Date(date).toLocaleDateString() : '—'}
                         </div>
+                        ${isHistory ? `<button class="btn btn-outline-full btn-history-details" data-id="${d.id || childSnap.key}" style="margin-left:10px; min-height:44px;">Ver detalhes</button>` : ''}
                     </div>
                 `;
             });
             container.innerHTML = html;
 
+            container.querySelectorAll('.btn-history-details').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const historyId = btn.dataset.id;
+                    const detailSnap = await get(ref(db, `imports/${historyId}`));
+                    if (!detailSnap.exists()) return;
+                    const detail = detailSnap.val();
+                    const rankingRows = (detail.rankingFinal || []).slice(0, 8).map((r, idx) => `
+                        <tr><td>${idx + 1}</td><td>${formatName(r.name)}</td><td>${r.pts || 0}</td><td>${r.v || 0}</td><td>${r.sg || 0}</td></tr>
+                    `).join('');
+                    historyDetailsContent.innerHTML = `
+                        <div style="display:grid; gap:12px;">
+                            <div class="group-card" style="padding:12px;">
+                                <h3 style="margin-bottom:8px;">${detail.name || 'Torneio'}</h3>
+                                <p><strong>Código:</strong> ${detail.code || detail.tournamentCode || '—'}</p>
+                                <p><strong>Modalidade:</strong> ${(detail.tournamentType || detail.modality || 'fifa').toUpperCase()}</p>
+                                <p><strong>Campeão:</strong> ${formatName(detail.champion || '—')}</p>
+                                <p><strong>Vice:</strong> ${formatName(detail.vice || '—')}</p>
+                                <p><strong>Participantes:</strong> ${(detail.participants || []).length}</p>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="group-table ranking-table">
+                                    <thead><tr><th>#</th><th>Jogador</th><th>PTS</th><th>V</th><th>SG</th></tr></thead>
+                                    <tbody>${rankingRows || '<tr><td colspan="5">Sem ranking disponível.</td></tr>'}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                    historyModal?.classList.add('active');
+                });
+            });
+
         } catch (e) {
             console.error(e);
         }
     }
+
+    document.getElementById('btn-close-history-details')?.addEventListener('click', () => {
+        document.getElementById('modal-history-details')?.classList.remove('active');
+    });
 
     // Initialize initial loads
     loadRanking('fifa');

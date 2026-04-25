@@ -125,8 +125,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const modalNextPhase = document.getElementById('modal-next-phase');
     const nextPhaseOrderInput = document.getElementById('next-phase-order-input');
     const nextPhasePreview = document.getElementById('next-phase-preview');
+    const nextPhaseMatchEditor = document.getElementById('next-phase-match-editor');
+    const ACTION_LABELS = {
+        'btn-encerrar': 'Encerrar e salvar torneio',
+        'btn-resetar': 'Resetar torneio (somente resultados)',
+        'btn-resetar-tudo': 'Resetar tudo no torneio atual',
+        'btn-apagar-cadastro': 'Apagar cadastro de participante',
+        'btn-resetar-codigos': 'Resetar códigos de acesso'
+    };
     let pendingSensitiveAction = null;
     let pendingNextPhaseQualified = [];
+    let pendingNextPhaseMatches = [];
     let repechageModalShown = false;
 
     function isPlaceholder(name) {
@@ -355,6 +364,80 @@ document.addEventListener('DOMContentLoaded', async () => {
         `).join('');
     }
 
+    function normalizeQualifiedNames() {
+        const typed = (nextPhaseOrderInput?.value || '')
+            .split('\n')
+            .map(n => n.trim())
+            .filter(Boolean);
+        return typed.length ? typed : [...pendingNextPhaseQualified];
+    }
+
+    function buildMatchesFromNames(names) {
+        const matches = [];
+        for (let i = 0; i < names.length; i += 2) {
+            matches.push({ p1: names[i] || 'BYE', p2: names[i + 1] || 'BYE' });
+        }
+        return matches;
+    }
+
+    function getDuplicatePlayersFromMatches(matches) {
+        const counts = new Map();
+        matches.forEach(m => {
+            [m.p1, m.p2].forEach(name => {
+                if (!name || name === 'BYE') return;
+                counts.set(name, (counts.get(name) || 0) + 1);
+            });
+        });
+        return [...counts.entries()].filter(([, count]) => count > 1).map(([name]) => name);
+    }
+
+    function renderNextPhaseMatchEditor() {
+        if (!nextPhaseMatchEditor) return;
+        const names = normalizeQualifiedNames();
+        pendingNextPhaseMatches = buildMatchesFromNames(names);
+
+        if (!pendingNextPhaseMatches.length) {
+            nextPhaseMatchEditor.innerHTML = '';
+            return;
+        }
+
+        const options = ['<option value="BYE">BYE</option>', ...names.map(name => `<option value="${name}">${formatName(name)}</option>`)].join('');
+        const duplicates = getDuplicatePlayersFromMatches(pendingNextPhaseMatches);
+
+        nextPhaseMatchEditor.innerHTML = `
+            ${pendingNextPhaseMatches.map((match, idx) => `
+                <div class="next-phase-match-card">
+                    <select class="form-control next-phase-select-a" data-match-index="${idx}">
+                        ${options}
+                    </select>
+                    <span class="next-phase-match-vs">Jogo ${idx + 1} • VS</span>
+                    <select class="form-control next-phase-select-b" data-match-index="${idx}">
+                        ${options}
+                    </select>
+                </div>
+            `).join('')}
+            ${duplicates.length ? `<div class="next-phase-alert">⚠️ Jogadores repetidos detectados: ${duplicates.map(formatName).join(', ')}</div>` : ''}
+        `;
+
+        nextPhaseMatchEditor.querySelectorAll('.next-phase-select-a').forEach(select => {
+            const idx = Number(select.dataset.matchIndex);
+            select.value = pendingNextPhaseMatches[idx].p1 || 'BYE';
+            select.addEventListener('change', () => {
+                pendingNextPhaseMatches[idx].p1 = select.value;
+                renderNextPhaseMatchEditor();
+            });
+        });
+
+        nextPhaseMatchEditor.querySelectorAll('.next-phase-select-b').forEach(select => {
+            const idx = Number(select.dataset.matchIndex);
+            select.value = pendingNextPhaseMatches[idx].p2 || 'BYE';
+            select.addEventListener('change', () => {
+                pendingNextPhaseMatches[idx].p2 = select.value;
+                renderNextPhaseMatchEditor();
+            });
+        });
+    }
+
     function checkAndOpenNextPhaseModal() {
         if (role !== 'organizador' || !tournamentState.knockout || repechageModalShown) return;
         const rep = tournamentState.knockout.repechage || [];
@@ -370,6 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         pendingNextPhaseQualified = qualified;
         if (nextPhaseOrderInput) nextPhaseOrderInput.value = qualified.join('\n');
         renderNextPhasePreview(qualified);
+        renderNextPhaseMatchEditor();
         modalNextPhase?.classList.add('active');
         repechageModalShown = true;
     }
@@ -1077,7 +1161,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const mataMataContainer = document.getElementById('tab-mata-mata');
         if (mataMataContainer) {
             if (tournamentState.knockout) {
-                let bracketHTML = `<div class="bracket-scroll-shell"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
+                let bracketHTML = `<div class="mata-mata-tab"><div class="bracket-scroll-area"><div class="bracket-scroll-shell"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
                                     ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
                 
                 // Helper: render a single bracket match card
@@ -1144,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 }
                 
-                bracketHTML += `</div></div>`;
+                bracketHTML += `</div></div></div></div>`;
                 mataMataContainer.innerHTML = bracketHTML;
 
                 // Add Listeners
@@ -1157,7 +1241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 });
             } else {
-                mataMataContainer.innerHTML = `<div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div>`;
+                mataMataContainer.innerHTML = `<div class="mata-mata-tab"><div class="bracket-scroll-area"><div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div></div></div>`;
             }
             checkAndOpenNextPhaseModal();
         }
@@ -1508,6 +1592,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     function askSensitivePassword(actionFn) {
         if (role !== 'organizador') return;
         pendingSensitiveAction = actionFn;
+        const titleEl = document.querySelector('#modal-sensitive-password .modal-header h2');
+        const textEl = document.querySelector('#modal-sensitive-password .modal-header p');
+        const actionLabel = ACTION_LABELS[actionFn?.actionId] || 'Ação administrativa';
+        if (titleEl) titleEl.textContent = 'Confirmar ação administrativa';
+        if (textEl) textEl.textContent = `Essa ação é sensível e precisa da senha do organizador (${actionLabel}).`;
         if (sensitivePasswordInput) sensitivePasswordInput.value = '';
         if (sensitivePasswordError) sensitivePasswordError.style.display = 'none';
         modalSensitivePassword?.classList.add('active');
@@ -1544,25 +1633,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         pendingNextPhaseQualified = shuffleArray(pendingNextPhaseQualified);
         if (nextPhaseOrderInput) nextPhaseOrderInput.value = pendingNextPhaseQualified.join('\n');
         renderNextPhasePreview(pendingNextPhaseQualified);
+        renderNextPhaseMatchEditor();
     });
 
     nextPhaseOrderInput?.addEventListener('input', () => {
         const lines = nextPhaseOrderInput.value.split('\n').map(n => n.trim()).filter(Boolean);
         renderNextPhasePreview(lines);
+        renderNextPhaseMatchEditor();
     });
 
     document.getElementById('btn-confirm-next-phase')?.addEventListener('click', async () => {
-        const names = (nextPhaseOrderInput?.value || '').split('\n').map(n => n.trim()).filter(Boolean);
-        if (!names.length) {
+        const names = normalizeQualifiedNames();
+        const matchesFromEditor = pendingNextPhaseMatches.length ? pendingNextPhaseMatches : buildMatchesFromNames(names);
+        if (!names.length && !matchesFromEditor.length) {
             alert('Informe ao menos um classificado.');
             return;
         }
         if (!tournamentState.knockout?.rounds?.length) return;
+        const duplicates = getDuplicatePlayersFromMatches(matchesFromEditor);
+        if (duplicates.length) {
+            const keepGoing = confirm(`Há jogadores repetidos em jogos diferentes (${duplicates.map(formatName).join(', ')}). Deseja confirmar mesmo assim?`);
+            if (!keepGoing) return;
+        }
+        const hasSameMatchPlayer = matchesFromEditor.some(m => m.p1 && m.p2 && m.p1 !== 'BYE' && m.p1 === m.p2);
+        if (hasSameMatchPlayer) {
+            alert('Um confronto não pode ter o mesmo jogador nos dois lados.');
+            return;
+        }
         const firstRound = tournamentState.knockout.rounds[0];
         const matches = [];
-        for (let i = 0; i < names.length; i += 2) {
-            const p1 = names[i];
-            const p2 = names[i + 1] || 'BYE';
+        for (let i = 0; i < matchesFromEditor.length; i++) {
+            const p1 = matchesFromEditor[i].p1 || 'BYE';
+            const p2 = matchesFromEditor[i].p2 || 'BYE';
             if (p2 === 'BYE') {
                 matches.push({ p1, p2: 'BYE', s1: '1', s2: '0', autoAdvance: true });
             } else {
@@ -1593,7 +1695,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('Próxima fase definida com sucesso.');
     });
 
-    document.getElementById('btn-close-next-phase')?.addEventListener('click', () => modalNextPhase?.classList.remove('active'));
+    document.getElementById('btn-close-next-phase')?.addEventListener('click', () => {
+        pendingNextPhaseMatches = [];
+        modalNextPhase?.classList.remove('active');
+    });
 
     document.getElementById('btn-logout-organizer')?.addEventListener('click', () => {
         ['organizerAuth', 'organizerRole', 'copaAuth', 'adminSession'].forEach(k => localStorage.removeItem(k));
@@ -1700,13 +1805,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (b.pts !== a.pts) return b.pts - a.pts;
                 if (b.v !== a.v) return b.v - a.v;
                 if (b.sg !== a.sg) return b.sg - a.sg;
-                return b.gp - a.gp;
+                if (b.gp !== a.gp) return b.gp - a.gp;
+                if (a.gc !== b.gc) return a.gc - b.gc;
+                return (a.name || '').localeCompare(b.name || '', 'pt-BR');
             });
             const historyPayload = {
                 id: `hist_${Date.now()}`,
                 type: 'tournament-history',
+                status: 'finalizado',
                 name: tournamentState.name || 'Torneio sem nome',
                 tournamentType: 'fifa',
+                modality: 'fifa',
+                code: tournamentState.tournamentCode || null,
                 createdAt: tournamentState.createdAt || new Date().toISOString(),
                 finishedAt,
                 participants: tournamentState.registeredPlayers || [],
@@ -1862,6 +1972,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!btn) return;
         btn.addEventListener('click', () => {
             if (SENSITIVE_IDS.has(id)) {
+                fn.actionId = id;
                 askSensitivePassword(fn);
             } else {
                 fn();
