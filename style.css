@@ -36,10 +36,8 @@ body {
 @media (max-width: 768px) {
     body {
         background-image: url('imgs/imagem de fundo-mobile.webp');
-        position: fixed;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
+        min-height: 100dvh;
+        overflow-y: auto;
     }
 
     .hero-logos img {
@@ -69,15 +67,10 @@ body {
 
     .main-content {
         padding: 0.5rem;
+        padding-bottom: calc(40px + env(safe-area-inset-bottom));
         margin-top: 5px;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        overscroll-behavior-y: contain;
-        scrollbar-width: none; /* Firefox */
-    }
-    
-    .main-content::-webkit-scrollbar {
-        display: none; /* Safari and Chrome */
     }
 }
 
