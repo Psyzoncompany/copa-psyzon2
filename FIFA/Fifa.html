@@ -352,6 +352,41 @@
         </div>
     </div>
 
+    <!-- MODAL JOGOS DO MATA-MATA -->
+    <div id="modal-jogos-mata-mata" class="modal">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <div class="header-info">
+                    <h2 id="modal-mata-mata-title">Resultado Mata-Mata</h2>
+                    <p>Insira o placar do confronto</p>
+                </div>
+                <button class="btn-close-modal"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="knockout-match-edit">
+                    <div class="edit-player">
+                        <span id="edit-p1-name">Jogador 1</span>
+                        <input type="number" id="edit-s1" min="0" placeholder="0">
+                    </div>
+                    <div class="edit-vs">VS</div>
+                    <div class="edit-player">
+                        <input type="number" id="edit-s2" min="0" placeholder="0">
+                        <span id="edit-p2-name">Jogador 2</span>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; text-align: center; color: #51715C; font-size: 0.9rem;">
+                    <i class="ph ph-info"></i> O vencedor avançará automaticamente para a próxima fase.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-full btn-close-modal">Cancelar</button>
+                <button class="btn btn-primary" id="btn-save-knockout">
+                    <i class="ph-fill ph-floppy-disk"></i> Salvar Resultado
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: PERFIL DO JOGADOR -->
     <div id="modal-perfil" class="modal">
         <div class="modal-content profile-modal-content">

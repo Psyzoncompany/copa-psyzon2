@@ -85,6 +85,99 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     let selectedGroupIndex = null;
+    let selectedKnockoutMatch = null; // { type, rIdx, mIdx }
+
+    const modalMataMata = document.getElementById('modal-jogos-mata-mata');
+    const editP1Name = document.getElementById('edit-p1-name');
+    const editP2Name = document.getElementById('edit-p2-name');
+    const editS1 = document.getElementById('edit-s1');
+    const editS2 = document.getElementById('edit-s2');
+    const btnSaveKnockout = document.getElementById('btn-save-knockout');
+
+    function openKnockoutEdit(type, rIdx, mIdx) {
+        selectedKnockoutMatch = { type, rIdx, mIdx };
+        let match;
+        if (type === 'repechage') {
+            match = tournamentState.knockout.repechage[mIdx];
+            document.getElementById('modal-mata-mata-title').textContent = 'Resultado Repescagem';
+        } else {
+            match = tournamentState.knockout.rounds[rIdx].matches[mIdx];
+            document.getElementById('modal-mata-mata-title').textContent = 'Resultado ' + tournamentState.knockout.rounds[rIdx].name;
+        }
+
+        if (editP1Name) editP1Name.textContent = match.p1;
+        if (editP2Name) editP2Name.textContent = match.p2;
+        if (editS1) editS1.value = match.s1 || '';
+        if (editS2) editS2.value = match.s2 || '';
+
+        if (modalMataMata) modalMataMata.classList.add('active');
+    }
+
+    if (btnSaveKnockout) {
+        btnSaveKnockout.addEventListener('click', async () => {
+            if (!selectedKnockoutMatch) return;
+            const { type, rIdx, mIdx } = selectedKnockoutMatch;
+            const s1Val = editS1.value;
+            const s2Val = editS2.value;
+
+            if (s1Val === '' || s2Val === '') {
+                alert('Preencha os dois placares.');
+                return;
+            }
+
+            const s1 = parseInt(s1Val);
+            const s2 = parseInt(s2Val);
+
+            if (s1 === s2) {
+                alert('Mata-mata não pode terminar em empate. Use o placar agregado ou pênaltis.');
+                return;
+            }
+
+            let match;
+            if (type === 'repechage') {
+                match = tournamentState.knockout.repechage[mIdx];
+            } else {
+                match = tournamentState.knockout.rounds[rIdx].matches[mIdx];
+            }
+
+            match.s1 = s1Val;
+            match.s2 = s2Val;
+
+            const winner = s1 > s2 ? match.p1 : match.p2;
+
+            // Avançar vencedor
+            if (type === 'repechage') {
+                const firstRound = tournamentState.knockout.rounds[0];
+                const placeholder = `Vencedor Rep. ${mIdx + 1}`;
+                firstRound.matches.forEach(m => {
+                    if (m.p1 === placeholder) m.p1 = winner;
+                    if (m.p2 === placeholder) m.p2 = winner;
+                });
+            } else if (rIdx < tournamentState.knockout.rounds.length - 1) {
+                const nextRound = tournamentState.knockout.rounds[rIdx + 1];
+                const roundName = tournamentState.knockout.rounds[rIdx].name;
+                const placeholder = `Vencedor ${roundName} ${mIdx + 1}`;
+                nextRound.matches.forEach(m => {
+                    if (m.p1 === placeholder) m.p1 = winner;
+                    if (m.p2 === placeholder) m.p2 = winner;
+                });
+            } else {
+                tournamentState.top3.first = winner;
+                tournamentState.top3.second = (winner === match.p1) ? match.p2 : match.p1;
+            }
+
+            if (db) {
+                try {
+                    await set(ref(db, 'tournaments/current'), tournamentState);
+                    renderTournamentFromState();
+                    modalMataMata.classList.remove('active');
+                    alert('Placar salvo e vencedor avançado!');
+                } catch (e) {
+                    console.error('Erro ao salvar mata-mata:', e);
+                }
+            }
+        });
+    }
 
     // ROUND ROBIN MATCH GENERATION
     function generateRoundRobin(playersNames, idaVolta = false) {
@@ -344,6 +437,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (participantsInput) participantsInput.addEventListener('input', updatePreview);
     if (formatSelect) formatSelect.addEventListener('change', updatePreview);
 
+    const homeAwayInput = document.getElementById('tourney-home-away');
+    if (homeAwayInput) {
+        homeAwayInput.addEventListener('change', () => {
+            if (homeAwayInput.checked && formatSelect) {
+                formatSelect.value = 'grupos-mata-mata';
+            }
+            updatePreview();
+        });
+    }
+
     // ========== CONFIG UPDATE BUTTON ==========
     const btnUpdateConfig = document.getElementById('btn-update-config');
     if (btnUpdateConfig) {
@@ -509,7 +612,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 for(let i=0; i < M; i++) {
                     let p1 = repechagePlayers.shift();
                     let p2 = repechagePlayers.shift();
-                    repechageRound.push({ p1, p2 });
+                    repechageRound.push({ p1, p2, s1: '', s2: '' });
                     repechagePlayers.push(`Vencedor Rep. ${i+1}`);
                 }
             }
@@ -538,7 +641,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 for(let m=0; m < currentRoundPlayers.length; m+=2) {
                     let p1 = currentRoundPlayers[m] || 'A definir';
                     let p2 = currentRoundPlayers[m+1] || 'A definir';
-                    roundMatches.push({ p1, p2 });
+                    roundMatches.push({ p1, p2, s1: '', s2: '' });
                     nextRoundPlayers.push(`Vencedor ${roundName} ${m/2 + 1}`);
                 }
                 rounds.push({ name: roundName, matches: roundMatches });
@@ -659,36 +762,40 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
                     bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">Repescagem</div>`;
-                    tournamentState.knockout.repechage.forEach(match => {
+                    tournamentState.knockout.repechage.forEach((match, mIdx) => {
+                        const showBtn = role === 'organizador' && !isPreview;
                         bracketHTML += `
                             <div class="bracket-match">
                                 <div class="bracket-slot">
                                     <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${match.p1}</span>
-                                    <span>—</span>
+                                    <span class="slot-score">${match.s1 || '—'}</span>
                                 </div>
                                 <div class="bracket-slot">
                                     <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${match.p2}</span>
-                                    <span>—</span>
+                                    <span class="slot-score">${match.s2 || '—'}</span>
                                 </div>
+                                ${showBtn ? `<button class="btn-edit-knockout" data-type="repechage" data-m="${mIdx}" title="Editar Resultado"><i class="ph ph-pencil-simple"></i></button>` : ''}
                             </div>`;
                     });
                     bracketHTML += `</div>`;
                 }
 
                 if (tournamentState.knockout.rounds) {
-                    tournamentState.knockout.rounds.forEach(round => {
+                    tournamentState.knockout.rounds.forEach((round, rIdx) => {
                         bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">${round.name}</div>`;
-                        round.matches.forEach(match => {
+                        round.matches.forEach((match, mIdx) => {
+                            const showBtn = role === 'organizador' && !isPreview;
                             bracketHTML += `
                                 <div class="bracket-match">
                                     <div class="bracket-slot">
                                         <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${match.p1}</span>
-                                        <span>—</span>
+                                        <span class="slot-score">${match.s1 || '—'}</span>
                                     </div>
                                     <div class="bracket-slot">
                                         <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${match.p2}</span>
-                                        <span>—</span>
+                                        <span class="slot-score">${match.s2 || '—'}</span>
                                     </div>
+                                    ${showBtn ? `<button class="btn-edit-knockout" data-type="round" data-r="${rIdx}" data-m="${mIdx}" title="Editar Resultado"><i class="ph ph-pencil-simple"></i></button>` : ''}
                                 </div>`;
                         });
                         bracketHTML += `</div>`;
@@ -697,6 +804,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 bracketHTML += `</div>`;
                 mataMataContainer.innerHTML = bracketHTML;
+
+                // Add Listeners
+                mataMataContainer.querySelectorAll('.btn-edit-knockout').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const type = btn.dataset.type;
+                        const rIdx = parseInt(btn.dataset.r || 0);
+                        const mIdx = parseInt(btn.dataset.m || 0);
+                        openKnockoutEdit(type, rIdx, mIdx);
+                    });
+                });
             } else {
                 mataMataContainer.innerHTML = `<div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div>`;
             }

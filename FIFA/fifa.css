@@ -1618,3 +1618,90 @@ body {
     width: 100% !important;
     max-width: 500px !important;
 }
+
+.bracket-slot .slot-score {
+    color: #16A34A;
+    font-weight: 800;
+    font-size: 0.9rem;
+    min-width: 20px;
+    text-align: right;
+}
+
+.btn-edit-knockout {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(22, 163, 74, 0.1);
+    border: none;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #16A34A;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0;
+    z-index: 10;
+}
+
+.bracket-match:hover .btn-edit-knockout {
+    opacity: 1;
+    right: 8px;
+}
+
+.btn-edit-knockout:hover {
+    background: #16A34A;
+    color: #fff;
+}
+
+/* Modal Edit Style */
+.knockout-match-edit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px 0;
+}
+
+.edit-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.edit-player span {
+    font-weight: 700;
+    color: #042D15;
+    text-align: center;
+    font-size: 1rem;
+}
+
+.edit-player input {
+    width: 70px;
+    height: 60px;
+    text-align: center;
+    font-size: 1.8rem;
+    font-weight: 800;
+    border-radius: 12px;
+    border: 2px solid rgba(0,0,0,0.05);
+    background: rgba(255,255,255,0.5);
+    color: #16A34A;
+}
+
+.edit-player input:focus {
+    border-color: #16A34A;
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.1);
+}
+
+.edit-vs {
+    font-weight: 900;
+    color: rgba(0,0,0,0.1);
+    font-size: 1.2rem;
+    margin-top: 25px;
+}
