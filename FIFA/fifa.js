@@ -403,21 +403,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btnGerarCodigos) {
         btnGerarCodigos.addEventListener('click', () => {
             codesList.innerHTML = '';
-            // Check existing codes to find last number
-            let lastNumber = 0;
-            if (tournamentState.codes && tournamentState.codes.length > 0) {
-                const lastCodeObj = tournamentState.codes[tournamentState.codes.length - 1];
-                if (lastCodeObj && lastCodeObj.code) {
-                    const match = lastCodeObj.code.match(/\d+$/);
-                    if (match) lastNumber = parseInt(match[0], 10);
-                }
-            } else {
-                tournamentState.codes = [];
-            }
-
+            // Gerar códigos aleatórios
+            tournamentState.codes = [];
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             for (let i = 0; i < 32; i++) {
-                const nextNumber = (lastNumber + i + 1).toString().padStart(5, "0");
-                const code = `F${nextNumber}`; // F para FIFA
+                let randomPart = '';
+                for (let j = 0; j < 5; j++) {
+                    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                const code = `F-${randomPart}`; // F para FIFA
                 tournamentState.codes.push({ code, used: false });
             }
             

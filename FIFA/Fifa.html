@@ -78,6 +78,29 @@
                         <input type="checkbox" id="tourney-home-away">
                         <span>Casa e Fora (Ida/Volta)</span>
                     </label>
+
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <label style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>Backup (JSON)</span>
+                            <button class="btn btn-outline" id="btn-export-json" style="padding: 4px 8px; font-size: 11px; background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:4px; cursor:pointer;"><i class="ph ph-download-simple"></i> Exportar</button>
+                        </label>
+                        <div class="field" style="margin-top:10px;">
+                            <input type="file" id="import-file" class="form-control" accept=".json" style="padding-top:10px; font-size:11px;">
+                        </div>
+                        <div class="field" style="margin-top:10px;">
+                            <select id="import-modality" class="form-control" style="font-size:12px;">
+                                <option value="fifa">FIFA</option>
+                                <option value="sinuca">Sinuca</option>
+                                <option value="cs">Counter-Strike</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="btn-preview-import" style="width:100%; font-size:12px; margin-top:5px;">
+                            <i class="ph-bold ph-eye"></i> Pré-visualizar Importação
+                        </button>
+                        <div id="import-preview-area" style="display: none; margin-top: 15px; font-size: 12px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <!-- Resumo Injetado -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -259,39 +282,6 @@
 
             <!-- TAB 4: HISTÓRICO E IMPORTAÇÃO -->
             <div id="tab-historico" class="tab-content" style="display: none;">
-                
-                <div class="admin-only" id="import-section" style="display: none; background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 14px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.1);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="margin:0; display:flex; align-items:center; gap:8px;"><i class="ph ph-upload-simple"></i> Backup (JSON)</h2>
-                        <button class="btn btn-outline" id="btn-export-json" style="padding: 6px 12px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #fff; cursor: pointer; border-radius: 6px;">
-                            <i class="ph ph-download-simple"></i> Exportar Atual
-                        </button>
-                    </div>
-                    
-                    <div class="config-row">
-                        <div class="config-group">
-                            <label>Arquivo JSON</label>
-                            <input type="file" id="import-file" class="form-control" accept=".json" style="padding-top: 10px;">
-                        </div>
-                        <div class="config-group">
-                            <label>Modalidade</label>
-                            <select id="import-modality" class="form-control">
-                                <option value="fifa">FIFA</option>
-                                <option value="sinuca">Sinuca</option>
-                                <option value="cs">Counter-Strike</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <button class="btn btn-primary" id="btn-preview-import" style="margin-top: 15px;">
-                        <i class="ph-bold ph-eye"></i> Pré-visualizar Importação
-                    </button>
-                    
-                    <div id="import-preview-area" style="display: none; margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
-                        <!-- Resumo da Importação Injetado -->
-                    </div>
-                </div>
-
                 <div class="bracket-bar">
                     <h2>Histórico de Torneios</h2>
                 </div>
