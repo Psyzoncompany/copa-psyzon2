@@ -597,7 +597,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <div class="player-avatar">
                                         ${photo ? `<img src="${photo}" alt="">` : `<img src="https://flagcdn.com/w80/${countryCode || 'br'}.png" alt="" class="flag-avatar">`}
                                     </div>
-                                    <span style="${nameStyle}">${formatName(player.name)}</span>
+                                    <span style="${nameStyle}" class="player-name-clickable" onclick="openPlayerProfile('${player.name}')">${formatName(player.name)}</span>
                                     ${(isGroupFinished && statusLabel) ? `<span class="player-status-badge ${statusClass}">${statusLabel}</span>` : ''}
                                 </div>
                             </td>
@@ -662,8 +662,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     tournamentState.knockout.repechage.forEach(match => {
                         bracketHTML += `
                             <div class="bracket-match">
-                                <div class="bracket-slot"><span>${match.p1}</span><span>—</span></div>
-                                <div class="bracket-slot"><span>${match.p2}</span><span>—</span></div>
+                                <div class="bracket-slot">
+                                    <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${match.p1}</span>
+                                    <span>—</span>
+                                </div>
+                                <div class="bracket-slot">
+                                    <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${match.p2}</span>
+                                    <span>—</span>
+                                </div>
                             </div>`;
                     });
                     bracketHTML += `</div>`;
@@ -675,8 +681,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         round.matches.forEach(match => {
                             bracketHTML += `
                                 <div class="bracket-match">
-                                    <div class="bracket-slot"><span>${match.p1}</span><span>—</span></div>
-                                    <div class="bracket-slot"><span>${match.p2}</span><span>—</span></div>
+                                    <div class="bracket-slot">
+                                        <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${match.p1}</span>
+                                        <span>—</span>
+                                    </div>
+                                    <div class="bracket-slot">
+                                        <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${match.p2}</span>
+                                        <span>—</span>
+                                    </div>
                                 </div>`;
                         });
                         bracketHTML += `</div>`;
@@ -867,28 +879,119 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // ========== PLAYER PROFILE MODAL ==========
+    const modalPerfil = document.getElementById('modal-perfil');
+    const perfilTarget = document.getElementById('perfil-card-target');
+    const closePerfil = document.getElementById('close-perfil');
+
+    if (closePerfil) closePerfil.addEventListener('click', () => modalPerfil.style.display = 'none');
+
+    async function openPlayerProfile(playerName) {
+        window.openPlayerProfile = openPlayerProfile; // Make it global
+        if (!playerName || playerName.startsWith('A definir') || playerName.startsWith('1º ') || playerName.startsWith('2º ') || playerName.startsWith('Vencedor ') || playerName.startsWith('Classificado')) return;
+
+        // Mostrar loading no modal
+        perfilTarget.innerHTML = '<div style="padding: 40px; text-align: center;"><i class="ph ph-circle-notch animate-spin" style="font-size: 40px; color: #16A34A;"></i><p style="margin-top: 10px; color: #51715C;">Buscando perfil...</p></div>';
+        modalPerfil.style.display = 'flex';
+
+        try {
+            // 1. Buscar dados do participante no Firebase
+            const participantsRef = ref(db, 'participants');
+            const pSnap = await get(participantsRef);
+            let pData = null;
+
+            if (pSnap.exists()) {
+                pSnap.forEach(child => {
+                    if (child.val().nome === playerName) {
+                        pData = child.val();
+                    }
+                });
+            }
+
+            if (!pData) {
+                // Tenta buscar no registeredPlayers do tournamentState como fallback
+                const regP = (tournamentState.registeredPlayers || []).find(p => p.name === playerName);
+                if (regP) pData = { nome: regP.name, nick: regP.nick, photo: regP.photo, countryCode: regP.countryCode };
+            }
+
+            // 2. Simular/Calcular estatísticas (Aqui você pode buscar do histórico real futuramente)
+            // Por enquanto, usaremos valores padrão ou do histórico se existir
+            const stats = {
+                nome: pData ? pData.nome : playerName,
+                username: pData ? `@${pData.nick || pData.nome.split(' ')[0].toLowerCase()}` : '@atleta',
+                foto: pData && pData.photo ? pData.photo : `https://api.dicebear.com/7.x/avataaars/svg?seed=${playerName}`,
+                trofeus: 0, finals: 0, semis: 0,
+                jogos: 0, vitorias: 0, empates: 0, derrotas: 0, gols: 0, golsSofridos: 0
+            };
+
+            // 3. Renderizar o card (Inspirado no perfil.js)
+            const saldo = stats.gols - stats.golsSofridos;
+            let saldoClass = saldo > 0 ? 'saldo-pos' : (saldo < 0 ? 'saldo-neg' : 'saldo-neu');
+
+            perfilTarget.innerHTML = `
+                <div class="profile-card" style="margin: 0 auto; max-width: 100%;">
+                    <div class="profile-header">
+                        <div class="avatar-wrapper">
+                            <img src="${stats.foto}" alt="">
+                        </div>
+                        <div class="profile-info">
+                            <h1>${stats.nome}</h1>
+                            <span class="username">${stats.username}</span>
+                        </div>
+                    </div>
+                    <div class="main-badges">
+                        <div class="badge-item">
+                            <i class="ph-fill ph-trophy badge-icon"></i>
+                            <span class="badge-value">${stats.trofeus}</span>
+                            <span class="badge-label">Troféus</span>
+                        </div>
+                        <div class="badge-item">
+                            <i class="ph-fill ph-medal badge-icon" style="color: #cbd5e1;"></i>
+                            <span class="badge-value">${stats.finals}</span>
+                            <span class="badge-label">Finais</span>
+                        </div>
+                        <div class="badge-item">
+                            <i class="ph-fill ph-target badge-icon" style="color: #94a3b8;"></i>
+                            <span class="badge-value">${stats.semis}</span>
+                            <span class="badge-label">Semis</span>
+                        </div>
+                    </div>
+                    <div class="general-stats">
+                        <div class="stats-grid">
+                            <div class="stat-box"><span class="stat-box-value">${stats.jogos}</span><span class="stat-box-label">Jogos</span></div>
+                            <div class="stat-box"><span class="stat-box-value">${stats.vitorias}</span><span class="stat-box-label">Vitórias</span></div>
+                            <div class="stat-box"><span class="stat-box-value">${stats.empates}</span><span class="stat-box-label">Empates</span></div>
+                            <div class="stat-box"><span class="stat-box-value">${stats.derrotas}</span><span class="stat-box-label">Derrotas</span></div>
+                            <div class="stat-box"><span class="stat-box-value">${stats.gols}</span><span class="stat-box-label">Gols</span></div>
+                            <div class="stat-box"><span class="stat-box-value">${stats.golsSofridos}</span><span class="stat-box-label">Sofridos</span></div>
+                            <div class="stat-box highlight ${saldoClass}">
+                                <span class="stat-box-label">Saldo de Gols</span>
+                                <span class="stat-box-value">${saldo > 0 ? '+' : ''}${saldo}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } catch (e) {
+            console.error('Erro ao carregar perfil:', e);
+            perfilTarget.innerHTML = '<p style="padding: 20px; color: #ef4444; text-align: center;">Erro ao carregar os dados do atleta.</p>';
+        }
+    }
+
     // ========== ACTION BUTTONS ==========
     const actions = {
         'btn-embaralhar': () => {
             if (!tournamentState.groups || tournamentState.groups.length === 0) return;
-            
-            // Coletar todos os jogadores atuais dos grupos
             let allPlayers = [];
             tournamentState.groups.forEach(g => {
                 g.players.forEach(p => allPlayers.push({ name: p.name }));
             });
-            
-            // Embaralhar (Fisher-Yates)
             for (let i = allPlayers.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [allPlayers[i], allPlayers[j]] = [allPlayers[j], allPlayers[i]];
             }
-            
-            // Reconstruir o chaveamento
             buildTournamentState(allPlayers, tournamentState.format);
             renderTournamentFromState(false);
-            
-            // Salvar no Firebase
             if (db) {
                 update(ref(db, 'tournaments/current'), { 
                     groups: tournamentState.groups, 
@@ -896,8 +999,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updatedAt: new Date().toISOString()
                 }).catch(e => console.error('Erro ao embaralhar:', e));
             }
-            
-            console.log('[Action] Bracket shuffled');
         },
         'btn-atualizar': async () => {
             if (!tournamentState.groups || tournamentState.groups.length === 0) {
