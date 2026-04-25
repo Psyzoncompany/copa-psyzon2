@@ -179,7 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
-                    await markCodeAsUsed(validCodeData);
+                    const existingData = docSnap.data();
+                    await markCodeAsUsed(validCodeData, existingData);
                     window.location.href = `FIFA/Fifa.html?role=participante&id=${cpfRaw}`;
                 } else {
                     if (confirm('Não encontramos seu cadastro. Verifique o CPF ou faça um novo cadastro.\nDeseja fazer um novo cadastro agora?')) {
@@ -256,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 await setDoc(docRef, newParticipant);
                 
-                await markCodeAsUsed(validCodeData);
+                await markCodeAsUsed(validCodeData, newParticipant);
 
                 alert('Cadastro realizado com sucesso!');
                 window.location.href = `FIFA/Fifa.html?role=participante&id=${cpfRaw}`;
@@ -270,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function markCodeAsUsed(codeStr) {
+    async function markCodeAsUsed(codeStr, participantData) {
         if (!codeStr) return;
         try {
             const docRef = doc(db, 'codes', 'pool');
@@ -280,11 +281,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 const codesArray = data.codes || [];
                 const updatedCodes = codesArray.map(c => {
                     if (c.code === codeStr) {
-                        return { ...c, used: true };
+                        return { ...c, used: true, usedBy: participantData.cpf };
                     }
                     return c;
                 });
                 await updateDoc(docRef, { codes: updatedCodes });
+            }
+
+            // Adicionar ao torneio atual
+            if (participantData) {
+                const tRef = doc(db, 'tournaments', 'current');
+                const tSnap = await getDoc(tRef);
+                if (tSnap.exists()) {
+                    const tData = tSnap.data();
+                    let regPlayers = tData.registeredPlayers || [];
+                    // Evitar duplicidade caso ele recarregue ou re-entre
+                    if (!regPlayers.find(p => p.id === participantData.cpf)) {
+                        regPlayers.push({
+                            id: participantData.cpf,
+                            name: participantData.nome,
+                            nick: participantData.nick || "",
+                            flagId: participantData.flag || "br"
+                        });
+                        await updateDoc(tRef, { registeredPlayers: regPlayers });
+                    }
+                }
             }
         } catch(e) {
             console.error("Failed to update code usage", e);

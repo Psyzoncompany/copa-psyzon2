@@ -6,6 +6,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+import { initRankingSystem } from './ranking.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCL2u-oSlw8EWQ96atPI9Tc-0cIl2k9K6M",
@@ -58,6 +59,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         organizerPanel.style.display = 'flex';
     }
 
+    // Inicializa o módulo de Ranking
+    initRankingSystem(db, role);
+
     // ========== TOURNAMENT STATE (Firebase-Ready) ==========
     let tournamentState = {
         name: '',
@@ -91,7 +95,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (n >= 2) {
             phasesInfo.textContent = `${Math.ceil(Math.log2(n))} fases`;
-            generatePreviewStructure(n, format);
+            
+            // Verifica os participantes reais que já entraram
+            let realParticipants = tournamentState.registeredPlayers || [];
+            
+            // Monta a array final mesclando reais + placeholders
+            let mockParticipants = [];
+            for (let i = 0; i < n; i++) {
+                if (realParticipants[i]) {
+                    mockParticipants.push({ name: realParticipants[i].name });
+                } else {
+                    mockParticipants.push({ name: `A definir (Slot ${i+1})` });
+                }
+            }
+            
+            buildTournamentState(mockParticipants, format);
+            renderTournamentFromState(true);
         } else {
             phasesInfo.textContent = '—';
             groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Configure e gere o chaveamento para começar.</p></div>`;
@@ -509,37 +528,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // ========== MOBILE SIDEBAR TOGGLE ==========
-    const btnToggle = document.getElementById('btn-toggle-organizer');
-    const sidebar = document.querySelector('.sidebar');
-    
-    if (btnToggle && sidebar) {
-        btnToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            sidebar.classList.toggle('active');
-        });
-
-        // Close when clicking outside
-        document.addEventListener('click', (e) => {
-            if (sidebar.classList.contains('active') && !sidebar.contains(e.target) && e.target !== btnToggle) {
-                sidebar.classList.remove('active');
-            }
-        });
-
-        // Close on Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && sidebar.classList.contains('active')) {
-                sidebar.classList.remove('active');
-            }
-        });
-    }
-
+    // Removido bloco duplicado do Mobile Sidebar Toggle
     // ========== VER CLIENTES ==========
     const btnClientes = document.getElementById('btn-ver-clientes');
     if (btnClientes) {
         btnClientes.addEventListener('click', () => {
             alert('Módulo de fichas dos clientes em desenvolvimento.');
             // Future: open modal or navigate to clients page
+        });
+    }
+
+    // ========== EXPORT JSON ==========
+    const btnExportJson = document.getElementById('btn-export-json');
+    if (btnExportJson) {
+        btnExportJson.addEventListener('click', () => {
+            if (!tournamentState || (!tournamentState.groups && !tournamentState.name)) {
+                alert("Nenhum torneio válido para exportar.");
+                return;
+            }
+            
+            // Format for compatibility with the old system (if it's active) or just dump state
+            let exportData = {
+                tournamentName: tournamentState.name || 'Torneio_Exportado',
+                tournamentFormat: tournamentState.format,
+                status: tournamentState.status,
+                registeredPlayers: tournamentState.registeredPlayers || [],
+                groups: tournamentState.groups || [],
+                knockout: tournamentState.knockout || null
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `backup_${exportData.tournamentName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
         });
     }
 });

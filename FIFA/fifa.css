@@ -955,6 +955,10 @@ body {
         overflow: hidden;
     }
 
+    .topbar-right {
+        margin-right: 50px; /* Evita que o botão fixed fique em cima do botão de sair */
+    }
+
     .topbar-menu-btn {
         display: flex;
         position: fixed;
