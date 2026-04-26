@@ -2603,3 +2603,50 @@ body {
         text-align: center;
     }
 }
+
+/* ========================
+   KNOCKOUT REWORK (LIGHT)
+   ======================== */
+.mata-mata-tab {
+    background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(241,247,255,0.72));
+    border: 1px solid rgba(207, 222, 239, 0.8);
+    border-radius: 20px;
+    padding: 14px;
+}
+.knockout-summary-pills { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+.knockout-pill {
+    display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 12px;
+    font-size:12px; font-weight:700; color:#1f3b5f; background:rgba(219,234,254,.65); border:1px solid rgba(147,197,253,.6);
+}
+.knockout-pill.champion { color:#7c4a00; background:rgba(254,240,138,.45); border-color:rgba(234,179,8,.45); }
+.bracket-container { align-items:stretch; gap:8px; padding:1.25rem .25rem; }
+.bracket-round {
+    min-width:310px; padding:8px 8px 10px; border-radius:16px; background:rgba(255,255,255,.52);
+    border:1px solid rgba(191,219,254,.6); justify-content:flex-start; gap:10px;
+}
+.bracket-round-title { position:static; transform:none; margin:0 0 4px; text-align:left; color:#1e3a8a; letter-spacing:.7px; font-size:12px; }
+.bracket-round-title small { margin-left:8px; color:#64748b; font-weight:700; letter-spacing:0; }
+.bracket-round-gap { display:flex; align-items:center; justify-content:center; color:#60a5fa; min-width:22px; }
+.bracket-match.modern { width:100%; margin:0; border-radius:14px; border:1px solid rgba(203,213,225,.8); background:rgba(255,255,255,.95); overflow:visible; }
+.bracket-match.modern::before, .bracket-match.modern::after, .bracket-round:not(:last-child) .bracket-match::after, .bracket-round:not(:first-child) .bracket-match::before { content:none; }
+.bracket-match-head { display:flex; align-items:center; justify-content:space-between; padding:9px 11px; border-bottom:1px solid rgba(226,232,240,.85); }
+.match-title { font-size:12px; font-weight:800; color:#0f172a; }
+.player-line { display:inline-flex; align-items:center; gap:8px; min-width:0; }
+.knockout-avatar { width:22px; height:22px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#1e3a8a; background:rgba(219,234,254,.9); }
+.bracket-slot { padding:9px 11px; }
+.bracket-slot .player-name-clickable { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:185px; }
+.knockout-card-footer { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 11px 10px; border-top:1px solid rgba(226,232,240,.85); }
+.winner-tag { font-size:11px; font-weight:700; color:#15803d; }
+.btn-edit-knockout {
+    position:static; transform:none; opacity:1; width:auto; height:auto; border-radius:999px; padding:5px 10px;
+    font-size:12px; font-weight:700; gap:4px; background:rgba(59,130,246,.12); color:#1d4ed8;
+}
+.bracket-match:hover .btn-edit-knockout { right:auto; }
+.champion-column { min-width:260px; }
+.champion-card { background:linear-gradient(160deg, rgba(254,249,195,.95), rgba(255,255,255,.98)); border:1px solid rgba(250,204,21,.4); border-radius:16px; padding:18px 14px; text-align:center; }
+.champion-icon { font-size:28px; }
+@media (max-width: 768px) {
+    .bracket-round { min-width:300px; }
+    .bracket-match.modern { min-width:280px; }
+    .bracket-slot .player-name-clickable { max-width:158px; }
+}

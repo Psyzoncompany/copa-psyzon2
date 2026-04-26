@@ -1608,8 +1608,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             const groupsPending = (tournamentState.groups || []).some(group => (group.matches || []).some(m => m.gHome === '' || m.gAway === ''));
             const repechagePending = (tournamentState.knockout?.repechage || []).some(m => !isMatchResolvedForProgression(m));
             if (tournamentState.knockout) {
-                let bracketHTML = `<div class="mata-mata-tab"><div class="knockout-scroll-indicator">Arraste para o lado para ver as próximas fases</div><div class="knockout-scroll-container"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
-                                    ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
+                const allBracketMatches = [
+                    ...(tournamentState.knockout.repechage || []),
+                    ...((tournamentState.knockout.rounds || []).flatMap(round => round.matches || []))
+                ];
+                const finalizedCount = allBracketMatches.filter(match => !!getKnockoutMatchWinner(match)).length;
+                const pendingCount = Math.max(0, allBracketMatches.length - finalizedCount);
+                const firstPendingRound = (tournamentState.knockout.rounds || []).find(round => (round.matches || []).some(match => !getKnockoutMatchWinner(match)));
+                const currentPhase = firstPendingRound?.name || ((tournamentState.knockout.rounds || []).length ? 'Finalizado' : 'Aguardando');
+                const finalRound = tournamentState.knockout.rounds?.[tournamentState.knockout.rounds.length - 1];
+                const champion = finalRound?.matches?.[0] ? getKnockoutMatchWinner(finalRound.matches[0]) : null;
+                let bracketHTML = `<div class="mata-mata-tab">
+                    <div class="knockout-summary-pills">
+                        <span class="knockout-pill"><i class="ph ph-check-circle"></i> Finalizadas: ${finalizedCount}</span>
+                        <span class="knockout-pill"><i class="ph ph-clock"></i> Pendentes: ${pendingCount}</span>
+                        <span class="knockout-pill"><i class="ph ph-flag"></i> Fase atual: ${currentPhase}</span>
+                        ${champion ? `<span class="knockout-pill champion"><i class="ph-fill ph-trophy"></i> Campeão: ${formatName(champion)}</span>` : ''}
+                    </div>
+                    <div class="knockout-scroll-indicator">Arraste para o lado para ver as próximas fases</div>
+                    <div class="knockout-scroll-container"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
+                    ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
                 if ((tournamentState.groups || []).length && groupsPending) {
                     bracketHTML += `<div class="empty-state"><i class="ph ph-warning-circle"></i><h3>Mata-mata bloqueado</h3><p>Finalize todos os jogos da fase de grupos para gerar o mata-mata.</p></div>`;
                     mataMataContainer.innerHTML = bracketHTML + `</div></div></div>`;
@@ -1622,97 +1640,108 @@ document.addEventListener('DOMContentLoaded', async () => {
                     renderRanking();
                     return;
                 }
-                
-                // Helper: render a single bracket match card
-                function renderBracketMatch(match, type, rIdx, mIdx) {
+
+                function playerBadge(name) {
+                    const cleaned = formatName(displayParticipantName(name || 'A definir'));
+                    const initials = cleaned.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0].toUpperCase()).join('') || '?';
+                    return `<span class="knockout-avatar">${initials}</span><span class="player-name-clickable" onclick="openPlayerProfile('${name || ''}')">${cleaned}</span>`;
+                }
+
+                function matchStatus(match, winner, isTwoLegged) {
+                    if (match.walkover && winner) return 'Avançou por BYE';
+                    if (!isRealPlayer(match.p1) || !isRealPlayer(match.p2)) return 'A definir';
+                    if (winner) return 'Finalizado';
+                    const singleFilled = match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null;
+                    const legFilled = match.idaS1 !== '' && match.idaS2 !== '' && match.voltaS1 !== '' && match.voltaS2 !== '' && match.idaS1 != null && match.idaS2 != null && match.voltaS1 != null && match.voltaS2 != null;
+                    if (isTwoLegged && legFilled && !winner) return 'Desempate necessário';
+                    if (singleFilled || match.status === 'in-progress') return 'Em andamento';
+                    if ((String(match.p1 || '') + String(match.p2 || '')).includes('Vencedor')) return 'Aguardando vencedor anterior';
+                    return 'Pendente';
+                }
+
+                function renderBracketMatch(match, type, rIdx, mIdx, label) {
                     const showBtn = role === 'organizador' && !isPreview;
-                    const hasResult = (match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null) || !!match.completed;
                     const winner = getKnockoutMatchWinner(match);
-
-                    const p1Win = winner === match.p1;
-                    const p2Win = winner === match.p2;
-                    const p1Class = p1Win ? 'bracket-slot winner' : (p2Win ? 'bracket-slot loser' : 'bracket-slot');
-                    const p2Class = p2Win ? 'bracket-slot winner' : (p1Win ? 'bracket-slot loser' : 'bracket-slot');
-
-                    // Score display
-                    let score1 = match.s1 || '—';
-                    let score2 = match.s2 || '—';
-                    if (match.walkover && winner) {
-                        score1 = match.p1 === winner ? 'WO' : '—';
-                        score2 = match.p2 === winner ? 'WO' : '—';
-                    }
-                    
-                    // Penalty indicator
-                    let penaltyBadge = '';
-                    if (match.pen1 && match.pen2) {
-                        penaltyBadge = `<div class="penalty-badge"><i class="ph-fill ph-soccer-ball"></i> Pên: ${match.pen1} x ${match.pen2}</div>`;
-                    }
                     const isTwoLegged = !!tournamentState.homeAway && !match.walkover && !isBye(match.p1) && !isBye(match.p2);
+                    const hasResult = (match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null) || !!match.completed || !!winner;
+                    const statusText = matchStatus(match, winner, isTwoLegged);
+                    const p1Class = winner === match.p1 ? 'bracket-slot winner' : (winner === match.p2 ? 'bracket-slot loser' : 'bracket-slot');
+                    const p2Class = winner === match.p2 ? 'bracket-slot winner' : (winner === match.p1 ? 'bracket-slot loser' : 'bracket-slot');
+                    const agg1 = (parseInt(match.idaS1 || 0, 10) || 0) + (parseInt(match.voltaS1 || 0, 10) || 0);
+                    const agg2 = (parseInt(match.idaS2 || 0, 10) || 0) + (parseInt(match.voltaS2 || 0, 10) || 0);
+                    const score1 = match.walkover && winner ? (match.p1 === winner ? 'WO' : '—') : (hasResult ? (isTwoLegged ? String(agg1) : String(match.s1 ?? '—')) : '—');
+                    const score2 = match.walkover && winner ? (match.p2 === winner ? 'WO' : '—') : (hasResult ? (isTwoLegged ? String(agg2) : String(match.s2 ?? '—')) : '—');
                     const idaScore = (match.idaS1 != null && match.idaS1 !== '' && match.idaS2 != null && match.idaS2 !== '') ? `${match.idaS1} x ${match.idaS2}` : '—';
                     const voltaScore = (match.voltaS1 != null && match.voltaS1 !== '' && match.voltaS2 != null && match.voltaS2 !== '') ? `${match.voltaS1} x ${match.voltaS2}` : '—';
-                    const statusText = match.walkover ? 'walkover' : (winner ? 'concluído' : (match.status === 'in-progress' ? 'em andamento' : 'pendente'));
 
                     const testSimBtn = (testModeActive && role === 'organizador' && !isPreview)
                         ? `<button class="btn-test-inline" data-test-action="knockout-match-sim" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}">Simular confronto</button>`
                         : '';
                     return `
-                        <div class="bracket-match ${hasResult ? 'has-result' : ''} ${winner ? 'finished' : ''}">
-                            <span class="bracket-status">${statusText}</span>
+                        <div class="bracket-match modern ${hasResult ? 'has-result' : ''} ${winner ? 'finished' : ''}">
+                            <div class="bracket-match-head">
+                                <span class="match-title">${label}</span>
+                                ${showBtn ? `<button class="btn-edit-knockout" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar resultado"><i class="ph ph-pencil-simple"></i> Editar</button>` : ''}
+                            </div>
                             <div class="${p1Class}">
-                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${formatName(displayParticipantName(match.p1))}</span>
+                                <span class="player-line">${playerBadge(match.p1)}</span>
                                 <span class="slot-score">${score1}</span>
                             </div>
                             <div class="${p2Class}">
-                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${formatName(displayParticipantName(match.p2))}</span>
+                                <span class="player-line">${playerBadge(match.p2)}</span>
                                 <span class="slot-score">${score2}</span>
                             </div>
-                            ${isTwoLegged ? `
-                                <div class="knockout-legs-inline">
-                                    <span><strong>IDA</strong> ${formatName(displayParticipantName(match.p1))} ${idaScore} ${formatName(displayParticipantName(match.p2))}</span>
-                                    <span><strong>VOLTA</strong> ${formatName(displayParticipantName(match.p2))} ${voltaScore} ${formatName(displayParticipantName(match.p1))}</span>
-                                    <span><strong>AGREGADO</strong> ${formatName(displayParticipantName(match.p1))} ${score1} x ${score2} ${formatName(displayParticipantName(match.p2))}</span>
-                                </div>
-                            ` : ''}
-                            ${penaltyBadge}
-                            ${match.walkover && winner ? `<div class="penalty-badge">Classificado automaticamente: ${formatName(winner)}</div>` : ''}
+                            ${isTwoLegged ? `<div class="knockout-legs-inline">
+                                <span><strong>IDA</strong> ${formatName(displayParticipantName(match.p1))} ${idaScore} ${formatName(displayParticipantName(match.p2))}</span>
+                                <span><strong>VOLTA</strong> ${formatName(displayParticipantName(match.p2))} ${voltaScore} ${formatName(displayParticipantName(match.p1))}</span>
+                                <span><strong>AGREGADO</strong> ${formatName(displayParticipantName(match.p1))} ${agg1} x ${agg2} ${formatName(displayParticipantName(match.p2))}</span>
+                            </div>` : ''}
+                            ${match.pen1 && match.pen2 ? `<div class="penalty-badge"><i class="ph-fill ph-soccer-ball"></i> Pênaltis: ${match.pen1} x ${match.pen2}</div>` : ''}
+                            <div class="knockout-card-footer">
+                                <span class="bracket-status">${statusText}</span>
+                                ${winner ? `<span class="winner-tag"><i class="ph-fill ph-seal-check"></i> Classificado: ${formatName(winner)}</span>` : ''}
+                            </div>
                             ${testSimBtn}
-                            ${showBtn ? `<button class="btn-edit-knockout" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar Resultado"><i class="ph ph-pencil-simple"></i></button>` : ''}
                         </div>`;
                 }
 
                 if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
-                    bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">Repescagem</div>`;
-                    if (testModeActive && role === 'organizador' && !isPreview) {
-                        bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
-                            <button class="btn-test-inline" data-test-action="repechage-sim-all">Simular repescagem completa</button>
-                            <button class="btn-test-inline danger" data-test-action="repechage-clear">Limpar repescagem</button>
-                            <button class="btn-test-inline" data-test-action="repechage-advance">Avançar vencedores</button>
-                            <button class="btn-test-inline" data-test-action="repechage-next-phase">Gerar próxima fase</button>
-                        </div>`;
-                    }
+                    bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">🏁 Repescagem</div>`;
                     tournamentState.knockout.repechage.forEach((match, mIdx) => {
-                        bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx);
+                        bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx, `Repescagem ${mIdx + 1}`);
                     });
-                    bracketHTML += `</div>`;
+                    bracketHTML += `</div><div class="bracket-round-gap"><i class="ph ph-arrow-right"></i></div>`;
                 }
 
                 if (tournamentState.knockout.rounds) {
                     tournamentState.knockout.rounds.forEach((round, rIdx) => {
-                        bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">${round.name}</div>`;
+                        const totalMatches = (round.matches || []).length;
+                        bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">🏆 ${round.name} <small>${totalMatches} jogos</small></div>`;
                         if (testModeActive && role === 'organizador' && !isPreview) {
                             bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
                                 <button class="btn-test-inline" data-test-action="knockout-phase-sim" data-r="${rIdx}">Simular esta fase</button>
                                 <button class="btn-test-inline danger" data-test-action="knockout-phase-clear" data-r="${rIdx}">Limpar esta fase</button>
-                                <button class="btn-test-inline" data-test-action="knockout-phase-advance" data-r="${rIdx}">Avançar vencedores desta fase</button>
+                                <button class="btn-test-inline" data-test-action="knockout-phase-advance" data-r="${rIdx}">Avançar vencedores</button>
                             </div>`;
                         }
                         round.matches.forEach((match, mIdx) => {
-                            bracketHTML += renderBracketMatch(match, 'round', rIdx, mIdx);
+                            bracketHTML += renderBracketMatch(match, 'round', rIdx, mIdx, `${round.name} ${mIdx + 1}`);
                         });
-                        bracketHTML += `</div>`;
+                        bracketHTML += `</div>${rIdx < tournamentState.knockout.rounds.length - 1 ? '<div class="bracket-round-gap"><i class="ph ph-arrow-right"></i></div>' : ''}`;
                     });
                 }
-                
+
+                if (champion) {
+                    bracketHTML += `<div class="bracket-round champion-column">
+                        <div class="bracket-round-title">CAMPEÃO</div>
+                        <div class="champion-card">
+                            <span class="champion-icon">🏆</span>
+                            <h4>${formatName(champion)}</h4>
+                            <p>Título confirmado</p>
+                        </div>
+                    </div>`;
+                }
+
                 bracketHTML += `</div></div></div>`;
                 mataMataContainer.innerHTML = bracketHTML;
 
