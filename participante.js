@@ -34,17 +34,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function normalizeParticipant(raw = {}) {
         return {
-            id: raw.id || raw.participantId || null,
+            id: raw.id || raw.uid || raw.participantId || raw.cpf || null,
+            uid: raw.uid || null,
             name: raw.name || raw.nome || '',
             nick: raw.nick || '',
+            cpf: raw.cpf || null,
             cpfHash: raw.cpfHash || null,
             whatsapp: raw.whatsapp || raw.whats || '',
             instagram: raw.instagram || raw.insta || '',
+            email: raw.email || null,
             flagId: raw.flagId || raw.teamName || raw.flag || 'br',
             countryCode: (raw.countryCode || 'br').toLowerCase(),
             photoUrl: raw.photoUrl || raw.photo || raw.fotoURL || null,
             createdAt: raw.createdAt || new Date().toISOString()
         };
+    }
+
+    function getParticipantStableId(participant = {}) {
+        return participant.id || participant.uid || participant.cpf || participant.email || null;
     }
 
     function normalizeCodeEntry(raw) {
@@ -366,8 +373,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (docSnap.exists()) {
                     const existingData = normalizeParticipant(docSnap.val());
-                    await markCodeAsUsed(validCodeData, existingData);
-                    window.location.href = `FIFA/Fifa.html?role=participante&id=${encodeURIComponent(existingData.id || participantId || cpfRaw)}`;
+                    const registrationOk = await markCodeAsUsed(validCodeData, existingData);
+                    if (!registrationOk) return;
+                    window.location.href = `FIFA/Fifa.html?role=participante&id=${encodeURIComponent(getParticipantStableId(existingData) || participantId || cpfRaw)}`;
                 } else {
                     if (confirm('Não encontramos seu cadastro. Verifique o CPF ou faça um novo cadastro.\nDeseja fazer um novo cadastro agora?')) {
                         screenLogin.style.display = 'none';
@@ -481,7 +489,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 await set(ref(db, 'participants/' + participantId), normalized);
                 await set(hashIdxRef, participantId);
                 
-                await markCodeAsUsed(validCodeData, normalized);
+                const registrationOk = await markCodeAsUsed(validCodeData, normalized);
+                if (!registrationOk) return;
 
                 alert('Cadastro realizado com sucesso!');
                 window.location.href = `FIFA/Fifa.html?role=participante&id=${encodeURIComponent(participantId)}`;
@@ -518,88 +527,127 @@ document.addEventListener('DOMContentLoaded', () => {
         return !!tx.committed;
     }
 
+    async function releaseAccessCodeIfOwned(codeStr, participantId) {
+        if (!codeStr || !participantId) return false;
+        const cRef = ref(db, 'codes/pool');
+        const tx = await runTransaction(cRef, (current) => {
+            if (!current || !Array.isArray(current.codes)) return current;
+            const normalizedCodes = current.codes.map(normalizeCodeEntry);
+            const idx = normalizedCodes.findIndex(c => c.code === codeStr);
+            if (idx < 0) return;
+            const code = normalizedCodes[idx];
+            const owner = code.participantId || code.usedBy || null;
+            if (code.status !== 'used' || owner !== participantId) return;
+            normalizedCodes[idx] = {
+                ...code,
+                status: 'available',
+                used: false,
+                participantId: null,
+                usedBy: null,
+                usedAt: null
+            };
+            current.codes = normalizedCodes;
+            return current;
+        });
+        return !!tx.committed;
+    }
+
     async function markCodeAsUsed(codeStr, participantData) {
-        if (!codeStr) return;
+        if (!codeStr) return false;
+        const stableParticipantId = getParticipantStableId(participantData || {});
+        if (!stableParticipantId) {
+            alert('Não foi possível validar seu cadastro. Faça login novamente antes de usar o código.');
+            return false;
+        }
+
+        let codeConsumed = false;
         try {
-            const codeConsumed = await consumeAccessCodeAtomically(codeStr, participantData?.id || participantData?.cpf);
+            if (!participantData) return false;
+            const tRef = ref(db, 'tournaments/current');
+            const tSnap = await get(tRef);
+            if (!tSnap.exists()) {
+                alert('Nenhum torneio ativo foi encontrado para inscrição.');
+                return false;
+            }
+
+            const tData = tSnap.val();
+            let regPlayers = tData.registeredPlayers || [];
+
+            const alreadyRegistered = regPlayers.some((p) => getParticipantStableId(p) === stableParticipantId);
+            if (alreadyRegistered) {
+                alert('Você já está inscrito neste torneio!');
+                return false;
+            }
+
+            codeConsumed = await consumeAccessCodeAtomically(codeStr, stableParticipantId);
             if (!codeConsumed) {
                 alert('Este código foi utilizado por outro participante. Solicite um novo código ao organizador.');
-                return;
+                return false;
             }
 
-            // 2. Adicionar ao torneio e encaixar no chaveamento
-            if (participantData) {
-                const tRef = ref(db, 'tournaments/current');
-                const tSnap = await get(tRef);
-                if (tSnap.exists()) {
-                    const tData = tSnap.val();
-                    let regPlayers = tData.registeredPlayers || [];
+            regPlayers.push({
+                id: stableParticipantId,
+                uid: participantData.uid || null,
+                cpf: participantData.cpf || null,
+                email: participantData.email || null,
+                name: participantData.name || participantData.nome,
+                nick: participantData.nick || "",
+                flagId: participantData.flagId || participantData.flag || "br",
+                countryCode: participantData.countryCode || "br",
+                photo: participantData.photoUrl || participantData.photo || null
+            });
 
-                    // Evitar duplicidade
-                    const participantId = participantData.id || participantData.cpf;
-                    if (regPlayers.find(p => p.id === participantId)) {
-                        alert('Você já está inscrito neste torneio!');
-                        return; // Não marca o código como usado nem faz nada
-                    }
-
-                    regPlayers.push({
-                            id: participantId,
-                            name: participantData.name || participantData.nome,
-                            nick: participantData.nick || "",
-                            flagId: participantData.flagId || participantData.flag || "br",
-                            countryCode: participantData.countryCode || "br",
-                            photo: participantData.photoUrl || participantData.photo || null
-                        });
-
-                        // 3. ENCAIXAR NO CHAVEAMENTO — Fase de Grupos
-                        let placed = false;
-                        if (tData.groups && tData.groups.length > 0) {
-                            for (let g = 0; g < tData.groups.length && !placed; g++) {
-                                for (let p = 0; p < tData.groups[g].players.length && !placed; p++) {
-                                    if (tData.groups[g].players[p].name.startsWith('A definir')) {
-                                        tData.groups[g].players[p].name = participantData.name || participantData.nome;
-                                        placed = true;
-                                    }
-                                }
-                            }
+            // 3. ENCAIXAR NO CHAVEAMENTO — Fase de Grupos
+            let placed = false;
+            if (tData.groups && tData.groups.length > 0) {
+                for (let g = 0; g < tData.groups.length && !placed; g++) {
+                    for (let p = 0; p < tData.groups[g].players.length && !placed; p++) {
+                        if (tData.groups[g].players[p].name.startsWith('A definir')) {
+                            tData.groups[g].players[p].name = participantData.name || participantData.nome;
+                            placed = true;
                         }
-
-                        // 4. ENCAIXAR NO CHAVEAMENTO — Mata-mata (eliminatória direta)
-                        if (!placed && tData.knockout && tData.knockout.rounds) {
-                            const firstRound = tData.knockout.rounds[0];
-                            if (firstRound && firstRound.matches) {
-                                for (let m = 0; m < firstRound.matches.length && !placed; m++) {
-                                    if (firstRound.matches[m].p1.startsWith('A definir') || firstRound.matches[m].p1.startsWith('Classificado')) {
-                                        firstRound.matches[m].p1 = participantData.name || participantData.nome;
-                                        placed = true;
-                                    } else if (firstRound.matches[m].p2.startsWith('A definir') || firstRound.matches[m].p2.startsWith('Classificado')) {
-                                        firstRound.matches[m].p2 = participantData.name || participantData.nome;
-                                        placed = true;
-                                    }
-                                }
-                            }
-                        }
-
-                        // 5. Salvar tudo de volta no Firebase
-                        const updateData = {
-                            registeredPlayers: regPlayers,
-                            updatedAt: new Date().toISOString()
-                        };
-                        if (tData.groups) updateData.groups = tData.groups;
-                        if (tData.knockout) updateData.knockout = tData.knockout;
-
-                        await update(tRef, updateData);
-
-                        // Atualizar cópia indexada pelo código do torneio
-                        if (tData.tournamentCode) {
-                            await update(ref(db, 'tournaments/' + tData.tournamentCode), updateData);
-                        }
-
-                        console.log(`✅ ${participantData.name || participantData.nome} encaixado no chaveamento!`);
                     }
                 }
-            } catch(e) {
-                console.error("Failed to update code usage", e);
             }
+
+            // 4. ENCAIXAR NO CHAVEAMENTO — Mata-mata (eliminatória direta)
+            if (!placed && tData.knockout && tData.knockout.rounds) {
+                const firstRound = tData.knockout.rounds[0];
+                if (firstRound && firstRound.matches) {
+                    for (let m = 0; m < firstRound.matches.length && !placed; m++) {
+                        if (firstRound.matches[m].p1.startsWith('A definir') || firstRound.matches[m].p1.startsWith('Classificado')) {
+                            firstRound.matches[m].p1 = participantData.name || participantData.nome;
+                            placed = true;
+                        } else if (firstRound.matches[m].p2.startsWith('A definir') || firstRound.matches[m].p2.startsWith('Classificado')) {
+                            firstRound.matches[m].p2 = participantData.name || participantData.nome;
+                            placed = true;
+                        }
+                    }
+                }
+            }
+
+            // 5. Salvar tudo de volta no Firebase
+            const updateData = {
+                registeredPlayers: regPlayers,
+                updatedAt: new Date().toISOString()
+            };
+            if (tData.groups) updateData.groups = tData.groups;
+            if (tData.knockout) updateData.knockout = tData.knockout;
+
+            await update(tRef, updateData);
+
+            // Atualizar cópia indexada pelo código do torneio
+            if (tData.tournamentCode) {
+                await update(ref(db, 'tournaments/' + tData.tournamentCode), updateData);
+            }
+
+            console.log(`✅ ${participantData.name || participantData.nome} encaixado no chaveamento!`);
+            return true;
+        } catch(e) {
+            console.error("Failed to update code usage", e);
+            if (codeConsumed) await releaseAccessCodeIfOwned(codeStr, stableParticipantId);
+            alert('Falha ao concluir inscrição. Tentamos preservar o código; confirme com o organizador antes de reutilizar.');
+            return false;
         }
+    }
 });
