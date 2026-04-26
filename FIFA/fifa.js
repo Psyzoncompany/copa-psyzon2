@@ -267,14 +267,220 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
+    const VALID_KNOCKOUT_SIZES = [2, 4, 8, 16, 32, 64];
+
+    function getRoundNameBySize(size) {
+        const map = {
+            2: 'Final',
+            4: 'Semifinal',
+            8: 'Quartas de Final',
+            16: 'Oitavas de Final',
+            32: '16avos de Final',
+            64: '32avos de Final'
+        };
+        return map[size] || `Fase de ${size}`;
+    }
+
+    function getNearestValidKnockoutSize(totalPlayers) {
+        const valid = VALID_KNOCKOUT_SIZES.filter(size => size <= totalPlayers);
+        return valid.length ? valid[valid.length - 1] : 2;
+    }
+
+    function getSortedGroupPlayers(group) {
+        return [...(group?.players || [])].sort((a, b) => {
+            if ((b.pts || 0) !== (a.pts || 0)) return (b.pts || 0) - (a.pts || 0);
+            if ((b.sg || 0) !== (a.sg || 0)) return (b.sg || 0) - (a.sg || 0);
+            return (b.gp || 0) - (a.gp || 0);
+        });
+    }
+
+    function getGroupQualifiedEntries() {
+        const entries = [];
+        (tournamentState.groups || []).forEach(group => {
+            const sorted = getSortedGroupPlayers(group);
+            sorted.slice(0, 2).forEach((player, idx) => {
+                if (!isRealPlayer(player?.name)) return;
+                entries.push({
+                    name: player.name,
+                    groupName: group.name,
+                    position: idx + 1,
+                    pts: player.pts || 0,
+                    sg: player.sg || 0,
+                    gp: player.gp || 0
+                });
+            });
+        });
+        return entries.sort((a, b) =>
+            a.position - b.position ||
+            b.pts - a.pts ||
+            b.sg - a.sg ||
+            b.gp - a.gp ||
+            a.name.localeCompare(b.name, 'pt-BR')
+        );
+    }
+
+    function createKnockoutRounds(initialSlots) {
+        const rounds = [];
+        let currentRoundPlayers = [...initialSlots];
+        while (currentRoundPlayers.length > 1) {
+            const roundSize = currentRoundPlayers.length;
+            const roundName = getRoundNameBySize(roundSize);
+            const roundMatches = [];
+            const nextRoundPlayers = [];
+            for (let m = 0; m < currentRoundPlayers.length; m += 2) {
+                const p1 = currentRoundPlayers[m] || 'BYE';
+                const p2 = currentRoundPlayers[m + 1] || 'BYE';
+                const winnerToken = `Vencedor ${roundName} ${m / 2 + 1}`;
+                const match = createMatchData(p1, p2, winnerToken);
+                resolveByeMatchOutcome(match);
+                roundMatches.push(match);
+                nextRoundPlayers.push(winnerToken);
+            }
+            rounds.push({ name: roundName, matches: roundMatches });
+            currentRoundPlayers = nextRoundPlayers;
+        }
+        return rounds;
+    }
+
+    function buildKnockoutBlueprintFromQualifiedNames(qualifiedNames) {
+        const totalQualified = qualifiedNames.length;
+        const isPerfectBracket = VALID_KNOCKOUT_SIZES.includes(totalQualified);
+        const targetSize = isPerfectBracket ? totalQualified : getNearestValidKnockoutSize(totalQualified);
+        let repechagePairs = [];
+        let firstRoundSlots = [];
+
+        if (isPerfectBracket) {
+            firstRoundSlots = [...qualifiedNames];
+        } else {
+            const directSlots = targetSize - (totalQualified - targetSize);
+            const directQualified = qualifiedNames.slice(0, Math.max(0, directSlots));
+            const repechageQualified = qualifiedNames.slice(Math.max(0, directSlots));
+            firstRoundSlots = [...directQualified];
+            for (let i = 0; i < repechageQualified.length; i += 2) {
+                const token = `Vencedor Rep. ${Math.floor(i / 2) + 1}`;
+                repechagePairs.push({
+                    p1: repechageQualified[i] || 'BYE',
+                    p2: repechageQualified[i + 1] || 'BYE',
+                    token
+                });
+                firstRoundSlots.push(token);
+            }
+        }
+        return { repechagePairs, firstRoundSlots };
+    }
+
+    function getCurrentKnockoutQualifiersFromState() {
+        const knockout = tournamentState.knockout;
+        if (!knockout?.rounds?.length) return [];
+        const qualifiers = [];
+        const pushUnique = (name) => {
+            if (!isRealPlayer(name)) return;
+            if (!qualifiers.includes(name)) qualifiers.push(name);
+        };
+        const repSet = new Set();
+        (knockout.repechage || []).forEach(match => {
+            pushUnique(match.p1);
+            pushUnique(match.p2);
+            if (isRealPlayer(match.p1)) repSet.add(match.p1);
+            if (isRealPlayer(match.p2)) repSet.add(match.p2);
+        });
+        const firstRound = knockout.rounds[0];
+        (firstRound?.matches || []).forEach(match => {
+            [match.p1, match.p2].forEach(slot => {
+                if (typeof slot === 'string' && slot.startsWith('Vencedor Rep.')) return;
+                if (repSet.has(slot)) return;
+                pushUnique(slot);
+            });
+        });
+        (knockout.repechage || []).forEach(match => {
+            pushUnique(match.p1);
+            pushUnique(match.p2);
+        });
+        return qualifiers;
+    }
+
+    function haveQualifiersChanged(oldQualifiers, newQualifiers) {
+        if ((oldQualifiers || []).length !== (newQualifiers || []).length) return true;
+        for (let i = 0; i < oldQualifiers.length; i++) {
+            if ((oldQualifiers[i] || '').trim() !== (newQualifiers[i] || '').trim()) return true;
+        }
+        return false;
+    }
+
+    function hasManualKnockoutChanges(expectedQualifiedNames) {
+        const knockout = tournamentState.knockout;
+        if (!knockout?.rounds?.length) return false;
+        const blueprint = buildKnockoutBlueprintFromQualifiedNames(expectedQualifiedNames);
+        const currentRep = knockout.repechage || [];
+        if (currentRep.length !== blueprint.repechagePairs.length) return true;
+        for (let i = 0; i < currentRep.length; i++) {
+            if (currentRep[i].p1 !== blueprint.repechagePairs[i].p1 || currentRep[i].p2 !== blueprint.repechagePairs[i].p2) return true;
+        }
+        const firstRoundMatches = knockout.rounds[0]?.matches || [];
+        const expectedSlots = blueprint.firstRoundSlots;
+        if (firstRoundMatches.length * 2 !== expectedSlots.length) return true;
+        const currentSlots = firstRoundMatches.flatMap(match => [match.p1, match.p2]);
+        for (let i = 0; i < expectedSlots.length; i++) {
+            if ((currentSlots[i] || '') !== (expectedSlots[i] || '')) return true;
+        }
+        return false;
+    }
+
+    function hasKnockoutResults() {
+        if (!tournamentState.knockout) return false;
+        const allMatches = [
+            ...(tournamentState.knockout.repechage || []),
+            ...((tournamentState.knockout.rounds || []).flatMap(round => round.matches || []))
+        ];
+        return allMatches.some(match => {
+            const hasScore = (match.s1 !== '' && match.s1 != null) || (match.s2 !== '' && match.s2 != null) ||
+                (match.idaS1 !== '' && match.idaS1 != null) || (match.idaS2 !== '' && match.idaS2 != null) ||
+                (match.voltaS1 !== '' && match.voltaS1 != null) || (match.voltaS2 !== '' && match.voltaS2 != null);
+            const hasPenalty = (match.pen1 !== '' && match.pen1 != null) || (match.pen2 !== '' && match.pen2 != null);
+            const hasWinner = isRealPlayer(match.winner) || !!getKnockoutMatchWinner(match);
+            const hasFlowFlags = !!match.completed || !!match.walkover || match.status === 'completed' || match.status === 'walkover';
+            return hasScore || hasPenalty || hasWinner || hasFlowFlags;
+        });
+    }
+
+    function hasEliminationStarted(expectedQualifiedNames = []) {
+        return hasKnockoutResults() || hasManualKnockoutChanges(expectedQualifiedNames);
+    }
+
+    async function rebuildKnockoutFromGroups() {
+        const qualifiedEntries = getGroupQualifiedEntries();
+        const totalQualified = qualifiedEntries.length;
+        if (totalQualified < 2) return false;
+        const qualifiedNames = qualifiedEntries.map(entry => entry.name);
+        const blueprint = buildKnockoutBlueprintFromQualifiedNames(qualifiedNames);
+        const repechage = blueprint.repechagePairs.map(pair => {
+            const match = createMatchData(pair.p1, pair.p2, pair.token);
+            resolveByeMatchOutcome(match);
+            return match;
+        });
+        const firstRoundSlots = blueprint.firstRoundSlots;
+
+        const rounds = createKnockoutRounds(firstRoundSlots);
+        tournamentState.knockout = { repechage, rounds };
+
+        if (!repechage.length) {
+            const qualifiedForModal = [...qualifiedNames];
+            initializeNextPhaseMatchEditor(qualifiedForModal, 'empty');
+            if (nextPhaseOrderInput) nextPhaseOrderInput.value = qualifiedForModal.join('\n');
+            renderNextPhasePreview(qualifiedForModal);
+            renderNextPhaseMatchEditor();
+            modalNextPhase?.classList.add('active');
+            repechageModalShown = true;
+        } else {
+            repechageModalShown = false;
+        }
+        return true;
+    }
+
     function getGroupLeaders(position = 0) {
         const leaders = [];
         (tournamentState.groups || []).forEach(g => {
-            const sorted = [...(g.players || [])].sort((a, b) => {
-                if ((b.pts || 0) !== (a.pts || 0)) return (b.pts || 0) - (a.pts || 0);
-                if ((b.sg || 0) !== (a.sg || 0)) return (b.sg || 0) - (a.sg || 0);
-                return (b.gp || 0) - (a.gp || 0);
-            });
+            const sorted = getSortedGroupPlayers(g);
             if (sorted[position] && !isPlaceholder(sorted[position].name)) leaders.push(sorted[position].name);
         });
         return leaders;
@@ -1411,7 +1617,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             while(currentRoundPlayers.length > 1) {
                 let matchesInRound = currentRoundPlayers.length / 2;
-                let roundName = matchesInRound === 1 ? 'Final' : (matchesInRound === 2 ? 'Semifinal' : (matchesInRound === 4 ? 'Quartas de Final' : `Fase de ${matchesInRound*2}`));
+                let roundName = getRoundNameBySize(matchesInRound * 2);
                 
                 let roundMatches = [];
                 let nextRoundPlayers = [];
@@ -1520,9 +1726,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const photo = regP ? regP.photo : null;
                     const countryCode = regP ? regP.countryCode : 'br';
                     
-                    const statusLabel = i === 0 ? 'CLASSIFICADO' : (i === 1 ? 'REPESCAGEM' : (i === 2 ? 'POSSÍVEL 3º' : ''));
-                    const statusClass = i === 0 ? 'status-classified' : (i === 1 ? 'status-playoff' : (i === 2 ? 'status-possible' : ''));
-                    const leftBorderClass = isGroupFinished ? (i === 0 ? 'border-green' : (i === 1 ? 'border-gold' : (i === 2 ? 'border-orange' : ''))) : '';
+                    const statusLabel = i === 0 ? 'CLASSIFICADO' : (i === 1 ? 'CLASSIFICADO' : '');
+                    const statusClass = i <= 1 ? 'status-classified' : '';
+                    const leftBorderClass = isGroupFinished ? (i === 0 ? 'border-green' : (i === 1 ? 'border-gold' : '')) : '';
 
                     const isMe = participantName && player.name === participantName;
                     const nameStyle = isMe ? 'color: #16A34A; font-weight: 800;' : 'color: #042D15; font-weight: 600;';
@@ -1629,16 +1835,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="knockout-scroll-container"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
                     ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
                 if ((tournamentState.groups || []).length && groupsPending) {
-                    bracketHTML += `<div class="empty-state"><i class="ph ph-warning-circle"></i><h3>Mata-mata bloqueado</h3><p>Finalize todos os jogos da fase de grupos para gerar o mata-mata.</p></div>`;
-                    mataMataContainer.innerHTML = bracketHTML + `</div></div></div>`;
-                    renderRanking();
-                    return;
+                    bracketHTML += `<div class="knockout-warning-banner"><i class="ph ph-warning-circle"></i> Mata-mata em preparação: finalize todos os jogos da fase de grupos.</div>`;
                 }
                 if ((tournamentState.knockout?.repechage || []).length && repechagePending) {
-                    bracketHTML += `<div class="empty-state"><i class="ph ph-warning-circle"></i><h3>Repescagem pendente</h3><p>Finalize a repescagem para definir os classificados do mata-mata.</p></div>`;
-                    mataMataContainer.innerHTML = bracketHTML + `</div></div></div>`;
-                    renderRanking();
-                    return;
+                    bracketHTML += `<div class="knockout-warning-banner"><i class="ph ph-warning-circle"></i> Repescagem pendente: você pode editar resultados normalmente para liberar a próxima fase.</div>`;
                 }
 
                 function playerBadge(name) {
@@ -1706,7 +1906,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
-                    bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">🏁 Repescagem</div>`;
+                    bracketHTML += `<div class="bracket-round"><div class="bracket-round-title"><i class="ph ph-flag-checkered"></i> Repescagem</div>`;
                     tournamentState.knockout.repechage.forEach((match, mIdx) => {
                         bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx, `Repescagem ${mIdx + 1}`);
                     });
@@ -1716,7 +1916,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (tournamentState.knockout.rounds) {
                     tournamentState.knockout.rounds.forEach((round, rIdx) => {
                         const totalMatches = (round.matches || []).length;
-                        bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">🏆 ${round.name} <small>${totalMatches} jogos</small></div>`;
+                        bracketHTML += `<div class="bracket-round"><div class="bracket-round-title"><i class="ph ph-trophy"></i> ${round.name} <small>${totalMatches} jogos</small></div>`;
                         if (testModeActive && role === 'organizador' && !isPreview) {
                             bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
                                 <button class="btn-test-inline" data-test-action="knockout-phase-sim" data-r="${rIdx}">Simular esta fase</button>
@@ -1735,7 +1935,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     bracketHTML += `<div class="bracket-round champion-column">
                         <div class="bracket-round-title">CAMPEÃO</div>
                         <div class="champion-card">
-                            <span class="champion-icon">🏆</span>
+                            <span class="champion-icon"><i class="ph-fill ph-trophy"></i></span>
                             <h4>${formatName(champion)}</h4>
                             <p>Título confirmado</p>
                         </div>
@@ -1744,6 +1944,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 bracketHTML += `</div></div></div>`;
                 mataMataContainer.innerHTML = bracketHTML;
+                setupKnockoutScrollInteractions(mataMataContainer);
 
                 // Add Listeners
                 mataMataContainer.querySelectorAll('.btn-edit-knockout').forEach(btn => {
@@ -1760,6 +1961,50 @@ document.addEventListener('DOMContentLoaded', async () => {
             checkAndOpenNextPhaseModal();
         }
         renderRanking();
+    }
+
+    function setupKnockoutScrollInteractions(rootEl) {
+        const scroller = rootEl?.querySelector('.knockout-scroll-container');
+        if (!scroller || scroller.dataset.dragReady === '1') return;
+        scroller.dataset.dragReady = '1';
+
+        let dragging = false;
+        let startX = 0;
+        let startLeft = 0;
+        const isInteractiveTarget = (target) => !!target?.closest('button, a, input, select, textarea, .btn-edit-knockout');
+
+        scroller.addEventListener('pointerdown', (event) => {
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            if (isInteractiveTarget(event.target)) return;
+            dragging = true;
+            startX = event.clientX;
+            startLeft = scroller.scrollLeft;
+            scroller.classList.add('dragging');
+            try { scroller.setPointerCapture(event.pointerId); } catch (_) { /* noop */ }
+        });
+
+        scroller.addEventListener('pointermove', (event) => {
+            if (!dragging) return;
+            const deltaX = event.clientX - startX;
+            scroller.scrollLeft = startLeft - deltaX;
+            event.preventDefault();
+        }, { passive: false });
+
+        const stopDrag = (event) => {
+            if (!dragging) return;
+            dragging = false;
+            scroller.classList.remove('dragging');
+            try { scroller.releasePointerCapture(event.pointerId); } catch (_) { /* noop */ }
+        };
+        scroller.addEventListener('pointerup', stopDrag);
+        scroller.addEventListener('pointercancel', stopDrag);
+        scroller.addEventListener('pointerleave', stopDrag);
+
+        scroller.addEventListener('wheel', (event) => {
+            if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+            scroller.scrollLeft += event.deltaY;
+            event.preventDefault();
+        }, { passive: false });
     }
 
     // ========== TABS NAVIGATION ==========
@@ -2140,7 +2385,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             alert('Existem jogos pendentes na fase de grupos.');
             return;
         }
-        await seedKnockoutWithGroupResults();
+        await rebuildKnockoutFromGroups();
         renderTournamentFromState();
         addTestModeLog('Classificação automática para repescagem e próxima fase aplicada');
     }
@@ -2157,11 +2402,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!tournamentState.knockout) return;
         const groupsTable = {};
         (tournamentState.groups || []).forEach(group => {
-            groupsTable[group.name] = [...(group.players || [])].sort((a, b) => {
-                if ((b.pts || 0) !== (a.pts || 0)) return (b.pts || 0) - (a.pts || 0);
-                if ((b.sg || 0) !== (a.sg || 0)) return (b.sg || 0) - (a.sg || 0);
-                return (b.gp || 0) - (a.gp || 0);
-            });
+            groupsTable[group.name] = getSortedGroupPlayers(group);
         });
         (tournamentState.knockout.repechage || []).forEach(match => {
             match.p1 = resolveGroupPlaceholderName(match.p1Source || match.p1, groupsTable);
@@ -3583,12 +3824,38 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.innerHTML = '<i class="ph ph-circle-notch animate-spin"></i> Salvando...';
 
             try {
-                // Update stats
-                updateGroupStats(selectedGroupIndex);
+                // Update stats (todos os grupos para classificação consistente)
+                (tournamentState.groups || []).forEach((_, idx) => updateGroupStats(idx));
+
+                const groupsFinished = (tournamentState.groups || []).every(group =>
+                    (group.matches || []).length > 0 &&
+                    (group.matches || []).every(m => m.gHome !== '' && m.gAway !== '')
+                );
+                if (groupsFinished) {
+                    const newQualifiers = getGroupQualifiedEntries().map(entry => entry.name);
+                    const hasKnockout = !!tournamentState.knockout?.rounds?.length;
+                    if (!hasKnockout) {
+                        await rebuildKnockoutFromGroups();
+                    } else {
+                        const oldQualifiers = getCurrentKnockoutQualifiersFromState();
+                        const qualifiersChanged = haveQualifiersChanged(oldQualifiers, newQualifiers);
+                        if (qualifiersChanged) {
+                            const eliminationStarted = hasEliminationStarted(oldQualifiers);
+                            if (!eliminationStarted) {
+                                await rebuildKnockoutFromGroups();
+                            } else {
+                                const shouldRebuild = confirm('Alterar essa partida muda os classificados e pode recriar o mata-mata, apagando resultados já lançados. Deseja continuar?');
+                                if (shouldRebuild) {
+                                    await rebuildKnockoutFromGroups();
+                                }
+                            }
+                        }
+                    }
+                }
                 recalculateGeneralStats();
                 
                 // Persist
-                await persistCurrentTournament({ generalStats: tournamentState.generalStats });
+                await persistCurrentTournament({ groups: tournamentState.groups, knockout: tournamentState.knockout, generalStats: tournamentState.generalStats });
 
                 renderTournamentFromState();
                 document.getElementById('modal-jogos-grupo').classList.remove('active');
