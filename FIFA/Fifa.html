@@ -176,6 +176,12 @@
                     <h3>Ações do Torneio</h3>
                 </div>
                 <div class="card-body actions-grid">
+                    <button class="btn btn-action btn-test-toggle" id="btn-toggle-test-mode">
+                        <i class="ph-fill ph-flask"></i> Entrar em modo teste
+                    </button>
+                    <div id="test-mode-indicator" class="test-mode-indicator" style="display:none;">
+                        <i class="ph-fill ph-beaker"></i> Modo teste ativado
+                    </div>
                     <button class="btn btn-action btn-orange" id="btn-embaralhar">
                         <i class="ph-fill ph-shuffle"></i> Embaralhar Chaveamento
                     </button>
@@ -194,6 +200,47 @@
                 </div>
             </div>
 
+            <div class="card test-tools-card" id="card-test-tools" style="display:none;">
+                <div class="card-header">
+                    <i class="ph-fill ph-test-tube"></i>
+                    <h3>Painel do modo teste</h3>
+                </div>
+                <div class="card-body">
+                    <p class="test-tools-help">Use essas funções apenas para validar o fluxo do torneio sem impactar dados reais.</p>
+                    <div class="actions-grid">
+                        <button class="btn btn-action btn-test" id="btn-test-add-random">Adicionar jogadores aleatórios</button>
+                        <button class="btn btn-action btn-test" id="btn-test-add-8">Adicionar 8 jogadores</button>
+                        <button class="btn btn-action btn-test" id="btn-test-add-16">Adicionar 16 jogadores</button>
+                        <button class="btn btn-action btn-test" id="btn-test-add-32">Adicionar 32 jogadores</button>
+                        <button class="btn btn-action btn-test" id="btn-test-add-64">Adicionar 64 jogadores</button>
+                        <button class="btn btn-action btn-test" id="btn-test-generate-bracket">Gerar chaveamento teste</button>
+                        <button class="btn btn-action btn-test" id="btn-test-sim-groups">Simular fase de grupos</button>
+                        <button class="btn btn-action btn-test" id="btn-test-sim-repechage">Simular repescagem</button>
+                        <button class="btn btn-action btn-test" id="btn-test-sim-knockout">Simular mata-mata</button>
+                        <button class="btn btn-action btn-test" id="btn-test-sim-full">Simular torneio completo</button>
+                        <button class="btn btn-action btn-test" id="btn-test-clear-results">Limpar resultados de teste</button>
+                        <button class="btn btn-action btn-test-danger" id="btn-test-reset-all">Resetar teste completo</button>
+                        <button class="btn btn-action btn-test" id="btn-test-generate-code">Gerar código teste</button>
+                        <button class="btn btn-action btn-test" id="btn-test-save-firebase">Testar salvamento</button>
+                        <button class="btn btn-action btn-test" id="btn-test-read-firebase">Ler teste do Firebase</button>
+                        <button class="btn btn-action btn-test" id="btn-test-update-firebase">Atualizar teste no Firebase</button>
+                        <button class="btn btn-action btn-test-danger" id="btn-test-remove-firebase">Remover teste do Firebase</button>
+                        <button class="btn btn-action btn-test" id="btn-test-history">Testar histórico</button>
+                        <button class="btn btn-action btn-test-danger" id="btn-test-history-remove">Remover históricos teste</button>
+                        <button class="btn btn-action btn-test" id="btn-test-ranking">Testar ranking geral</button>
+                        <button class="btn btn-action btn-test-danger" id="btn-test-ranking-clear">Limpar ranking teste</button>
+                        <button class="btn btn-action btn-test" id="btn-test-next-phase">Avançar fase teste</button>
+                        <button class="btn btn-action btn-test" id="btn-test-prev-phase">Voltar fase teste</button>
+                    </div>
+                    <div class="test-log-box">
+                        <h4>Log de teste</h4>
+                        <div id="test-mode-log" class="test-mode-log">
+                            <p class="test-log-empty">Sem ações de teste ainda.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- SAIR (Somente Organizador) -->
             <div style="margin-top: auto; padding-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); width: 100%;">
                 <button id="btn-logout-organizer" class="btn btn-red-outline" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; border-color: rgba(230,57,70,0.3); color: #E63946; background: rgba(230,57,70,0.08);">
@@ -207,6 +254,7 @@
 
             <!-- TAB 1: FASE DE GRUPOS -->
             <div id="tab-grupos" class="tab-content active" style="display: block;">
+                <div id="test-toolbar-grupos" class="context-test-toolbar" style="display:none;"></div>
                 <!-- PRIZE BANNER -->
                 <div class="prize-banner" id="prize-banner" style="display:none;">
                     <i class="ph-fill ph-trophy"></i>
@@ -254,6 +302,7 @@
 
             <!-- TAB 2: MATA-MATA -->
             <div id="tab-mata-mata" class="tab-content" style="display: none;">
+                <div id="test-toolbar-mata-mata" class="context-test-toolbar" style="display:none;"></div>
                 <div class="mata-mata-tab">
                     <div class="bracket-scroll-area">
                         <div class="empty-state">
@@ -267,6 +316,7 @@
 
             <!-- TAB 3: RANKING -->
             <div id="tab-ranking" class="tab-content" style="display: none;">
+                <div id="test-toolbar-ranking" class="context-test-toolbar" style="display:none;"></div>
                 <div class="card" style="background: rgba(255,255,255,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.8); border-radius: 20px; padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,60,20,0.05);">
                     <div class="bracket-bar" style="margin-bottom: 1rem;">
                         <h2 style="color: #042D15;">Ranking Oficial</h2>
@@ -312,6 +362,7 @@
 
             <!-- TAB 4: HISTÓRICO E IMPORTAÇÃO -->
             <div id="tab-historico" class="tab-content" style="display: none;">
+                <div id="test-toolbar-historico" class="context-test-toolbar" style="display:none;"></div>
                 <div class="bracket-bar">
                     <h2>Histórico de Torneios</h2>
                 </div>

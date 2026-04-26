@@ -117,7 +117,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editS2 = document.getElementById('edit-s2');
     const btnSaveKnockout = document.getElementById('btn-save-knockout');
     const SENSITIVE_PASSWORD = '153090';
-    const SENSITIVE_IDS = new Set(['btn-encerrar', 'btn-resetar', 'btn-resetar-tudo', 'btn-apagar-cadastro', 'btn-resetar-codigos']);
+    const SENSITIVE_IDS = new Set([
+        'btn-encerrar', 'btn-resetar', 'btn-resetar-tudo', 'btn-apagar-cadastro', 'btn-resetar-codigos',
+        'btn-toggle-test-mode', 'btn-test-exit-clear', 'btn-test-sim-full', 'btn-test-reset-all',
+        'btn-test-save-firebase', 'btn-test-remove-firebase', 'btn-test-history-remove', 'btn-test-ranking-clear'
+    ]);
     const modalSensitivePassword = document.getElementById('modal-sensitive-password');
     const sensitivePasswordInput = document.getElementById('sensitive-password-input');
     const sensitivePasswordError = document.getElementById('sensitive-password-error');
@@ -131,13 +135,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         'btn-resetar': 'Resetar torneio (somente resultados)',
         'btn-resetar-tudo': 'Resetar tudo no torneio atual',
         'btn-apagar-cadastro': 'Apagar cadastro de participante',
-        'btn-resetar-codigos': 'Resetar códigos de acesso'
+        'btn-resetar-codigos': 'Resetar códigos de acesso',
+        'btn-toggle-test-mode': 'Alternar modo teste',
+        'btn-test-sim-full': 'Simular torneio completo (teste)',
+        'btn-test-reset-all': 'Resetar teste completo',
+        'btn-test-exit-clear': 'Sair do modo teste limpando dados',
+        'btn-test-save-firebase': 'Testar salvamento no Firebase',
+        'btn-test-remove-firebase': 'Remover teste do Firebase',
+        'btn-test-history-remove': 'Remover histórico de teste',
+        'btn-test-ranking-clear': 'Limpar ranking de teste'
     };
     let pendingSensitiveAction = null;
     let pendingNextPhaseQualified = [];
     let pendingNextPhaseMatches = [];
     let pendingNextPhaseSignature = '';
     let repechageModalShown = false;
+    let testModeActive = false;
+    let testModeBackupState = null;
+    let testModeLogEntries = [];
 
     function isBye(value) {
         return typeof value === 'string' && value.trim().toUpperCase() === 'BYE';
@@ -166,6 +181,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (p1Bye && !p2Bye && isRealPlayer(match?.p2)) return match.p2;
         if (p2Bye && !p1Bye && isRealPlayer(match?.p1)) return match.p1;
         return null;
+    }
+
+    function isDoubleByeMatch(match) {
+        return isBye(match?.p1) && isBye(match?.p2);
+    }
+
+    function resolveByeMatchOutcome(match) {
+        if (!match) return { resolved: false, winner: null };
+        const byeWinner = getByeAutoWinner(match);
+        if (byeWinner) {
+            match.winner = byeWinner;
+            match.completed = true;
+            match.walkover = true;
+            match.status = 'walkover';
+            match.s1 = match.p1 === byeWinner ? '1' : '0';
+            match.s2 = match.p2 === byeWinner ? '1' : '0';
+            return { resolved: true, winner: byeWinner };
+        }
+        if (isDoubleByeMatch(match)) {
+            match.winner = null;
+            match.completed = true;
+            match.walkover = false;
+            match.status = 'void';
+            match.s1 = '';
+            match.s2 = '';
+            return { resolved: true, winner: null };
+        }
+        return { resolved: false, winner: null };
     }
 
     function clearMatchResultFields(match) {
@@ -290,6 +333,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         return stats;
     }
 
+    function isMatchResolvedForProgression(match) {
+        return !!getKnockoutMatchWinner(match) || isDoubleByeMatch(match);
+    }
+
     function isTournamentFullyCompleted() {
         const groupsDone = (tournamentState.groups || []).every(group =>
             (group.matches || []).length > 0 &&
@@ -300,11 +347,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             knockoutMatches.push(...(tournamentState.knockout.repechage || []));
             (tournamentState.knockout.rounds || []).forEach(r => knockoutMatches.push(...(r.matches || [])));
         }
-        const knockoutDone = knockoutMatches.length === 0 || knockoutMatches.every(m => m.s1 !== '' && m.s2 !== '' && getKnockoutMatchWinner(m));
+        const knockoutDone = knockoutMatches.length === 0 || knockoutMatches.every(m => {
+            if (isDoubleByeMatch(m)) return true;
+            return m.s1 !== '' && m.s2 !== '' && getKnockoutMatchWinner(m);
+        });
         return groupsDone && knockoutDone;
     }
 
     function persistCurrentTournament(extra = {}) {
+        if (testModeActive && !extra.__allowPersistInTestMode) {
+            return Promise.resolve();
+        }
+        if (extra && Object.prototype.hasOwnProperty.call(extra, '__allowPersistInTestMode')) {
+            delete extra.__allowPersistInTestMode;
+        }
         if (!db) return Promise.resolve();
         const updatedAt = new Date().toISOString();
         tournamentState.updatedAt = updatedAt;
@@ -479,18 +535,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const allSelectedPlayers = pendingNextPhaseMatches.flatMap(m => [m.p1, m.p2]).filter(isRealPlayer);
         const duplicates = getDuplicatePlayersFromMatches(pendingNextPhaseMatches);
+        const totalSlots = pendingNextPhaseMatches.length * 2;
+        const requiredByeSlots = Math.max(0, totalSlots - pendingNextPhaseQualified.length);
+        const selectedByeCount = pendingNextPhaseMatches.flatMap(m => [m.p1, m.p2]).filter(isBye).length;
 
         nextPhaseMatchEditor.innerHTML = `
             ${pendingNextPhaseMatches.map((match, idx) => `
                 <div class="next-phase-match-card">
                     <select class="form-control next-phase-select-a" data-match-index="${idx}">
                         <option value="">Selecionar jogador</option>
-                        <option value="BYE">BYE</option>
                     </select>
                     <span class="next-phase-match-vs">Jogo ${idx + 1} • VS</span>
                     <select class="form-control next-phase-select-b" data-match-index="${idx}">
                         <option value="">Selecionar jogador</option>
-                        <option value="BYE">BYE</option>
                     </select>
                 </div>
             `).join('')}
@@ -498,6 +555,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
 
         function populateSelect(select, currentValue) {
+            const canUseBye = currentValue === 'BYE' || selectedByeCount < requiredByeSlots;
+            if (canUseBye) {
+                const byeOpt = document.createElement('option');
+                byeOpt.value = 'BYE';
+                byeOpt.textContent = 'BYE';
+                select.appendChild(byeOpt);
+            }
             const available = pendingNextPhaseQualified.filter(name => name === currentValue || !allSelectedPlayers.includes(name));
             available.forEach(name => {
                 const opt = document.createElement('option');
@@ -560,7 +624,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (role !== 'organizador' || !tournamentState.knockout || repechageModalShown) return;
         const rep = tournamentState.knockout.repechage || [];
         if (!rep.length) return;
-        const done = rep.every(m => getKnockoutMatchWinner(m));
+        const done = rep.every(m => isMatchResolvedForProgression(m));
         if (!done) return;
         const qualified = getNextPhaseQualifiersFromBracket(tournamentState);
         if (!qualified.length) return;
@@ -600,15 +664,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             let winner = null;
             let totalS1 = 0, totalS2 = 0;
-            const byeWinner = getByeAutoWinner(match);
-            if (byeWinner) {
-                match.winner = byeWinner;
-                match.completed = true;
-                match.walkover = true;
-                match.status = 'walkover';
-                match.s1 = match.p1 === byeWinner ? '1' : '0';
-                match.s2 = match.p2 === byeWinner ? '1' : '0';
-                winner = byeWinner;
+            const byeResolution = resolveByeMatchOutcome(match);
+            if (byeResolution.resolved) {
+                winner = byeResolution.winner;
             }
 
             if (!winner && isHomeAway) {
@@ -760,6 +818,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('chk-ida-volta').checked = group.matches.length > expectedSingle;
         }
 
+        const controlsHost = document.getElementById('group-matches-stats');
+        if (controlsHost && testModeActive && role === 'organizador') {
+            controlsHost.innerHTML = `
+                <p>Total de jogos: <strong id="total-matches-count">0</strong></p>
+                <div class="context-test-buttons" style="justify-content:flex-end;">
+                    <button class="btn-test-inline" id="btn-test-sim-group-current">Simular este grupo</button>
+                    <button class="btn-test-inline danger" id="btn-test-clear-group-current">Limpar este grupo</button>
+                    <button class="btn-test-inline" id="btn-test-recalc-group-current">Recalcular grupo</button>
+                </div>
+            `;
+            document.getElementById('btn-test-sim-group-current')?.addEventListener('click', () => simulateGroupByIndexTest(index));
+            document.getElementById('btn-test-clear-group-current')?.addEventListener('click', () => clearGroupResultsTest(index));
+            document.getElementById('btn-test-recalc-group-current')?.addEventListener('click', () => recalculateGroupOnlyTest(index));
+        } else if (controlsHost) {
+            controlsHost.innerHTML = `<p>Total de jogos: <strong id="total-matches-count">0</strong></p>`;
+        }
+
         renderGroupMatchesList();
         document.getElementById('modal-jogos-grupo').classList.add('active');
     }
@@ -787,6 +862,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="match-team away">
                     <span>${formatName(m.away)}</span>
                 </div>
+                ${(testModeActive && role === 'organizador') ? `<div class="test-game-action"><button class="btn-test-inline" data-test-action="group-match-sim" data-group-index="${selectedGroupIndex}" data-match-index="${i}">⚡ Simular jogo</button></div>` : ''}
             </div>
         `).join('');
 
@@ -799,6 +875,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (side === 'home') group.matches[idx].gHome = val;
                 else group.matches[idx].gAway = val;
             });
+        });
+
+        container.querySelectorAll('[data-test-action="group-match-sim"]').forEach(btn => {
+            btn.addEventListener('click', () => simulateSingleGroupMatchTest(Number(btn.dataset.groupIndex), Number(btn.dataset.matchIndex)));
         });
     }
 
@@ -1037,6 +1117,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (db) {
         // --- Sync Tournament ---
         onValue(ref(db, 'tournaments/current'), (snapshot) => {
+            if (testModeActive) return;
             const data = snapshot.val();
             if (data) {
                 const isNew = !tournamentState.tournamentCode;
@@ -1205,15 +1286,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 clearMatchResultFields(match);
                 if (idx === 0) {
-                    const byeWinner = getByeAutoWinner(match);
-                    if (byeWinner) {
-                        match.winner = byeWinner;
-                        match.completed = true;
-                        match.walkover = true;
-                        match.status = 'walkover';
-                        match.s1 = match.p1 === byeWinner ? '1' : '0';
-                        match.s2 = match.p2 === byeWinner ? '1' : '0';
-                    }
+                    resolveByeMatchOutcome(match);
                 }
             });
         });
@@ -1302,11 +1375,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <tbody>${rows}</tbody>
                         </table>
                     </div>
+                    ${(testModeActive && role === 'organizador' && !isPreview) ? `
+                    <div class="context-test-buttons" style="padding: 8px 0 0;">
+                        <button class="btn-test-inline" data-test-action="group-sim" data-group-index="${index}">Simular este grupo</button>
+                        <button class="btn-test-inline danger" data-test-action="group-clear" data-group-index="${index}">Limpar este grupo</button>
+                        <button class="btn-test-inline" data-test-action="group-recalc" data-group-index="${index}">Recalcular grupo</button>
+                    </div>` : ''}
                     <div class="group-footer">
                         <button class="btn-group-games" data-index="${index}">Ver jogos do grupo <i class="ph ph-caret-right"></i></button>
                     </div>`;
                 
                 card.querySelector('.btn-group-games').addEventListener('click', () => openGroupMatches(index));
+                card.querySelectorAll('[data-test-action]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const groupIdx = Number(btn.dataset.groupIndex);
+                        if (btn.dataset.testAction === 'group-sim') return simulateGroupByIndexTest(groupIdx);
+                        if (btn.dataset.testAction === 'group-clear') return clearGroupResultsTest(groupIdx);
+                        if (btn.dataset.testAction === 'group-recalc') return recalculateGroupOnlyTest(groupIdx);
+                    });
+                });
                 groupsContainer.appendChild(card);
             });
         } else {
@@ -1346,6 +1433,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                     const statusText = match.walkover ? 'walkover' : (winner ? 'concluído' : (match.status === 'in-progress' ? 'em andamento' : 'pendente'));
 
+                    const testSimBtn = (testModeActive && role === 'organizador' && !isPreview)
+                        ? `<button class="btn-test-inline" data-test-action="knockout-match-sim" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}">Simular confronto</button>`
+                        : '';
                     return `
                         <div class="bracket-match ${hasResult ? 'has-result' : ''}">
                             <span class="bracket-status">${statusText}</span>
@@ -1358,12 +1448,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <span class="slot-score">${score2}</span>
                             </div>
                             ${penaltyBadge}
+                            ${testSimBtn}
                             ${showBtn ? `<button class="btn-edit-knockout" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar Resultado"><i class="ph ph-pencil-simple"></i></button>` : ''}
                         </div>`;
                 }
 
                 if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
                     bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">Repescagem</div>`;
+                    if (testModeActive && role === 'organizador' && !isPreview) {
+                        bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
+                            <button class="btn-test-inline" data-test-action="repechage-sim-all">Simular repescagem completa</button>
+                            <button class="btn-test-inline danger" data-test-action="repechage-clear">Limpar repescagem</button>
+                            <button class="btn-test-inline" data-test-action="repechage-advance">Avançar vencedores</button>
+                            <button class="btn-test-inline" data-test-action="repechage-next-phase">Gerar próxima fase</button>
+                        </div>`;
+                    }
                     tournamentState.knockout.repechage.forEach((match, mIdx) => {
                         bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx);
                     });
@@ -1373,6 +1472,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (tournamentState.knockout.rounds) {
                     tournamentState.knockout.rounds.forEach((round, rIdx) => {
                         bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">${round.name}</div>`;
+                        if (testModeActive && role === 'organizador' && !isPreview) {
+                            bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
+                                <button class="btn-test-inline" data-test-action="knockout-phase-sim" data-r="${rIdx}">Simular esta fase</button>
+                                <button class="btn-test-inline danger" data-test-action="knockout-phase-clear" data-r="${rIdx}">Limpar esta fase</button>
+                                <button class="btn-test-inline" data-test-action="knockout-phase-advance" data-r="${rIdx}">Avançar vencedores desta fase</button>
+                            </div>`;
+                        }
                         round.matches.forEach((match, mIdx) => {
                             bracketHTML += renderBracketMatch(match, 'round', rIdx, mIdx);
                         });
@@ -1417,6 +1523,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (targetContent) {
                 targetContent.style.display = 'block';
             }
+            renderContextualTestToolbars();
         });
     });
 
@@ -1493,6 +1600,738 @@ document.addEventListener('DOMContentLoaded', async () => {
         statusBadge.textContent = status === 'ativo' ? 'EM ANDAMENTO' : status === 'encerrado' ? 'FINALIZADO' : 'AGUARDANDO';
         statusBadge.className = 'live-badge' + (status === 'ativo' ? ' live' : '');
     }
+
+    // ========== TEST MODE ==========
+    const btnToggleTestMode = document.getElementById('btn-toggle-test-mode');
+    const cardTestTools = document.getElementById('card-test-tools');
+    const testModeIndicator = document.getElementById('test-mode-indicator');
+    const testModeLog = document.getElementById('test-mode-log');
+    const testToolbarGroups = document.getElementById('test-toolbar-grupos');
+    const testToolbarKnockout = document.getElementById('test-toolbar-mata-mata');
+    const testToolbarRanking = document.getElementById('test-toolbar-ranking');
+    const testToolbarHistory = document.getElementById('test-toolbar-historico');
+    const TEST_NAMES_POOL = ['Lucas', 'Mateus', 'Pedro', 'Rafael', 'João', 'Bruno', 'Caio', 'Felipe', 'Gustavo', 'André', 'Thiago', 'Vitor', 'Diego', 'Henrique', 'Daniel', 'Eduardo'];
+
+    function addTestModeLog(message) {
+        const stamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        testModeLogEntries.unshift(`[${stamp}] ${message}`);
+        if (testModeLogEntries.length > 100) testModeLogEntries = testModeLogEntries.slice(0, 100);
+        if (!testModeLog) return;
+        testModeLog.innerHTML = testModeLogEntries.length
+            ? testModeLogEntries.map(entry => `<p class="test-log-item">${entry}</p>`).join('')
+            : '<p class="test-log-empty">Sem ações de teste ainda.</p>';
+    }
+
+    function renderTestModeUI() {
+        if (role !== 'organizador') return;
+        if (btnToggleTestMode) {
+            btnToggleTestMode.innerHTML = testModeActive
+                ? '<i class="ph-fill ph-flask"></i> Sair do modo teste'
+                : '<i class="ph-fill ph-flask"></i> Entrar em modo teste';
+        }
+        if (cardTestTools) cardTestTools.style.display = testModeActive ? 'block' : 'none';
+        if (testModeIndicator) testModeIndicator.style.display = testModeActive ? 'flex' : 'none';
+        renderContextualTestToolbars();
+    }
+
+    function renderContextualTestToolbars() {
+        const hideAll = () => [testToolbarGroups, testToolbarKnockout, testToolbarRanking, testToolbarHistory].forEach(el => {
+            if (!el) return;
+            el.style.display = 'none';
+            el.innerHTML = '';
+        });
+        if (!(role === 'organizador' && testModeActive)) {
+            hideAll();
+            return;
+        }
+        if (testToolbarGroups) {
+            testToolbarGroups.style.display = 'block';
+            testToolbarGroups.innerHTML = `
+                <details class="context-test-collapse" open>
+                    <summary>Ferramentas de teste</summary>
+                    <span class="context-test-title">Modo teste ativo — ações simuladas não afetam torneios reais.</span>
+                    <div class="context-test-buttons">
+                        <button class="btn-test-inline" data-test-action="groups-sim-all">Simular todos os grupos</button>
+                        <button class="btn-test-inline danger" data-test-action="groups-clear-all">Limpar resultados dos grupos</button>
+                        <button class="btn-test-inline" data-test-action="groups-recalc-all">Recalcular todos os grupos</button>
+                        <button class="btn-test-inline" data-test-action="groups-classify">Classificar automaticamente</button>
+                    </div>
+                </details>
+                <div class="test-mini-log">Última ação de teste: ${testModeLogEntries[0] || 'nenhuma ação ainda'}</div>
+            `;
+        }
+        if (testToolbarKnockout) {
+            testToolbarKnockout.style.display = 'block';
+            testToolbarKnockout.innerHTML = `
+                <details class="context-test-collapse" open>
+                    <summary>Ferramentas de teste</summary>
+                    <span class="context-test-title">Ferramentas de teste do mata-mata/repescagem</span>
+                    <div class="context-test-buttons">
+                        <button class="btn-test-inline" data-test-action="knockout-next-pending">Simular próximo jogo pendente</button>
+                        <button class="btn-test-inline" data-test-action="knockout-phase-current">Simular fase atual</button>
+                        <button class="btn-test-inline" data-test-action="knockout-sim-all">Simular mata-mata completo</button>
+                        <button class="btn-test-inline danger" data-test-action="knockout-clear-all">Limpar mata-mata</button>
+                        <button class="btn-test-inline" data-test-action="knockout-champion">Definir campeão teste</button>
+                    </div>
+                </details>
+                <div class="test-mini-log">Última ação de teste: ${testModeLogEntries[0] || 'nenhuma ação ainda'}</div>
+            `;
+        }
+        if (testToolbarRanking) {
+            testToolbarRanking.style.display = 'block';
+            testToolbarRanking.innerHTML = `
+                <span class="context-test-title">Ferramentas de teste do ranking</span>
+                <div class="context-test-buttons">
+                    <button class="btn-test-inline" data-test-action="ranking-generate">Gerar ranking teste</button>
+                    <button class="btn-test-inline" data-test-action="ranking-recalc">Recalcular ranking</button>
+                    <button class="btn-test-inline danger" data-test-action="ranking-clear">Limpar ranking teste</button>
+                    <button class="btn-test-inline" data-test-action="ranking-add-champion">Adicionar campeão teste</button>
+                    <button class="btn-test-inline" data-test-action="ranking-add-finalist">Adicionar finalista teste</button>
+                </div>
+            `;
+        }
+        if (testToolbarHistory) {
+            testToolbarHistory.style.display = 'block';
+            testToolbarHistory.innerHTML = `
+                <span class="context-test-title">Ferramentas de teste do histórico</span>
+                <div class="context-test-buttons">
+                    <button class="btn-test-inline" data-test-action="history-create">Criar histórico teste</button>
+                    <button class="btn-test-inline danger" data-test-action="history-clear">Remover históricos teste</button>
+                    <button class="btn-test-inline" data-test-action="history-open">Testar abrir histórico</button>
+                </div>
+            `;
+        }
+    }
+
+    function randomScore(max = 5) {
+        return Math.floor(Math.random() * (max + 1));
+    }
+
+    function randomWinnerScore() {
+        let a = randomScore(5);
+        let b = randomScore(5);
+        while (a === b) {
+            a = randomScore(5);
+            b = randomScore(5);
+        }
+        return [a, b];
+    }
+
+    function makeRandomTestPlayers(count) {
+        return Array.from({ length: count }, (_, i) => {
+            const label = i + 1;
+            const natural = TEST_NAMES_POOL[i % TEST_NAMES_POOL.length];
+            return { name: `${natural} (Teste ${String(label).padStart(2, '0')})`, isTestMode: true };
+        });
+    }
+
+    async function enterTestMode() {
+        if (testModeActive) return;
+        testModeBackupState = JSON.parse(JSON.stringify(tournamentState));
+        testModeActive = true;
+        testModeLogEntries = [];
+        addTestModeLog('Modo teste ativado');
+        renderTestModeUI();
+        renderTournamentFromState();
+    }
+
+    async function exitTestMode(clearData = false) {
+        if (!testModeActive) return;
+        if (clearData && testModeBackupState) {
+            tournamentState = JSON.parse(JSON.stringify(testModeBackupState));
+            renderTournamentFromState();
+            updateStatus(tournamentState.status || 'aguardando');
+            addTestModeLog('Dados de teste removidos e estado real restaurado');
+        } else {
+            addTestModeLog('Modo teste desativado mantendo dados apenas localmente');
+        }
+        testModeActive = false;
+        testModeBackupState = null;
+        renderTestModeUI();
+    }
+
+    async function withSensitiveGuard(actionId, fn) {
+        if (!SENSITIVE_IDS.has(actionId)) {
+            await fn();
+            return;
+        }
+        fn.actionId = actionId;
+        askSensitivePassword(fn);
+    }
+
+    async function addRandomPlayersForTest(count, askConfirm = true) {
+        if (!testModeActive) return;
+        const existing = tournamentState.registeredPlayers || [];
+        if (askConfirm && existing.length && !confirm('Já existem jogadores cadastrados. Deseja substituir pelos jogadores de teste?')) return;
+        const players = makeRandomTestPlayers(count);
+        tournamentState.registeredPlayers = players;
+        tournamentState.participants = count;
+        tournamentState.status = 'ativo';
+        tournamentState.isTestMode = true;
+        if (participantsInput) participantsInput.value = String(count);
+        buildTournamentState(players, tournamentState.format || 'grupos-mata-mata');
+        renderTournamentFromState();
+        updateStatus('ativo');
+        addTestModeLog(`${count} jogadores adicionados para teste`);
+    }
+
+    async function simulateGroupPhaseTest() {
+        if (!testModeActive || !tournamentState.groups?.length) return;
+        tournamentState.groups.forEach((group, gIdx) => {
+            (group.matches || []).forEach(match => {
+                match.gHome = String(randomScore(5));
+                match.gAway = String(randomScore(5));
+                match.isTestData = true;
+            });
+            updateGroupStats(gIdx);
+        });
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        addTestModeLog('Fase de grupos simulada');
+    }
+
+    async function simulateSingleGroupMatchTest(groupIndex, matchIndex) {
+        if (!testModeActive) return;
+        const group = tournamentState.groups?.[groupIndex];
+        const match = group?.matches?.[matchIndex];
+        if (!group || !match) return;
+        match.gHome = String(randomScore(5));
+        match.gAway = String(randomScore(5));
+        match.isTestData = true;
+        updateGroupStats(groupIndex);
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        if (selectedGroupIndex === groupIndex) renderGroupMatchesList();
+        addTestModeLog(`Jogo simulado (${group.name}): ${formatName(match.home)} ${match.gHome} x ${match.gAway} ${formatName(match.away)}`);
+    }
+
+    async function simulateGroupByIndexTest(groupIndex) {
+        if (!testModeActive) return;
+        const group = tournamentState.groups?.[groupIndex];
+        if (!group) return;
+        (group.matches || []).forEach(match => {
+            match.gHome = String(randomScore(5));
+            match.gAway = String(randomScore(5));
+            match.isTestData = true;
+        });
+        updateGroupStats(groupIndex);
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        if (selectedGroupIndex === groupIndex) renderGroupMatchesList();
+        addTestModeLog(`${group.name} simulado com sucesso`);
+    }
+
+    async function clearGroupResultsTest(groupIndex) {
+        const group = tournamentState.groups?.[groupIndex];
+        if (!group) return;
+        (group.matches || []).forEach(match => {
+            match.gHome = '';
+            match.gAway = '';
+            delete match.isTestData;
+        });
+        updateGroupStats(groupIndex);
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        if (selectedGroupIndex === groupIndex) renderGroupMatchesList();
+        addTestModeLog(`Resultados limpos em ${group.name}`);
+    }
+
+    async function recalculateGroupOnlyTest(groupIndex) {
+        const group = tournamentState.groups?.[groupIndex];
+        if (!group) return;
+        updateGroupStats(groupIndex);
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        if (selectedGroupIndex === groupIndex) renderGroupMatchesList();
+        addTestModeLog(`Classificação recalculada em ${group.name}`);
+    }
+
+    async function clearAllGroupResultsTest() {
+        (tournamentState.groups || []).forEach((group, idx) => {
+            (group.matches || []).forEach(match => {
+                match.gHome = '';
+                match.gAway = '';
+                delete match.isTestData;
+            });
+            updateGroupStats(idx);
+        });
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        addTestModeLog('Resultados de todos os grupos limpos');
+    }
+
+    async function recalculateAllGroupsTest() {
+        (tournamentState.groups || []).forEach((_, idx) => updateGroupStats(idx));
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        addTestModeLog('Todos os grupos recalculados');
+    }
+
+    async function classifyAutomaticallyFromGroupsTest() {
+        const hasPending = (tournamentState.groups || []).some(g => (g.matches || []).some(m => m.gHome === '' || m.gAway === ''));
+        if (hasPending) {
+            alert('Existem jogos pendentes na fase de grupos.');
+            return;
+        }
+        await seedKnockoutWithGroupResults();
+        renderTournamentFromState();
+        addTestModeLog('Classificação automática para repescagem e próxima fase aplicada');
+    }
+
+    function resolveGroupPlaceholderName(name, groupsTable) {
+        const match = typeof name === 'string' ? name.match(/(\d)º (Grupo [A-Z])/i) : null;
+        if (!match) return name;
+        const pos = Number(match[1]) - 1;
+        const groupName = match[2];
+        return groupsTable[groupName]?.[pos]?.name || name;
+    }
+
+    async function seedKnockoutWithGroupResults() {
+        if (!tournamentState.knockout) return;
+        const groupsTable = {};
+        (tournamentState.groups || []).forEach(group => {
+            groupsTable[group.name] = [...(group.players || [])].sort((a, b) => {
+                if ((b.pts || 0) !== (a.pts || 0)) return (b.pts || 0) - (a.pts || 0);
+                if ((b.sg || 0) !== (a.sg || 0)) return (b.sg || 0) - (a.sg || 0);
+                return (b.gp || 0) - (a.gp || 0);
+            });
+        });
+        (tournamentState.knockout.repechage || []).forEach(match => {
+            match.p1 = resolveGroupPlaceholderName(match.p1Source || match.p1, groupsTable);
+            match.p2 = resolveGroupPlaceholderName(match.p2Source || match.p2, groupsTable);
+            resolveByeMatchOutcome(match);
+        });
+        (tournamentState.knockout.rounds || []).forEach((round, idx) => {
+            (round.matches || []).forEach(match => {
+                if (idx === 0) {
+                    match.p1 = resolveGroupPlaceholderName(match.p1Source || match.p1, groupsTable);
+                    match.p2 = resolveGroupPlaceholderName(match.p2Source || match.p2, groupsTable);
+                }
+                resolveByeMatchOutcome(match);
+            });
+        });
+    }
+
+    async function simulateRepechageTest() {
+        if (!testModeActive || !tournamentState.knockout) return;
+        await seedKnockoutWithGroupResults();
+        (tournamentState.knockout.repechage || []).forEach(match => {
+            const bye = resolveByeMatchOutcome(match);
+            if (bye.resolved) return;
+            const [s1, s2] = randomWinnerScore();
+            match.s1 = String(s1);
+            match.s2 = String(s2);
+            match.isTestData = true;
+            match.winner = s1 > s2 ? match.p1 : match.p2;
+            match.completed = true;
+            match.status = 'completed';
+            propagateWinnerToNextRound(tournamentState.knockout, match.winnerToken, match.winner, -1);
+        });
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        addTestModeLog('Repescagem simulada');
+    }
+
+    async function simulateKnockoutTest() {
+        if (!testModeActive || !tournamentState.knockout) return;
+        await seedKnockoutWithGroupResults();
+        for (let r = 0; r < (tournamentState.knockout.rounds || []).length; r++) {
+            const round = tournamentState.knockout.rounds[r];
+            for (const match of (round.matches || [])) {
+                const bye = resolveByeMatchOutcome(match);
+                if (!bye.resolved) {
+                    const [s1, s2] = randomWinnerScore();
+                    match.s1 = String(s1);
+                    match.s2 = String(s2);
+                    match.isTestData = true;
+                    match.winner = s1 > s2 ? match.p1 : match.p2;
+                    match.completed = true;
+                    match.status = 'completed';
+                }
+                if (match.winner) {
+                    propagateWinnerToNextRound(tournamentState.knockout, match.winnerToken, match.winner, r);
+                }
+            }
+        }
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        const finalRound = tournamentState.knockout.rounds?.[tournamentState.knockout.rounds.length - 1];
+        const champion = finalRound?.matches?.[0]?.winner || 'A definir';
+        tournamentState.top3 = { ...tournamentState.top3, first: champion };
+        addTestModeLog(`Mata-mata simulado. Campeão: ${champion}`);
+    }
+
+    async function simulateKnockoutMatchTest(type, rIdx, mIdx) {
+        if (!testModeActive || !tournamentState.knockout) return;
+        const match = type === 'repechage'
+            ? tournamentState.knockout.repechage?.[mIdx]
+            : tournamentState.knockout.rounds?.[rIdx]?.matches?.[mIdx];
+        if (!match) return;
+        const bye = resolveByeMatchOutcome(match);
+        if (!bye.resolved) {
+            const [s1, s2] = randomWinnerScore();
+            match.s1 = String(s1);
+            match.s2 = String(s2);
+            match.isTestData = true;
+            match.winner = s1 > s2 ? match.p1 : match.p2;
+            match.completed = true;
+            match.status = 'completed';
+        }
+        if (match.winner) {
+            propagateWinnerToNextRound(tournamentState.knockout, match.winnerToken, match.winner, type === 'repechage' ? -1 : rIdx);
+        }
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        addTestModeLog(`Confronto simulado: ${formatName(match.p1)} x ${formatName(match.p2)} (${match.winner || 'sem vencedor real'})`);
+    }
+
+    async function simulateKnockoutPhaseTest(rIdx) {
+        if (!testModeActive || !tournamentState.knockout?.rounds?.[rIdx]) return;
+        const round = tournamentState.knockout.rounds[rIdx];
+        for (let mIdx = 0; mIdx < round.matches.length; mIdx++) {
+            await simulateKnockoutMatchTest('round', rIdx, mIdx);
+        }
+        addTestModeLog(`Fase simulada: ${round.name}`);
+    }
+
+    async function clearKnockoutPhaseTest(rIdx) {
+        const round = tournamentState.knockout?.rounds?.[rIdx];
+        if (!round) return;
+        round.matches.forEach(clearMatchResultFields);
+        recalculateGeneralStats();
+        renderTournamentFromState();
+        addTestModeLog(`Resultados limpos da fase: ${round.name}`);
+    }
+
+    async function clearRepechageTest() {
+        (tournamentState.knockout?.repechage || []).forEach(clearMatchResultFields);
+        renderTournamentFromState();
+        addTestModeLog('Repescagem limpa');
+    }
+
+    async function clearTestRanking() {
+        if (!db) return alert('Firebase indisponível.');
+        await remove(ref(db, 'ranking/test/fifa'));
+        addTestModeLog('Ranking de teste removido');
+        alert('Ranking de teste removido.');
+    }
+
+    async function addRankingBadgeTest(kind) {
+        if (!db) return;
+        const path = 'ranking/test/fifa';
+        const snap = await get(ref(db, path));
+        const data = snap.exists() ? snap.val() : { isTestMode: true, players: [] };
+        if (!data.players.length) data.players = makeRandomTestPlayers(4).map(p => ({ name: p.name, titulos: 0, finais: 0 }));
+        data.players[0][kind] = (data.players[0][kind] || 0) + 1;
+        await set(ref(db, path), data);
+        addTestModeLog(`${kind === 'titulos' ? 'Título' : 'Final'} de teste adicionado para ${data.players[0].name}`);
+        alert('Ranking teste atualizado.');
+    }
+
+    async function removeTestHistory() {
+        if (!db) return alert('Firebase indisponível.');
+        const snap = await get(ref(db, 'imports'));
+        if (!snap.exists()) return alert('Nenhum histórico encontrado.');
+        const all = snap.val();
+        const keys = Object.keys(all).filter(k => all[k]?.isTestMode === true);
+        await Promise.all(keys.map(k => remove(ref(db, `imports/${k}`))));
+        addTestModeLog(`${keys.length} históricos de teste removidos`);
+        alert('Históricos de teste removidos.');
+    }
+
+    async function readFirebaseTest() {
+        if (!db) return alert('Erro ao conectar com Firebase.');
+        const lastId = localStorage.getItem('lastFifaTestSaveId');
+        if (!lastId) return alert('Nenhum teste salvo encontrado.');
+        const snap = await get(ref(db, `tests/fifa/${lastId}`));
+        if (!snap.exists()) return alert('Teste não encontrado.');
+        addTestModeLog(`Teste lido no Firebase (${lastId})`);
+        alert('Teste lido com sucesso.');
+    }
+
+    async function updateFirebaseTest() {
+        if (!db) return alert('Erro ao conectar com Firebase.');
+        const lastId = localStorage.getItem('lastFifaTestSaveId');
+        if (!lastId) return alert('Nenhum teste salvo encontrado.');
+        await update(ref(db, `tests/fifa/${lastId}`), { updatedAt: new Date().toISOString(), ping: 'updated', isTestMode: true });
+        addTestModeLog(`Teste atualizado no Firebase (${lastId})`);
+        alert('Teste atualizado com sucesso.');
+    }
+
+    async function simulateCompleteTournamentTest() {
+        if (!testModeActive) return;
+        if (!(tournamentState.registeredPlayers || []).length) {
+            await addRandomPlayersForTest(parseInt(participantsInput?.value, 10) || 16, false);
+        }
+        await simulateGroupPhaseTest();
+        await simulateRepechageTest();
+        await simulateKnockoutTest();
+        addTestModeLog('Simulação completa concluída');
+    }
+
+    async function clearTestResultsOnly() {
+        if (!testModeActive) return;
+        (tournamentState.groups || []).forEach((group, idx) => {
+            (group.matches || []).forEach(match => {
+                match.gHome = '';
+                match.gAway = '';
+            });
+            updateGroupStats(idx);
+        });
+        if (tournamentState.knockout) resetKnockoutResults(tournamentState.knockout);
+        tournamentState.generalStats = {};
+        tournamentState.top3 = { first: '—', second: '—', third: '—' };
+        renderTournamentFromState();
+        addTestModeLog('Resultados de teste limpos');
+    }
+
+    async function resetTestCompletely() {
+        if (!testModeActive) return;
+        tournamentState.registeredPlayers = [];
+        tournamentState.groups = [];
+        tournamentState.knockout = null;
+        tournamentState.generalStats = {};
+        tournamentState.top3 = { first: '—', second: '—', third: '—' };
+        tournamentState.status = 'aguardando';
+        if (participantsInput) participantsInput.value = '8';
+        updateStatus('aguardando');
+        renderTournamentFromState();
+        addTestModeLog('Reset de teste completo executado');
+    }
+
+    async function generateTestCodeOnly() {
+        if (!testModeActive) return;
+        const code = await generateTournamentCode('fifa');
+        tournamentState.tournamentCode = code;
+        addTestModeLog(`Código de teste gerado: ${code}`);
+        alert(`Código de teste: ${code}`);
+    }
+
+    async function testFirebaseSave() {
+        if (!db) {
+            alert('Firebase indisponível neste ambiente.');
+            return;
+        }
+        const payload = {
+            id: `test_${Date.now()}`,
+            isTestMode: true,
+            label: 'TORNEIO TESTE',
+            createdAt: new Date().toISOString(),
+            tournament: JSON.parse(JSON.stringify(tournamentState))
+        };
+        try {
+            await set(ref(db, `tests/fifa/${payload.id}`), payload);
+            localStorage.setItem('lastFifaTestSaveId', payload.id);
+            addTestModeLog(`Teste salvo no Firebase (${payload.id})`);
+            alert('Teste salvo com sucesso no Firebase');
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao salvar teste no Firebase');
+        }
+    }
+
+    async function removeFirebaseTestData() {
+        if (!db) return;
+        const lastId = localStorage.getItem('lastFifaTestSaveId');
+        if (!lastId) {
+            alert('Nenhum teste salvo anteriormente para remover.');
+            return;
+        }
+        try {
+            await remove(ref(db, `tests/fifa/${lastId}`));
+            addTestModeLog(`Teste removido do Firebase (${lastId})`);
+            alert('Teste removido do Firebase');
+            localStorage.removeItem('lastFifaTestSaveId');
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao remover teste do Firebase');
+        }
+    }
+
+    async function testHistoryInsert() {
+        if (!db) {
+            alert('Firebase indisponível.');
+            return;
+        }
+        const fakeHistory = {
+            id: `hist_test_${Date.now()}`,
+            type: 'tournament-history',
+            isTestMode: true,
+            status: 'finalizado',
+            name: 'TORNEIO TESTE',
+            tournamentType: 'fifa',
+            importedAt: new Date().toISOString(),
+            champion: tournamentState.top3?.first || 'Jogador Teste'
+        };
+        await set(ref(db, `imports/${fakeHistory.id}`), fakeHistory);
+        addTestModeLog('Histórico de teste criado');
+        alert('Histórico de teste criado com sucesso.');
+    }
+
+    async function testRankingData() {
+        if (!db) {
+            alert('Firebase indisponível.');
+            return;
+        }
+        const rankingPayload = {
+            isTestMode: true,
+            updatedAt: new Date().toISOString(),
+            players: makeRandomTestPlayers(8).map((p, idx) => ({
+                name: p.name,
+                titulos: Math.floor(Math.random() * 5),
+                finais: Math.floor(Math.random() * 8),
+                semifinais: Math.floor(Math.random() * 12),
+                vitorias: 10 + idx * 2,
+                jogos: 15 + idx * 2,
+                gols: 20 + idx * 3,
+                golsContra: 9 + idx,
+                saldo: 11 + idx * 2,
+                pontos: 40 + idx * 3,
+                aproveitamento: `${Math.floor(55 + Math.random() * 40)}%`
+            }))
+        };
+        await set(ref(db, 'ranking/test/fifa'), rankingPayload);
+        addTestModeLog('Ranking de teste gerado');
+        alert('Dados de teste de ranking gerados.');
+    }
+
+    async function advanceTestPhase() {
+        if (!testModeActive || !tournamentState.knockout) return;
+        const firstPendingRound = (tournamentState.knockout.rounds || []).find(r => (r.matches || []).some(m => !getKnockoutMatchWinner(m)));
+        if (!firstPendingRound) {
+            addTestModeLog('Não há fase pendente para avançar');
+            return;
+        }
+        for (const match of (firstPendingRound.matches || [])) {
+            if (getKnockoutMatchWinner(match)) continue;
+            const bye = resolveByeMatchOutcome(match);
+            if (bye.resolved && bye.winner) {
+                propagateWinnerToNextRound(tournamentState.knockout, match.winnerToken, bye.winner);
+                continue;
+            }
+            const [s1, s2] = randomWinnerScore();
+            match.s1 = String(s1);
+            match.s2 = String(s2);
+            match.winner = s1 > s2 ? match.p1 : match.p2;
+            match.completed = true;
+            match.status = 'completed';
+            propagateWinnerToNextRound(tournamentState.knockout, match.winnerToken, match.winner);
+        }
+        renderTournamentFromState();
+        addTestModeLog(`Fase avançada manualmente (${firstPendingRound.name})`);
+    }
+
+    async function rollbackTestPhase() {
+        if (!testModeActive || !tournamentState.knockout?.rounds?.length) return;
+        const rounds = tournamentState.knockout.rounds;
+        const lastCompletedIdx = rounds.map((r, idx) => ({ r, idx })).reverse().find(({ r }) => (r.matches || []).every(m => !!getKnockoutMatchWinner(m)))?.idx;
+        if (lastCompletedIdx == null || lastCompletedIdx <= 0) {
+            addTestModeLog('Não há fase válida para voltar');
+            return;
+        }
+        rounds[lastCompletedIdx].matches.forEach(clearMatchResultFields);
+        rounds[lastCompletedIdx - 1].matches.forEach(m => {
+            if (m.winnerToken) propagateWinnerToNextRound(tournamentState.knockout, m.winnerToken, m.winnerToken, lastCompletedIdx - 1);
+        });
+        renderTournamentFromState();
+        addTestModeLog(`Fase de teste retornada para ${rounds[lastCompletedIdx - 1].name}`);
+    }
+
+    function bindTestModeButtons() {
+        const handlers = {
+            'btn-test-add-random': () => addRandomPlayersForTest(parseInt(participantsInput?.value, 10) || 16),
+            'btn-test-add-8': () => addRandomPlayersForTest(8),
+            'btn-test-add-16': () => addRandomPlayersForTest(16),
+            'btn-test-add-32': () => addRandomPlayersForTest(32),
+            'btn-test-add-64': () => addRandomPlayersForTest(64),
+            'btn-test-generate-bracket': async () => {
+                if (!(tournamentState.registeredPlayers || []).length) await addRandomPlayersForTest(parseInt(participantsInput?.value, 10) || 16, false);
+                buildTournamentState(tournamentState.registeredPlayers, tournamentState.format || 'grupos-mata-mata');
+                renderTournamentFromState();
+                addTestModeLog('Chaveamento de teste gerado');
+            },
+            'btn-test-sim-groups': simulateGroupPhaseTest,
+            'btn-test-sim-repechage': simulateRepechageTest,
+            'btn-test-sim-knockout': simulateKnockoutTest,
+            'btn-test-sim-full': simulateCompleteTournamentTest,
+            'btn-test-clear-results': clearTestResultsOnly,
+            'btn-test-reset-all': resetTestCompletely,
+            'btn-test-generate-code': generateTestCodeOnly,
+            'btn-test-save-firebase': testFirebaseSave,
+            'btn-test-read-firebase': readFirebaseTest,
+            'btn-test-update-firebase': updateFirebaseTest,
+            'btn-test-remove-firebase': removeFirebaseTestData,
+            'btn-test-history': testHistoryInsert,
+            'btn-test-history-remove': removeTestHistory,
+            'btn-test-ranking': testRankingData,
+            'btn-test-ranking-clear': clearTestRanking,
+            'btn-test-next-phase': advanceTestPhase,
+            'btn-test-prev-phase': rollbackTestPhase
+        };
+
+        Object.entries(handlers).forEach(([id, fn]) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.addEventListener('click', async () => {
+                if (!testModeActive) {
+                    alert('Ative o modo teste para usar essa ferramenta.');
+                    return;
+                }
+                await withSensitiveGuard(id, async () => fn());
+            });
+        });
+    }
+
+    function bindContextualToolbarActions() {
+        document.addEventListener('click', async (ev) => {
+            const btn = ev.target.closest('[data-test-action]');
+            if (!btn) return;
+            if (!testModeActive || role !== 'organizador') return;
+            const action = btn.dataset.testAction;
+            if (action === 'groups-sim-all') return simulateGroupPhaseTest();
+            if (action === 'groups-clear-all') return clearAllGroupResultsTest();
+            if (action === 'groups-recalc-all') return recalculateAllGroupsTest();
+            if (action === 'groups-classify') return classifyAutomaticallyFromGroupsTest();
+            if (action === 'knockout-match-sim') return simulateKnockoutMatchTest(btn.dataset.type, parseInt(btn.dataset.r || '-1', 10), parseInt(btn.dataset.m || '-1', 10));
+            if (action === 'knockout-phase-sim') return simulateKnockoutPhaseTest(parseInt(btn.dataset.r || '0', 10));
+            if (action === 'knockout-phase-clear') return clearKnockoutPhaseTest(parseInt(btn.dataset.r || '0', 10));
+            if (action === 'knockout-phase-advance') return simulateKnockoutPhaseTest(parseInt(btn.dataset.r || '0', 10));
+            if (action === 'repechage-sim-all') return simulateRepechageTest();
+            if (action === 'repechage-clear') return clearRepechageTest();
+            if (action === 'repechage-advance') return simulateRepechageTest();
+            if (action === 'repechage-next-phase') return checkAndOpenNextPhaseModal();
+            if (action === 'knockout-next-pending') return advanceTestPhase();
+            if (action === 'knockout-phase-current') return simulateKnockoutPhaseTest(0);
+            if (action === 'knockout-sim-all') return simulateKnockoutTest();
+            if (action === 'knockout-clear-all') return resetKnockoutResults(tournamentState.knockout), renderTournamentFromState(), addTestModeLog('Mata-mata limpo');
+            if (action === 'knockout-champion') return simulateKnockoutTest();
+            if (action === 'ranking-generate') return testRankingData();
+            if (action === 'ranking-recalc') return recalculateGeneralStats(), addTestModeLog('Ranking recalculado com base no estado atual'), alert('Ranking recalculado (dados locais).');
+            if (action === 'ranking-clear') return withSensitiveGuard('btn-test-ranking-clear', clearTestRanking);
+            if (action === 'ranking-add-champion') return addRankingBadgeTest('titulos');
+            if (action === 'ranking-add-finalist') return addRankingBadgeTest('finais');
+            if (action === 'history-create') return testHistoryInsert();
+            if (action === 'history-clear') return withSensitiveGuard('btn-test-history-remove', removeTestHistory);
+            if (action === 'history-open') return alert('Abra um card de histórico para validar os detalhes.');
+        });
+    }
+
+    if (btnToggleTestMode) {
+        btnToggleTestMode.addEventListener('click', async () => {
+            if (!testModeActive) {
+                return withSensitiveGuard('btn-toggle-test-mode', enterTestMode);
+            }
+            const shouldClear = confirm('Deseja limpar os dados de teste?\n\nOK = Sim, limpar tudo\nCancelar = Não, manter dados de teste locais');
+            if (shouldClear) {
+                return withSensitiveGuard('btn-test-exit-clear', async () => exitTestMode(true));
+            }
+            return exitTestMode(false);
+        });
+    }
+    bindTestModeButtons();
+    bindContextualToolbarActions();
+    renderTestModeUI();
+
 
     // ========== SAVE PRIZE ==========
     const btnSalvarPremio = document.getElementById('btn-salvar-premio');
@@ -1833,15 +2672,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const p2 = matchesFromEditor[i].p2 || 'BYE';
             const winnerToken = firstRound.matches?.[i]?.winnerToken || `Vencedor ${firstRound.name} ${i + 1}`;
             const newMatch = createMatchData(p1, p2, winnerToken);
-            const byeWinner = getByeAutoWinner(newMatch);
-            if (byeWinner) {
-                newMatch.winner = byeWinner;
-                newMatch.completed = true;
-                newMatch.walkover = true;
-                newMatch.status = 'walkover';
-                newMatch.s1 = newMatch.p1 === byeWinner ? '1' : '0';
-                newMatch.s2 = newMatch.p2 === byeWinner ? '1' : '0';
-            }
+            resolveByeMatchOutcome(newMatch);
             matches.push(newMatch);
         }
         firstRound.matches = matches;
