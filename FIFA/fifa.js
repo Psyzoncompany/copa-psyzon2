@@ -46,6 +46,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const participantId = urlParams.get('id') || null;
     const participantName = urlParams.get('name') ? decodeURIComponent(urlParams.get('name')) : null;
 
+    document.querySelectorAll('[data-game-switch]').forEach(link => {
+        const game = link.dataset.gameSwitch;
+        const target = game === 'sinuca' ? '../SINUCA/sinuca.html' : 'Fifa.html';
+        const params = new URLSearchParams();
+        params.set('role', role);
+        if (participantId) params.set('id', participantId);
+        if (participantName) params.set('name', participantName);
+        link.href = `${target}?${params.toString()}`;
+    });
+
     const badge = document.getElementById('user-role-badge');
     const organizerPanel = document.getElementById('organizer-panel');
     const btnExitTopbar = document.getElementById('btn-exit-topbar');
@@ -167,6 +177,179 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let selectedGroupIndex = null;
     let selectedKnockoutMatch = null; // { type, rIdx, mIdx }
+
+    async function sha256Hex(value) {
+        const encoded = new TextEncoder().encode(value);
+        const hash = await crypto.subtle.digest('SHA-256', encoded);
+        return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function getPlayerIdentityValues(player) {
+        if (!player || typeof player !== 'object') return [];
+        return [
+            player.id,
+            player.uid,
+            player.participantId,
+            player.playerId,
+            player.cpf,
+            player.cpfRaw,
+            player.usedBy
+        ].filter(Boolean).map(String);
+    }
+
+    function matchesRemovalTarget(player, target) {
+        if (!player || !target) return false;
+        const ids = target.ids || new Set();
+        const values = getPlayerIdentityValues(player);
+        if (values.some(value => ids.has(value))) return true;
+        if (target.cpfRaw && values.includes(target.cpfRaw)) return true;
+        if (target.cpfHash && player.cpfHash === target.cpfHash) return true;
+        return false;
+    }
+
+    async function resolveParticipantRemovalTarget(identifier) {
+        const raw = String(identifier || '').trim();
+        const cpfRaw = raw.replace(/\D/g, '');
+        const canUseCpf = cpfRaw.length === 11;
+        let resolvedCpfRaw = canUseCpf ? cpfRaw : null;
+        let resolvedCpfHash = canUseCpf ? await sha256Hex(cpfRaw) : null;
+        const ids = new Set([raw]);
+        if (canUseCpf) ids.add(cpfRaw);
+
+        if (resolvedCpfHash) {
+            const hashIdxSnap = await get(ref(db, 'participantsByCpfHash/' + resolvedCpfHash));
+            if (hashIdxSnap.exists()) {
+                const indexedValue = hashIdxSnap.val();
+                if (typeof indexedValue === 'string') ids.add(indexedValue);
+                if (indexedValue && typeof indexedValue === 'object') {
+                    getPlayerIdentityValues(indexedValue).forEach(value => ids.add(value));
+                }
+            }
+        }
+
+        const participantsSnap = await get(ref(db, 'participants'));
+        const names = new Set();
+        if (participantsSnap.exists()) {
+            participantsSnap.forEach(child => {
+                const key = String(child.key);
+                const data = child.val() || {};
+                const keyMatches = ids.has(key);
+                const dataMatches = matchesRemovalTarget(data, { ids, cpfRaw: resolvedCpfRaw, cpfHash: resolvedCpfHash });
+                if (keyMatches || dataMatches) {
+                    ids.add(key);
+                    getPlayerIdentityValues(data).forEach(value => ids.add(value));
+                    if (!resolvedCpfRaw && data.cpf) {
+                        const participantCpf = String(data.cpf).replace(/\D/g, '');
+                        if (participantCpf.length === 11) resolvedCpfRaw = participantCpf;
+                    }
+                    if (!resolvedCpfHash && data.cpfHash) {
+                        resolvedCpfHash = data.cpfHash;
+                    }
+                    const displayName = data.name || data.nome || data.nick;
+                    if (displayName) names.add(String(displayName));
+                }
+            });
+        }
+
+        if (!resolvedCpfHash && resolvedCpfRaw) {
+            resolvedCpfHash = await sha256Hex(resolvedCpfRaw);
+        }
+
+        return {
+            ids,
+            names,
+            cpfRaw: resolvedCpfRaw,
+            cpfHash: resolvedCpfHash
+        };
+    }
+
+    async function removeParticipantFromTournamentPath(path, target) {
+        const tRef = ref(db, path);
+        const tSnap = await get(tRef);
+        if (!tSnap.exists()) return false;
+
+        const tData = tSnap.val();
+        const updates = {};
+        let changed = false;
+        ['registeredPlayers', 'participants', 'sinucaRanking', 'rankingFinal', 'ranking'].forEach(key => {
+            if (!Array.isArray(tData[key])) return;
+            const filtered = tData[key].filter(player => !matchesRemovalTarget(player, target));
+            if (filtered.length !== tData[key].length) {
+                updates[key] = filtered;
+                changed = true;
+            }
+        });
+
+        if (changed) {
+            updates.updatedAt = new Date().toISOString();
+            await update(tRef, updates);
+        }
+
+        return changed;
+    }
+
+    async function removeParticipantEverywhere(identifier) {
+        if (!db) return false;
+
+        const target = await resolveParticipantRemovalTarget(identifier);
+        const ids = Array.from(target.ids).filter(Boolean);
+
+        await Promise.all(ids.map(id => remove(ref(db, 'participants/' + id))));
+        if (target.cpfHash) {
+            await remove(ref(db, 'participantsByCpfHash/' + target.cpfHash));
+        }
+
+        const tournamentPaths = new Set(['tournaments/current', 'tournaments/sinuca/current']);
+        const currentSnap = await get(ref(db, 'tournaments/current'));
+        if (currentSnap.exists() && currentSnap.val()?.tournamentCode) {
+            tournamentPaths.add('tournaments/' + currentSnap.val().tournamentCode);
+        }
+        const sinucaSnap = await get(ref(db, 'tournaments/sinuca/current'));
+        if (sinucaSnap.exists() && sinucaSnap.val()?.tournamentCode) {
+            tournamentPaths.add('tournaments/' + sinucaSnap.val().tournamentCode);
+        }
+
+        await Promise.all(Array.from(tournamentPaths).map(path => removeParticipantFromTournamentPath(path, target)));
+
+        const cRef = ref(db, 'codes/pool');
+        const cSnap = await get(cRef);
+        if (cSnap.exists()) {
+            const cData = cSnap.val();
+            const codesArray = cData.codes || [];
+            let changed = false;
+            const updatedCodes = codesArray.map(code => {
+                const ownerValues = getPlayerIdentityValues(code);
+                const ownerMatches = ownerValues.some(value => target.ids.has(value)) ||
+                    (target.cpfHash && code.cpfHash === target.cpfHash) ||
+                    (target.cpfRaw && code.cpf === target.cpfRaw);
+
+                if (!ownerMatches) return code;
+                changed = true;
+                return {
+                    ...code,
+                    status: 'available',
+                    used: false,
+                    participantId: null,
+                    usedBy: null,
+                    usedByName: null,
+                    participantName: null,
+                    usedAt: null,
+                    cpf: null,
+                    cpfHash: null
+                };
+            });
+
+            if (changed) {
+                await update(cRef, { codes: updatedCodes });
+            }
+        }
+
+        if (tournamentState?.registeredPlayers) {
+            tournamentState.registeredPlayers = tournamentState.registeredPlayers.filter(player => !matchesRemovalTarget(player, target));
+        }
+
+        return true;
+    }
 
     const modalMataMata = document.getElementById('modal-jogos-mata-mata');
     const editP1Name = document.getElementById('edit-p1-name');
@@ -1443,22 +1626,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (resetBtn) {
                 resetBtn.addEventListener('click', async () => {
                     askSensitivePassword(async () => {
-                        const cpfToRemove = c.usedBy;
+                        const cpfToRemove = c.participantId || c.usedBy;
                         if (confirm(`Deseja liberar o código ${c.code} e APAGAR o cadastro do jogador associado?`)) {
                             if (!db) return;
                             try {
                                 const newCodes = [...codesArray];
-                                newCodes[idx] = { ...newCodes[idx], used: false, usedBy: null };
+                                newCodes[idx] = {
+                                    ...newCodes[idx],
+                                    status: 'available',
+                                    used: false,
+                                    participantId: null,
+                                    usedBy: null,
+                                    usedByName: null,
+                                    participantName: null,
+                                    usedAt: null,
+                                    cpf: null,
+                                    cpfHash: null
+                                };
                                 await set(ref(db, 'codes/pool'), { codes: newCodes });
 
                                 if (cpfToRemove) {
-                                    await remove(ref(db, 'participants/' + cpfToRemove));
-                                    if (tournamentState && tournamentState.registeredPlayers) {
-                                        const filtered = tournamentState.registeredPlayers.filter(p => p.id !== cpfToRemove);
-                                        if (filtered.length !== tournamentState.registeredPlayers.length) {
-                                            await update(ref(db, 'tournaments/current'), { registeredPlayers: filtered });
-                                        }
-                                    }
+                                    await removeParticipantEverywhere(cpfToRemove);
                                 }
                                 alert('Código liberado e cadastro removido!');
                             } catch (e) {
@@ -1751,6 +1939,72 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function createKnockoutPreviewData() {
+        const format = tournamentState.format || formatSelect?.value || 'grupos-mata-mata';
+        const showMataMata = format === 'mata-mata' || format === 'grupos-mata-mata' || format === 'eliminatoria';
+        if (!showMataMata) return null;
+
+        const registered = tournamentState.registeredPlayers || [];
+        const total = registered.length || parseInt(participantsInput?.value || tournamentState.participants || 8, 10) || 8;
+        const previewPlayers = registered.length
+            ? registered
+            : Array.from({ length: total }, (_, i) => ({ name: `A definir (Slot ${i + 1})` }));
+        const showGroups = format === 'grupos' || format === 'grupos-mata-mata';
+        const G = total <= 5 ? 1 : Math.ceil(total / 4);
+
+        let K;
+        if (G === 1) K = 2;
+        else if (G === 2) K = 4;
+        else {
+            K = Math.pow(2, Math.ceil(Math.log2(G)));
+            if (K === G) K = G * 2;
+        }
+
+        const W = K - G;
+        const M = G - W;
+        const repechagePlayers = Array.from({ length: G }, (_, i) => `2\u00ba Grupo ${String.fromCharCode(65 + i)}`).reverse();
+        const repechageRound = [];
+
+        if (M > 0 && showGroups) {
+            for (let i = 0; i < M; i++) {
+                const p1 = repechagePlayers.shift();
+                const p2 = repechagePlayers.shift();
+                repechageRound.push(createMatchData(p1, p2, `Vencedor Rep. ${i + 1}`));
+                repechagePlayers.push(`Vencedor Rep. ${i + 1}`);
+            }
+        }
+
+        let knockoutPlayers = [];
+        if (showGroups) {
+            for (let i = 0; i < G; i++) knockoutPlayers.push(`1\u00ba Grupo ${String.fromCharCode(65 + i)}`);
+            knockoutPlayers = knockoutPlayers.concat(repechagePlayers);
+        } else {
+            for (let i = 0; i < K; i++) {
+                knockoutPlayers.push(previewPlayers[i]?.name || previewPlayers[i]?.nome || `A definir (Slot ${i + 1})`);
+            }
+        }
+
+        const rounds = [];
+        let currentRoundPlayers = [...knockoutPlayers];
+        while (currentRoundPlayers.length > 1) {
+            const matchesInRound = currentRoundPlayers.length / 2;
+            const roundName = getRoundNameBySize(matchesInRound * 2);
+            const roundMatches = [];
+            const nextRoundPlayers = [];
+            for (let m = 0; m < currentRoundPlayers.length; m += 2) {
+                const p1 = currentRoundPlayers[m] || 'A definir';
+                const p2 = currentRoundPlayers[m + 1] || 'A definir';
+                const winnerToken = `Vencedor ${roundName} ${m / 2 + 1}`;
+                roundMatches.push(createMatchData(p1, p2, winnerToken));
+                nextRoundPlayers.push(winnerToken);
+            }
+            rounds.push({ name: roundName, matches: roundMatches });
+            currentRoundPlayers = nextRoundPlayers;
+        }
+
+        return { repechage: repechageRound, rounds };
+    }
+
     function formatName(fullName) {
         if (!fullName) return '';
         const parts = fullName.trim().split(/\s+/);
@@ -1940,24 +2194,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         const mataMataContainer = document.getElementById('tab-mata-mata');
         if (mataMataContainer) {
             const groupsPending = (tournamentState.groups || []).some(group => (group.matches || []).some(m => m.gHome === '' || m.gAway === ''));
-            const repechagePending = (tournamentState.knockout?.repechage || []).some(m => !isMatchResolvedForProgression(m));
-            if (tournamentState.knockout) {
-                normalizeKnockoutAutoAdvances(tournamentState.knockout);
+            const displayKnockout = tournamentState.knockout || createKnockoutPreviewData();
+            const isKnockoutPreview = isPreview || !tournamentState.knockout;
+            const repechagePending = (displayKnockout?.repechage || []).some(m => !isMatchResolvedForProgression(m));
+            if (displayKnockout) {
+                normalizeKnockoutAutoAdvances(displayKnockout);
                 const allBracketMatches = [
-                    ...(tournamentState.knockout.repechage || []),
-                    ...((tournamentState.knockout.rounds || []).flatMap(round => round.matches || []))
+                    ...(displayKnockout.repechage || []),
+                    ...((displayKnockout.rounds || []).flatMap(round => round.matches || []))
                 ];
                 const finalizedCount = allBracketMatches.filter(match => isMatchResolvedForProgression(match)).length;
                 const pendingCount = Math.max(0, allBracketMatches.length - finalizedCount);
-                const firstPendingRound = (tournamentState.knockout.rounds || []).find(round => (round.matches || []).some(match => !isMatchResolvedForProgression(match)));
-                const currentPhase = repechagePending ? 'Repescagem' : (firstPendingRound?.name || ((tournamentState.knockout.rounds || []).length ? 'Finalizado' : 'Aguardando'));
-                const finalRound = tournamentState.knockout.rounds?.[tournamentState.knockout.rounds.length - 1];
+                const firstPendingRound = (displayKnockout.rounds || []).find(round => (round.matches || []).some(match => !isMatchResolvedForProgression(match)));
+                const currentPhase = isKnockoutPreview ? 'Pre-visualizacao' : (repechagePending ? 'Repescagem' : (firstPendingRound?.name || ((displayKnockout.rounds || []).length ? 'Finalizado' : 'Aguardando')));
+                const finalRound = displayKnockout.rounds?.[displayKnockout.rounds.length - 1];
                 const champion = finalRound?.matches?.[0] ? getKnockoutMatchWinner(finalRound.matches[0]) : null;
                 let warningHTML = '';
+                if (isKnockoutPreview) {
+                    warningHTML += `<div class="knockout-warning-banner knockout-alert"><i class="ph ph-eye"></i><span>Pre-visualizacao do mata-mata: o chaveamento oficial ainda nao foi gerado.</span></div>`;
+                }
                 if ((tournamentState.groups || []).length && groupsPending) {
                     warningHTML += `<div class="knockout-warning-banner knockout-alert"><i class="ph ph-warning-circle"></i><span>Mata-mata em preparação: finalize todos os jogos da fase de grupos.</span></div>`;
                 }
-                if ((tournamentState.knockout?.repechage || []).length && repechagePending) {
+                if ((displayKnockout?.repechage || []).length && repechagePending && !isKnockoutPreview) {
                     warningHTML += `<div class="knockout-warning-banner knockout-alert"><i class="ph ph-warning-circle"></i><span>Repescagem pendente: edite os resultados para liberar a próxima fase.</span></div>`;
                 }
 
@@ -1977,8 +2236,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     ${warningHTML}
                     <div class="knockout-scroll-indicator"><i class="ph ph-arrows-left-right"></i>${window.matchMedia('(max-width: 768px)').matches ? 'Fases eliminatórias' : 'Linha de fases do mata-mata'}</div>
-                    <div class="knockout-scroll-frame bracket-scroll"><div class="knockout-scroll-container" tabindex="0" aria-label="Chaveamento mata-mata"><div class="bracket-container bracket-tree knockout-track${isPreview ? ' preview-mode' : ''}">
-                    ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
+                    <div class="knockout-scroll-frame bracket-scroll"><div class="knockout-scroll-container" tabindex="0" aria-label="Chaveamento mata-mata"><div class="bracket-container bracket-tree knockout-track${isKnockoutPreview ? ' preview-mode' : ''}">
+                    ${isKnockoutPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
 
                 function playerBadge(name) {
                     const cleaned = formatName(displayParticipantName(name || 'A definir'));
@@ -2011,17 +2270,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return 'is-waiting';
                 }
 
-                const slotBase = 154;
-                function connectorColumn(round, rIdx) {
+                const slotBase = 164;
+                function connectorColumn(round, rIdx, mode = 'paired') {
                     const slot = slotBase * (2 ** Math.max(0, rIdx));
-                    const pairs = Math.max(1, Math.ceil(((round?.matches || []).length || 1) / 2));
-                    return `<div class="bracket-connector-column" style="--slot:${slot}px" aria-hidden="true">
-                        ${Array.from({ length: pairs }, () => `<span class="bracket-connector-pair"><i></i></span>`).join('')}
+                    const matchCount = Math.max(1, (round?.matches || []).length || 1);
+                    const pairs = mode === 'simple' ? matchCount : Math.max(1, Math.ceil(matchCount / 2));
+                    return `<div class="bracket-connector-column ${mode === 'simple' ? 'simple-connector' : 'paired-connector'}" style="--slot:${slot}px" aria-hidden="true">
+                        ${Array.from({ length: pairs }, () => mode === 'simple' ? `<span class="bracket-connector-line"></span>` : `<span class="bracket-connector-pair"><i></i></span>`).join('')}
                     </div>`;
                 }
 
                 function renderBracketMatch(match, type, rIdx, mIdx, label) {
-                    const showBtn = role === 'organizador' && !isPreview;
+                    const showBtn = role === 'organizador' && !isKnockoutPreview;
                     const winner = getKnockoutMatchWinner(match);
                     const isTwoLegged = !!tournamentState.homeAway && !match.walkover && !isBye(match.p1) && !isBye(match.p2);
                     const hasResult = (match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null) || !!match.completed || !!winner;
@@ -2036,22 +2296,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const idaScore = (match.idaS1 != null && match.idaS1 !== '' && match.idaS2 != null && match.idaS2 !== '') ? `${match.idaS1} x ${match.idaS2}` : '—';
                     const voltaScore = (match.voltaS1 != null && match.voltaS1 !== '' && match.voltaS2 != null && match.voltaS2 !== '') ? `${match.voltaS1} x ${match.voltaS2}` : '—';
 
-                    const testSimBtn = (testModeActive && role === 'organizador' && !isPreview)
+                    const compactMeta = isTwoLegged && hasResult ? `(${idaScore}/${voltaScore})` : '';
+                    const scorePill = (score, meta = compactMeta) => `<span class="slot-score knockout-score-pill score-display score-pill"><strong>${score}</strong>${meta ? `<small>${meta}</small>` : ''}</span>`;
+                    const testSimBtn = (testModeActive && role === 'organizador' && !isKnockoutPreview)
                         ? `<button class="btn-test-inline" data-test-action="knockout-match-sim" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}">Simular confronto</button>`
                         : '';
                     return `
                         <div class="bracket-match match-card knockout-match-card modern ${statusClass} ${hasResult ? 'has-result' : ''} ${winner ? 'finished match-card-finished' : 'match-card-pending'}" data-open-type="${type}" data-open-r="${rIdx}" data-open-m="${mIdx}">
                             <div class="bracket-match-head match-header">
                                 <span class="match-title match-id">${label}</span>
-                                <span class="bracket-status match-status ${statusClass}">${statusText}</span>
+                                ${showBtn ? `<button class="btn-edit-knockout glass-button compact-edit" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar resultado"><i class="ph ph-pencil-simple"></i><span>Editar</span></button>` : ''}
                             </div>
                             <div class="${p1Class} match-team ${winner === match.p1 ? 'match-team-winner' : (winner === match.p2 ? 'match-team-loser' : '')}">
                                 <span class="player-line">${playerBadge(match.p1)}</span>
-                                <span class="slot-score knockout-score-pill score-display score-pill">${score1}</span>
+                                ${scorePill(score1)}
                             </div>
                             <div class="${p2Class} match-team ${winner === match.p2 ? 'match-team-winner' : (winner === match.p1 ? 'match-team-loser' : '')}">
                                 <span class="player-line">${playerBadge(match.p2)}</span>
-                                <span class="slot-score knockout-score-pill score-display score-pill">${score2}</span>
+                                ${scorePill(score2)}
                             </div>
                             ${isTwoLegged ? `<div class="knockout-legs-inline knockout-leg-summary">
                                 <span class="knockout-leg-row"><strong>IDA</strong><em>${formatName(displayParticipantName(match.p1))} ${idaScore} ${formatName(displayParticipantName(match.p2))}</em></span>
@@ -2067,21 +2329,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </div>`;
                 }
 
-                if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
+                if (displayKnockout.repechage && displayKnockout.repechage.length > 0) {
                     bracketHTML += `<section class="bracket-round knockout-phase-column" style="--slot:${slotBase}px"><div class="bracket-round-title knockout-phase-header"><i class="ph ph-flag-checkered"></i><span>Repescagem</span></div><div class="bracket-round-matches">`;
-                    tournamentState.knockout.repechage.forEach((match, mIdx) => {
+                    displayKnockout.repechage.forEach((match, mIdx) => {
                         bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx, `Repescagem ${mIdx + 1}`);
                     });
-                    bracketHTML += `</div></section>${connectorColumn({ matches: tournamentState.knockout.repechage }, 0)}`;
+                    bracketHTML += `</div></section>${connectorColumn({ matches: displayKnockout.repechage }, 0, 'simple')}`;
                 }
 
-                if (tournamentState.knockout.rounds) {
-                    tournamentState.knockout.rounds.forEach((round, rIdx) => {
+                if (displayKnockout.rounds) {
+                    displayKnockout.rounds.forEach((round, rIdx) => {
                         const totalMatches = (round.matches || []).length;
-                        const isFinal = rIdx === tournamentState.knockout.rounds.length - 1;
-                        const visualIndex = (tournamentState.knockout.repechage?.length ? rIdx + 1 : rIdx);
+                        const isFinal = rIdx === displayKnockout.rounds.length - 1;
+                        const visualIndex = rIdx;
                         bracketHTML += `<section class="bracket-round knockout-phase-column" style="--slot:${slotBase * (2 ** visualIndex)}px"><div class="bracket-round-title knockout-phase-header"><i class="ph ${isFinal ? 'ph-trophy' : 'ph-soccer-ball'}"></i><span>${round.name}</span><small>${totalMatches} jogos</small></div><div class="bracket-round-matches">`;
-                        if (testModeActive && role === 'organizador' && !isPreview) {
+                        if (testModeActive && role === 'organizador' && !isKnockoutPreview) {
                             bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
                                 <button class="btn-test-inline" data-test-action="knockout-phase-sim" data-r="${rIdx}">Simular esta fase</button>
                                 <button class="btn-test-inline danger" data-test-action="knockout-phase-clear" data-r="${rIdx}">Limpar esta fase</button>
@@ -2091,12 +2353,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         round.matches.forEach((match, mIdx) => {
                             bracketHTML += renderBracketMatch(match, 'round', rIdx, mIdx, `${round.name} ${mIdx + 1}`);
                         });
-                        bracketHTML += `</div></section>${rIdx < tournamentState.knockout.rounds.length - 1 ? connectorColumn(round, visualIndex) : ''}`;
+                        bracketHTML += `</div></section>${rIdx < displayKnockout.rounds.length - 1 ? connectorColumn(round, visualIndex) : ''}`;
                     });
                 }
 
                 if (champion) {
-                    const championVisualIndex = (tournamentState.knockout.repechage?.length ? tournamentState.knockout.rounds.length : tournamentState.knockout.rounds.length - 1);
+                    const championVisualIndex = Math.max(0, displayKnockout.rounds.length - 1);
                     bracketHTML += `<div class="bracket-connector-column champion-connector" style="--slot:${slotBase * (2 ** Math.max(0, championVisualIndex))}px" aria-hidden="true"><span class="bracket-champion-line"></span></div>
                     <section class="bracket-round knockout-phase-column champion-column" style="--slot:${slotBase * (2 ** Math.max(0, championVisualIndex))}px">
                         <div class="bracket-round-title knockout-phase-header champion-title"><i class="ph-fill ph-crown-simple"></i><span>Campeão</span></div>
@@ -2113,28 +2375,30 @@ document.addEventListener('DOMContentLoaded', async () => {
                 setupKnockoutScrollInteractions(mataMataContainer);
 
                 // Add Listeners
-                mataMataContainer.querySelectorAll('.btn-edit-knockout').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const type = btn.dataset.type;
-                        const rIdx = parseInt(btn.dataset.r || 0);
-                        const mIdx = parseInt(btn.dataset.m || 0);
-                        openKnockoutEdit(type, rIdx, mIdx);
+                if (!isKnockoutPreview) {
+                    mataMataContainer.querySelectorAll('.btn-edit-knockout').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const type = btn.dataset.type;
+                            const rIdx = parseInt(btn.dataset.r || 0);
+                            const mIdx = parseInt(btn.dataset.m || 0);
+                            openKnockoutEdit(type, rIdx, mIdx);
+                        });
                     });
-                });
-                mataMataContainer.querySelectorAll('.bracket-match').forEach(card => {
-                    card.addEventListener('click', (event) => {
-                        if (event.target.closest('button, a, input, select, textarea')) return;
-                        const scroller = mataMataContainer.querySelector('.knockout-scroll-container');
-                        if (scroller?.dataset.dragMoved === '1') {
-                            scroller.dataset.dragMoved = '0';
-                            return;
-                        }
-                        const type = card.dataset.openType;
-                        const rIdx = parseInt(card.dataset.openR || 0, 10);
-                        const mIdx = parseInt(card.dataset.openM || 0, 10);
-                        openKnockoutEdit(type, rIdx, mIdx, role !== 'organizador');
+                    mataMataContainer.querySelectorAll('.bracket-match').forEach(card => {
+                        card.addEventListener('click', (event) => {
+                            if (event.target.closest('button, a, input, select, textarea')) return;
+                            const scroller = mataMataContainer.querySelector('.knockout-scroll-container');
+                            if (scroller?.dataset.dragMoved === '1') {
+                                scroller.dataset.dragMoved = '0';
+                                return;
+                            }
+                            const type = card.dataset.openType;
+                            const rIdx = parseInt(card.dataset.openR || 0, 10);
+                            const mIdx = parseInt(card.dataset.openM || 0, 10);
+                            openKnockoutEdit(type, rIdx, mIdx, role !== 'organizador');
+                        });
                     });
-                });
+                }
             } else {
                 mataMataContainer.innerHTML = `<div class="mata-mata-tab"><div class="knockout-scroll-container"><div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div></div></div>`;
             }
@@ -3632,36 +3896,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (confirm(`Tem certeza que deseja apagar o cadastro do CPF ${cpfRaw}?`)) {
                 if (!db) return;
                 try {
-                    // 1. Remover da lista de participantes geral
-                    await remove(ref(db, 'participants/' + cpfRaw));
-
-                    // 2. Remover do torneio atual (se estiver lá)
-                    const tRef = ref(db, 'tournaments/current');
-                    const tSnap = await get(tRef);
-                    if (tSnap.exists()) {
-                        const tData = tSnap.val();
-                        const regPlayers = tData.registeredPlayers || [];
-                        const filteredPlayers = regPlayers.filter(p => p.id !== cpfRaw);
-                        
-                        if (regPlayers.length !== filteredPlayers.length) {
-                            await update(tRef, { registeredPlayers: filteredPlayers });
-                        }
-                    }
-
-                    // 3. Marcar código como disponível novamente (se houver um código associado)
-                    const cRef = ref(db, 'codes/pool');
-                    const cSnap = await get(cRef);
-                    if (cSnap.exists()) {
-                        const cData = cSnap.val();
-                        const codesArray = cData.codes || [];
-                        const updatedCodes = codesArray.map(c => {
-                            if (c.usedBy === cpfRaw) {
-                                return { ...c, used: false, usedBy: null };
-                            }
-                            return c;
-                        });
-                        await update(cRef, { codes: updatedCodes });
-                    }
+                    await removeParticipantEverywhere(cpfRaw);
 
                     alert('Cadastro removido com sucesso!');
                 } catch (e) {

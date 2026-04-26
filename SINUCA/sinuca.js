@@ -29,6 +29,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.toggle('is-organizer', isOrganizer);
     document.body.classList.toggle('is-visitor', !isOrganizer);
 
+    document.querySelectorAll('[data-game-switch]').forEach(link => {
+        const game = link.dataset.gameSwitch;
+        const target = game === 'fifa' ? '../FIFA/Fifa.html' : 'sinuca.html';
+        const nextParams = new URLSearchParams();
+        nextParams.set('role', role);
+        ['id', 'name'].forEach(key => {
+            const value = params.get(key);
+            if (value) nextParams.set(key, value);
+        });
+        link.href = `${target}?${nextParams.toString()}`;
+    });
+
     const defaultState = {
         name: 'COPA PSYZON SINUCA',
         participantLimit: 16,
@@ -361,6 +373,36 @@ document.addEventListener('DOMContentLoaded', () => {
         syncTournamentToFirebase();
         renderAll();
         switchTab('mata-mata');
+    }
+
+    function createBracketPreview() {
+        const names = state.participants.map(p => p.name).filter(Boolean);
+        const limit = getSelectedParticipantLimit();
+        const baseNames = names.length
+            ? names
+            : Array.from({ length: limit }, (_, index) => `A definir ${String(index + 1).padStart(2, '0')}`);
+
+        const size = nextPowerOfTwo(baseNames.length);
+        const slots = [...baseNames, ...Array.from({ length: size - baseNames.length }, () => 'BYE')];
+        const rounds = [];
+        let currentSlots = slots;
+
+        while (currentSlots.length > 1) {
+            const name = roundName(currentSlots.length);
+            const matches = [];
+            const nextSlots = [];
+
+            for (let i = 0; i < currentSlots.length; i += 2) {
+                const match = createMatch(currentSlots[i], currentSlots[i + 1], name, i / 2);
+                matches.push(match);
+                nextSlots.push(match.winnerToken);
+            }
+
+            rounds.push({ name, matches });
+            currentSlots = nextSlots;
+        }
+
+        return { rounds };
     }
 
     function propagateWinner(token, winner, fromRoundIndex) {
@@ -812,11 +854,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return { label: 'Pendente', cls: 'pending' };
     }
 
-    function renderPlayerRow(match, player, side, rIdx, mIdx) {
+    function renderPlayerRow(match, player, side, rIdx, mIdx, isPreview = false) {
         const winner = getWinner(match);
         const isWinnerRow = winner === player;
         const rowClass = isWinnerRow ? 'winner match-team-winner' : (winner && isRealPlayer(player) ? 'loser match-team-loser' : '');
-        const canWin = isOrganizer && !winner && isRealPlayer(player) && isRealPlayer(match.p1) && isRealPlayer(match.p2);
+        const canWin = !isPreview && isOrganizer && !winner && isRealPlayer(player) && isRealPlayer(match.p1) && isRealPlayer(match.p2);
         return `
             <div class="player-row match-team ${rowClass}">
                 <span class="player-info player-line">
@@ -833,22 +875,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderBracket() {
-        normalizeAutoAdvances();
+        const isPreview = !state.bracket?.rounds?.length;
+        if (!isPreview) normalizeAutoAdvances();
         const container = $('#bracket-container');
         const alerts = $('#knockout-alerts');
 
-        if (!state.bracket?.rounds?.length) {
-            alerts.innerHTML = `<div class="alert"><i class="ph ph-info"></i> Cadastre participantes e gere o mata-mata.</div>`;
-            container.innerHTML = `<div class="empty-state">Mata-mata ainda não gerado.</div>`;
-            updateBadges([]);
-            return;
-        }
-
-        const allMatches = state.bracket.rounds.flatMap(round => round.matches);
-        updateBadges(allMatches);
-        alerts.innerHTML = state.champion
-            ? `<div class="alert"><i class="ph ph-crown-simple"></i> Campeão definido: ${escapeHtml(state.champion)}.</div>`
-            : '';
+        const activeBracket = isPreview ? createBracketPreview() : state.bracket;
+        const activeChampion = isPreview ? null : state.champion;
+        const allMatches = activeBracket.rounds.flatMap(round => round.matches);
+        updateBadges(allMatches, activeBracket, activeChampion);
+        alerts.innerHTML = isPreview
+            ? `<div class="alert"><i class="ph ph-eye"></i> Pre-visualizacao do mata-mata: o chaveamento oficial ainda nao foi gerado.</div>`
+            : (activeChampion ? `<div class="alert"><i class="ph ph-crown-simple"></i> Campeão definido: ${escapeHtml(activeChampion)}.</div>` : '');
 
         const slotBase = 154;
         const connectorColumn = (round, rIdx) => {
@@ -860,11 +898,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         };
-        container.innerHTML = `<div class="bracket-tree">
-            ${state.bracket.rounds.map((round, rIdx) => `
+        container.innerHTML = `<div class="bracket-tree${isPreview ? ' preview-mode' : ''}">
+            ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}
+            ${activeBracket.rounds.map((round, rIdx) => `
                 <section class="phase-column bracket-round" style="--slot:${slotBase * (2 ** rIdx)}px">
                     <div class="phase-title bracket-round-title">
-                        <span><i class="ph ${rIdx === state.bracket.rounds.length - 1 ? 'ph-trophy' : 'ph-billiards'}"></i> ${escapeHtml(round.name)}</span>
+                        <span><i class="ph ${rIdx === activeBracket.rounds.length - 1 ? 'ph-trophy' : 'ph-billiards'}"></i> ${escapeHtml(round.name)}</span>
                         <small>${round.matches.length} jogos</small>
                     </div>
                     <div class="bracket-round-matches">
@@ -877,28 +916,28 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <strong class="match-id">${escapeHtml(round.name)} ${mIdx + 1}</strong>
                                     <span class="match-status ${status.cls}">${status.label}</span>
                                 </div>
-                                ${renderPlayerRow(match, match.p1, 'p1', rIdx, mIdx)}
-                                ${renderPlayerRow(match, match.p2, 'p2', rIdx, mIdx)}
+                                ${renderPlayerRow(match, match.p1, 'p1', rIdx, mIdx, isPreview)}
+                                ${renderPlayerRow(match, match.p2, 'p2', rIdx, mIdx, isPreview)}
                                 <div class="match-footer">
-                                    <span>${winner ? `Vencedor: ${escapeHtml(winner)}` : 'Definir vencedor'}</span>
+                                    <span>${winner ? `Vencedor: ${escapeHtml(winner)}` : (isPreview ? 'Previa do confronto' : 'Definir vencedor')}</span>
                                 </div>
                             </article>
                         `;
                     }).join('')}
                     </div>
                 </section>
-                ${rIdx < state.bracket.rounds.length - 1 ? connectorColumn(round, rIdx) : ''}
+                ${rIdx < activeBracket.rounds.length - 1 ? connectorColumn(round, rIdx) : ''}
             `).join('')}
-            ${state.champion ? `
-                <div class="bracket-connector-column champion-connector" style="--slot:${slotBase * (2 ** (state.bracket.rounds.length - 1))}px" aria-hidden="true">
+            ${activeChampion ? `
+                <div class="bracket-connector-column champion-connector" style="--slot:${slotBase * (2 ** (activeBracket.rounds.length - 1))}px" aria-hidden="true">
                     <span class="bracket-champion-line"></span>
                 </div>
-                <section class="phase-column bracket-round champion-column" style="--slot:${slotBase * (2 ** (state.bracket.rounds.length - 1))}px">
+                <section class="phase-column bracket-round champion-column" style="--slot:${slotBase * (2 ** (activeBracket.rounds.length - 1))}px">
                     <div class="phase-title"><span><i class="ph-fill ph-crown-simple"></i> Campeão</span></div>
                     <div class="bracket-round-matches">
                         <div class="champion-card">
                             <i class="ph-fill ph-trophy"></i>
-                            <strong>${escapeHtml(state.champion)}</strong>
+                            <strong>${escapeHtml(activeChampion)}</strong>
                             <span>Título confirmado</span>
                         </div>
                     </div>
@@ -907,13 +946,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`;
     }
 
-    function updateBadges(matches) {
+    function updateBadges(matches, bracket = state.bracket, champion = state.champion) {
         const finalized = matches.filter(match => isResolved(match)).length;
         const pending = Math.max(0, matches.length - finalized);
-        const currentRound = state.bracket?.rounds?.find(round => round.matches.some(match => !isResolved(match)));
+        const currentRound = bracket?.rounds?.find(round => round.matches.some(match => !isResolved(match)));
         $('#badge-finalized').innerHTML = `<i class="ph ph-check-circle"></i> Finalizadas: ${finalized}`;
         $('#badge-pending').innerHTML = `<i class="ph ph-clock"></i> Pendentes: ${pending}`;
-        $('#badge-phase').innerHTML = `<i class="ph ph-flag"></i> Fase atual: ${state.champion ? 'Finalizado' : (currentRound?.name || 'Aguardando')}`;
+        $('#badge-phase').innerHTML = `<i class="ph ph-flag"></i> Fase atual: ${champion ? 'Finalizado' : (currentRound?.name || 'Aguardando')}`;
     }
 
     function renderRanking() {

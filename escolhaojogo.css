@@ -122,10 +122,33 @@ body {
 }
 
 .game-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    border-radius: inherit;
+    display: none;
+}
+
+.game-icon::before {
+    content: "";
+    width: 40px;
+    height: 40px;
+    display: block;
+    background: #16a34a;
+    -webkit-mask: var(--game-icon-url) center / contain no-repeat;
+    mask: var(--game-icon-url) center / contain no-repeat;
+}
+
+.game-icon.fifa {
+    --game-icon-url: url("imgs/SVG LOGOS/svg FIFA.svg");
+}
+
+.game-icon.sinuca {
+    --game-icon-url: url("imgs/SVG LOGOS/SINUCA SVG.svg");
+}
+
+.game-icon.cs {
+    --game-icon-url: url("imgs/SVG LOGOS/SVG CS GO.svg");
+}
+
+.game-icon.futsal {
+    --game-icon-url: url("imgs/SVG LOGOS/FUTSAL SVG.svg");
 }
 
 .game-copy {
@@ -209,6 +232,11 @@ body {
         width: 48px;
         height: 48px;
         border-radius: 16px;
+    }
+
+    .game-icon::before {
+        width: 36px;
+        height: 36px;
     }
 
     .game-option > .ph-arrow-right,

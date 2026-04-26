@@ -1839,3 +1839,156 @@ body {
             url('imgs/sinuca-fundo-mobile.png') !important;
     }
 }
+
+/* Fixed Sinuca hotbars and quick game switch */
+:root {
+    --sinuca-topbar-height: 64px;
+    --sinuca-tabs-height: 48px;
+}
+
+body {
+    padding-top: calc(var(--sinuca-topbar-height) + var(--sinuca-tabs-height)) !important;
+}
+
+.topbar {
+    position: fixed !important;
+    inset: 0 0 auto 0 !important;
+    min-height: var(--sinuca-topbar-height) !important;
+    z-index: 1200 !important;
+}
+
+.tabs-nav {
+    position: fixed !important;
+    top: var(--sinuca-topbar-height) !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1190 !important;
+    min-height: var(--sinuca-tabs-height) !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+.tabs-nav::-webkit-scrollbar {
+    display: none !important;
+}
+
+.sinuca-shell {
+    height: calc(100dvh - var(--sinuca-topbar-height) - var(--sinuca-tabs-height)) !important;
+}
+
+.topbar-game-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.48);
+    background: rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+.game-switch-link {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    color: #0f5132;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.game-switch-link i {
+    font-size: 16px;
+}
+
+.game-switch-link.active {
+    background: linear-gradient(135deg, rgba(15, 143, 69, 0.96), rgba(246, 201, 69, 0.92));
+    color: #ffffff;
+    box-shadow: 0 10px 22px rgba(15, 143, 69, 0.18);
+}
+
+.topbar-game-choice {
+    min-height: 36px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 7px 11px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.48);
+    background: rgba(255, 255, 255, 0.20);
+    color: #0f5132;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 900;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+@media (max-width: 900px) {
+    :root {
+        --sinuca-topbar-height: 70px;
+        --sinuca-tabs-height: 52px;
+    }
+
+    body {
+        padding-top: calc(var(--sinuca-topbar-height) + var(--sinuca-tabs-height) + env(safe-area-inset-top)) !important;
+        background-attachment: fixed !important;
+    }
+
+    .topbar {
+        min-height: var(--sinuca-topbar-height) !important;
+        padding: calc(8px + env(safe-area-inset-top)) 12px 8px !important;
+        gap: 8px !important;
+    }
+
+    .brand img {
+        height: 30px !important;
+        max-width: 76px !important;
+    }
+
+    .brand strong {
+        font-size: 13px !important;
+    }
+
+    .top-actions {
+        gap: 6px !important;
+    }
+
+    .topbar-game-switch {
+        display: none !important;
+    }
+
+    .topbar-game-choice {
+        display: inline-flex !important;
+        min-height: 34px;
+        padding: 7px 10px;
+    }
+
+    .tabs-nav {
+        top: calc(var(--sinuca-topbar-height) + env(safe-area-inset-top)) !important;
+        min-height: var(--sinuca-tabs-height) !important;
+        padding-inline: 8px !important;
+    }
+
+    .tab {
+        min-height: var(--sinuca-tabs-height) !important;
+        padding: 0 12px !important;
+        font-size: 0.78rem !important;
+    }
+
+    .sinuca-shell {
+        height: auto !important;
+        min-height: calc(100dvh - var(--sinuca-topbar-height) - var(--sinuca-tabs-height)) !important;
+    }
+}
