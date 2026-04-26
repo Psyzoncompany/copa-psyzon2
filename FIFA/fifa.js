@@ -729,18 +729,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         return generalRankingCache;
     }
 
-    function openKnockoutEdit(type, rIdx, mIdx) {
+    function setKnockoutModalReadOnly(isReadOnly) {
+        const inputIds = [
+            'edit-s1', 'edit-s2',
+            'edit-ida-s1', 'edit-ida-s2', 'edit-volta-s1', 'edit-volta-s2',
+            'edit-pen1', 'edit-pen2'
+        ];
+        inputIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = isReadOnly;
+        });
+        if (btnSaveKnockout) btnSaveKnockout.style.display = isReadOnly ? 'none' : 'inline-flex';
+    }
+
+    function openKnockoutEdit(type, rIdx, mIdx, readOnly = false) {
         selectedKnockoutMatch = { type, rIdx, mIdx };
         let match;
         if (type === 'repechage') {
             match = tournamentState.knockout.repechage[mIdx];
             document.getElementById('modal-mata-mata-title').textContent = 'Resultado Repescagem';
-            document.getElementById('modal-mata-mata-subtitle').textContent = 'Empate vai para pênaltis';
+            document.getElementById('modal-mata-mata-subtitle').textContent = readOnly ? 'Visualização somente leitura' : 'Empate vai para pênaltis';
         } else {
             match = tournamentState.knockout.rounds[rIdx].matches[mIdx];
             document.getElementById('modal-mata-mata-title').textContent = 'Resultado ' + tournamentState.knockout.rounds[rIdx].name;
-            document.getElementById('modal-mata-mata-subtitle').textContent = 'Insira o placar do confronto';
+            document.getElementById('modal-mata-mata-subtitle').textContent = readOnly ? 'Visualização somente leitura' : 'Insira o placar do confronto';
         }
+        setKnockoutModalReadOnly(readOnly);
 
         const isHomeAway = tournamentState.homeAway || false;
         const singleEl = document.getElementById('knockout-single-score');
@@ -1009,6 +1023,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (btnSaveKnockout) {
         btnSaveKnockout.addEventListener('click', async () => {
+            if (role !== 'organizador') return;
             if (!selectedKnockoutMatch) return;
             const { type, rIdx, mIdx } = selectedKnockoutMatch;
             const isHomeAway = tournamentState.homeAway || false;
@@ -1770,7 +1785,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             ? `<tr><td>${i + 1}</td><td style="text-align:left;">${formatName(r.name)}</td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.d}</td><td>${r.gp}</td><td>${r.gc}</td><td>${r.sg > 0 ? '+' : ''}${r.sg}</td><td>${r.pts}</td><td>${(r.apr || 0).toFixed(1)}%</td><td>${r.phase || '—'}</td><td>${r.status || '—'}</td></tr>`
             : `<tr><td>${i + 1}</td><td style="text-align:left;">${formatName(r.name)}</td><td>${r.titulos}</td><td>${r.finais}</td><td>${r.semifinais}</td><td>${r.copas}</td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.d}</td><td>${r.gp}</td><td>${r.gc}</td><td>${r.sg > 0 ? '+' : ''}${r.sg}</td><td>${r.pts}</td><td>${(r.apr || 0).toFixed(1)}%</td></tr>`
         ).join('');
-        cards.innerHTML = rows.map((r, i) => `<article class="ranking-player-card"><div class="ranking-player-top"><div class="ranking-player-position">#${i + 1}</div><strong>${formatName(r.name)}</strong></div><div class="ranking-player-stats"><span class="ranking-chip">PTS: ${r.pts || 0}</span><span class="ranking-chip">J: ${r.j || 0}</span><span class="ranking-chip">V: ${r.v || 0}</span><span class="ranking-chip">SG: ${(r.sg || 0) > 0 ? '+' : ''}${r.sg || 0}</span></div></article>`).join('');
+        cards.innerHTML = `<ul class="ranking-list-mobile">${rows.map((r, i) => `
+            <li class="ranking-list-item">
+                <div class="ranking-list-head">
+                    <span class="ranking-list-pos">#${i + 1}</span>
+                    <strong>${formatName(r.name)}</strong>
+                </div>
+                <div class="ranking-list-meta">
+                    <span>PTS ${r.pts || 0}</span>
+                    <span>J ${r.j || 0}</span>
+                    <span>V ${r.v || 0}</span>
+                    <span>SG ${(r.sg || 0) > 0 ? '+' : ''}${r.sg || 0}</span>
+                </div>
+            </li>
+        `).join('')}</ul>`;
         top3.innerHTML = rows.slice(0, 3).map((r, i) => `<div class="ranking-top3-card pos-${i + 1}">${['🥇','🥈','🥉'][i]} ${formatName(r.name)}</div>`).join('');
         highlights.innerHTML = `<div class="ranking-highlight-card"><span>Jogadores</span><strong>${rows.length}</strong></div><div class="ranking-highlight-card"><span>Jogos</span><strong>${rows.reduce((n, r) => n + (r.j || 0), 0)}</strong></div><div class="ranking-highlight-card"><span>Gols</span><strong>${rows.reduce((n, r) => n + (r.gp || 0), 0)}</strong></div><div class="ranking-highlight-card"><span>Líder</span><strong>${formatName(rows[0].name)}</strong></div>`;
     }
@@ -1953,7 +1981,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ? `<button class="btn-test-inline" data-test-action="knockout-match-sim" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}">Simular confronto</button>`
                         : '';
                     return `
-                        <div class="bracket-match modern ${hasResult ? 'has-result' : ''} ${winner ? 'finished' : ''}">
+                        <div class="bracket-match modern ${hasResult ? 'has-result' : ''} ${winner ? 'finished' : ''}" data-open-type="${type}" data-open-r="${rIdx}" data-open-m="${mIdx}">
                             <div class="bracket-match-head">
                                 <span class="match-title">${label}</span>
                                 ${showBtn ? `<button class="btn-edit-knockout" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar resultado"><i class="ph ph-pencil-simple"></i> Editar</button>` : ''}
@@ -2030,6 +2058,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                         openKnockoutEdit(type, rIdx, mIdx);
                     });
                 });
+                mataMataContainer.querySelectorAll('.bracket-match').forEach(card => {
+                    card.addEventListener('click', (event) => {
+                        if (event.target.closest('button, a, input, select, textarea')) return;
+                        const scroller = mataMataContainer.querySelector('.knockout-scroll-container');
+                        if (scroller?.dataset.dragMoved === '1') {
+                            scroller.dataset.dragMoved = '0';
+                            return;
+                        }
+                        const type = card.dataset.openType;
+                        const rIdx = parseInt(card.dataset.openR || 0, 10);
+                        const mIdx = parseInt(card.dataset.openM || 0, 10);
+                        openKnockoutEdit(type, rIdx, mIdx, role !== 'organizador');
+                    });
+                });
             } else {
                 mataMataContainer.innerHTML = `<div class="mata-mata-tab"><div class="knockout-scroll-container"><div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div></div></div>`;
             }
@@ -2046,12 +2088,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         let dragging = false;
         let startX = 0;
         let startLeft = 0;
-        const isInteractiveTarget = (target) => !!target?.closest('button, a, input, select, textarea, .btn-edit-knockout');
+        let moved = false;
 
         scroller.addEventListener('pointerdown', (event) => {
             if (event.pointerType === 'mouse' && event.button !== 0) return;
-            if (isInteractiveTarget(event.target)) return;
             dragging = true;
+            moved = false;
+            scroller.dataset.dragMoved = '0';
             startX = event.clientX;
             startLeft = scroller.scrollLeft;
             scroller.classList.add('dragging');
@@ -2061,6 +2104,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         scroller.addEventListener('pointermove', (event) => {
             if (!dragging) return;
             const deltaX = event.clientX - startX;
+            if (Math.abs(deltaX) > 6) {
+                moved = true;
+                scroller.dataset.dragMoved = '1';
+            }
             scroller.scrollLeft = startLeft - deltaX;
             event.preventDefault();
         }, { passive: false });
@@ -2069,6 +2116,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!dragging) return;
             dragging = false;
             scroller.classList.remove('dragging');
+            if (!moved) {
+                scroller.dataset.dragMoved = '0';
+            }
             try { scroller.releasePointerCapture(event.pointerId); } catch (_) { /* noop */ }
         };
         scroller.addEventListener('pointerup', stopDrag);
