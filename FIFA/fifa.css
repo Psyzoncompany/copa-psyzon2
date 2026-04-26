@@ -2619,6 +2619,19 @@ body {
     font-size:12px; font-weight:700; color:#1f3b5f; background:rgba(219,234,254,.65); border:1px solid rgba(147,197,253,.6);
 }
 .knockout-pill.champion { color:#7c4a00; background:rgba(254,240,138,.45); border-color:rgba(234,179,8,.45); }
+.knockout-warning-banner {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(251, 191, 36, .35);
+    background: rgba(254, 249, 195, .65);
+    color:#854d0e;
+    font-size: 12px;
+    font-weight: 700;
+}
 .bracket-container { align-items:stretch; gap:8px; padding:1.25rem .25rem; }
 .bracket-round {
     min-width:310px; padding:8px 8px 10px; border-radius:16px; background:rgba(255,255,255,.52);

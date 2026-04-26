@@ -267,14 +267,135 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
     }
 
+    const VALID_KNOCKOUT_SIZES = [2, 4, 8, 16, 32, 64];
+
+    function getRoundNameBySize(size) {
+        const map = {
+            2: 'Final',
+            4: 'Semifinal',
+            8: 'Quartas de Final',
+            16: 'Oitavas de Final',
+            32: '16avos de Final',
+            64: '32avos de Final'
+        };
+        return map[size] || `Fase de ${size}`;
+    }
+
+    function getNearestValidKnockoutSize(totalPlayers) {
+        const valid = VALID_KNOCKOUT_SIZES.filter(size => size <= totalPlayers);
+        return valid.length ? valid[valid.length - 1] : 2;
+    }
+
+    function getSortedGroupPlayers(group) {
+        return [...(group?.players || [])].sort((a, b) => {
+            if ((b.pts || 0) !== (a.pts || 0)) return (b.pts || 0) - (a.pts || 0);
+            if ((b.sg || 0) !== (a.sg || 0)) return (b.sg || 0) - (a.sg || 0);
+            return (b.gp || 0) - (a.gp || 0);
+        });
+    }
+
+    function getGroupQualifiedEntries() {
+        const entries = [];
+        (tournamentState.groups || []).forEach(group => {
+            const sorted = getSortedGroupPlayers(group);
+            sorted.slice(0, 2).forEach((player, idx) => {
+                if (!isRealPlayer(player?.name)) return;
+                entries.push({
+                    name: player.name,
+                    groupName: group.name,
+                    position: idx + 1,
+                    pts: player.pts || 0,
+                    sg: player.sg || 0,
+                    gp: player.gp || 0
+                });
+            });
+        });
+        return entries.sort((a, b) =>
+            a.position - b.position ||
+            b.pts - a.pts ||
+            b.sg - a.sg ||
+            b.gp - a.gp ||
+            a.name.localeCompare(b.name, 'pt-BR')
+        );
+    }
+
+    function createKnockoutRounds(initialSlots) {
+        const rounds = [];
+        let currentRoundPlayers = [...initialSlots];
+        while (currentRoundPlayers.length > 1) {
+            const roundSize = currentRoundPlayers.length;
+            const roundName = getRoundNameBySize(roundSize);
+            const roundMatches = [];
+            const nextRoundPlayers = [];
+            for (let m = 0; m < currentRoundPlayers.length; m += 2) {
+                const p1 = currentRoundPlayers[m] || 'BYE';
+                const p2 = currentRoundPlayers[m + 1] || 'BYE';
+                const winnerToken = `Vencedor ${roundName} ${m / 2 + 1}`;
+                const match = createMatchData(p1, p2, winnerToken);
+                resolveByeMatchOutcome(match);
+                roundMatches.push(match);
+                nextRoundPlayers.push(winnerToken);
+            }
+            rounds.push({ name: roundName, matches: roundMatches });
+            currentRoundPlayers = nextRoundPlayers;
+        }
+        return rounds;
+    }
+
+    async function rebuildKnockoutFromGroups() {
+        const qualifiedEntries = getGroupQualifiedEntries();
+        const totalQualified = qualifiedEntries.length;
+        if (totalQualified < 2) return false;
+        const qualifiedNames = qualifiedEntries.map(entry => entry.name);
+        const isPerfectBracket = VALID_KNOCKOUT_SIZES.includes(totalQualified);
+        const targetSize = isPerfectBracket ? totalQualified : getNearestValidKnockoutSize(totalQualified);
+
+        let repechage = [];
+        let firstRoundSlots = [];
+
+        if (isPerfectBracket) {
+            firstRoundSlots = [...qualifiedNames];
+        } else {
+            const repechagePlayersCount = (totalQualified - targetSize) * 2;
+            const directSlots = targetSize - (totalQualified - targetSize);
+            const directQualified = qualifiedNames.slice(0, Math.max(0, directSlots));
+            const repechageQualified = qualifiedNames.slice(Math.max(0, directSlots));
+            firstRoundSlots = [...directQualified];
+            for (let i = 0; i < repechageQualified.length; i += 2) {
+                const token = `Vencedor Rep. ${Math.floor(i / 2) + 1}`;
+                const p1 = repechageQualified[i] || 'BYE';
+                const p2 = repechageQualified[i + 1] || 'BYE';
+                const match = createMatchData(p1, p2, token);
+                resolveByeMatchOutcome(match);
+                repechage.push(match);
+                firstRoundSlots.push(token);
+            }
+            if (repechageQualified.length !== repechagePlayersCount) {
+                console.warn('[Knockout] Ajuste automático de repescagem aplicado.');
+            }
+        }
+
+        const rounds = createKnockoutRounds(firstRoundSlots);
+        tournamentState.knockout = { repechage, rounds };
+
+        if (!repechage.length) {
+            const qualifiedForModal = [...qualifiedNames];
+            initializeNextPhaseMatchEditor(qualifiedForModal, 'empty');
+            if (nextPhaseOrderInput) nextPhaseOrderInput.value = qualifiedForModal.join('\n');
+            renderNextPhasePreview(qualifiedForModal);
+            renderNextPhaseMatchEditor();
+            modalNextPhase?.classList.add('active');
+            repechageModalShown = true;
+        } else {
+            repechageModalShown = false;
+        }
+        return true;
+    }
+
     function getGroupLeaders(position = 0) {
         const leaders = [];
         (tournamentState.groups || []).forEach(g => {
-            const sorted = [...(g.players || [])].sort((a, b) => {
-                if ((b.pts || 0) !== (a.pts || 0)) return (b.pts || 0) - (a.pts || 0);
-                if ((b.sg || 0) !== (a.sg || 0)) return (b.sg || 0) - (a.sg || 0);
-                return (b.gp || 0) - (a.gp || 0);
-            });
+            const sorted = getSortedGroupPlayers(g);
             if (sorted[position] && !isPlaceholder(sorted[position].name)) leaders.push(sorted[position].name);
         });
         return leaders;
@@ -1411,7 +1532,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             while(currentRoundPlayers.length > 1) {
                 let matchesInRound = currentRoundPlayers.length / 2;
-                let roundName = matchesInRound === 1 ? 'Final' : (matchesInRound === 2 ? 'Semifinal' : (matchesInRound === 4 ? 'Quartas de Final' : `Fase de ${matchesInRound*2}`));
+                let roundName = getRoundNameBySize(matchesInRound * 2);
                 
                 let roundMatches = [];
                 let nextRoundPlayers = [];
@@ -1520,9 +1641,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const photo = regP ? regP.photo : null;
                     const countryCode = regP ? regP.countryCode : 'br';
                     
-                    const statusLabel = i === 0 ? 'CLASSIFICADO' : (i === 1 ? 'REPESCAGEM' : (i === 2 ? 'POSSÍVEL 3º' : ''));
-                    const statusClass = i === 0 ? 'status-classified' : (i === 1 ? 'status-playoff' : (i === 2 ? 'status-possible' : ''));
-                    const leftBorderClass = isGroupFinished ? (i === 0 ? 'border-green' : (i === 1 ? 'border-gold' : (i === 2 ? 'border-orange' : ''))) : '';
+                    const statusLabel = i === 0 ? 'CLASSIFICADO' : (i === 1 ? 'CLASSIFICADO' : '');
+                    const statusClass = i <= 1 ? 'status-classified' : '';
+                    const leftBorderClass = isGroupFinished ? (i === 0 ? 'border-green' : (i === 1 ? 'border-gold' : '')) : '';
 
                     const isMe = participantName && player.name === participantName;
                     const nameStyle = isMe ? 'color: #16A34A; font-weight: 800;' : 'color: #042D15; font-weight: 600;';
@@ -1629,16 +1750,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="knockout-scroll-container"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
                     ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
                 if ((tournamentState.groups || []).length && groupsPending) {
-                    bracketHTML += `<div class="empty-state"><i class="ph ph-warning-circle"></i><h3>Mata-mata bloqueado</h3><p>Finalize todos os jogos da fase de grupos para gerar o mata-mata.</p></div>`;
-                    mataMataContainer.innerHTML = bracketHTML + `</div></div></div>`;
-                    renderRanking();
-                    return;
+                    bracketHTML += `<div class="knockout-warning-banner"><i class="ph ph-warning-circle"></i> Mata-mata em preparação: finalize todos os jogos da fase de grupos.</div>`;
                 }
                 if ((tournamentState.knockout?.repechage || []).length && repechagePending) {
-                    bracketHTML += `<div class="empty-state"><i class="ph ph-warning-circle"></i><h3>Repescagem pendente</h3><p>Finalize a repescagem para definir os classificados do mata-mata.</p></div>`;
-                    mataMataContainer.innerHTML = bracketHTML + `</div></div></div>`;
-                    renderRanking();
-                    return;
+                    bracketHTML += `<div class="knockout-warning-banner"><i class="ph ph-warning-circle"></i> Repescagem pendente: você pode editar resultados normalmente para liberar a próxima fase.</div>`;
                 }
 
                 function playerBadge(name) {
@@ -2140,7 +2255,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             alert('Existem jogos pendentes na fase de grupos.');
             return;
         }
-        await seedKnockoutWithGroupResults();
+        await rebuildKnockoutFromGroups();
         renderTournamentFromState();
         addTestModeLog('Classificação automática para repescagem e próxima fase aplicada');
     }
@@ -2157,11 +2272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!tournamentState.knockout) return;
         const groupsTable = {};
         (tournamentState.groups || []).forEach(group => {
-            groupsTable[group.name] = [...(group.players || [])].sort((a, b) => {
-                if ((b.pts || 0) !== (a.pts || 0)) return (b.pts || 0) - (a.pts || 0);
-                if ((b.sg || 0) !== (a.sg || 0)) return (b.sg || 0) - (a.sg || 0);
-                return (b.gp || 0) - (a.gp || 0);
-            });
+            groupsTable[group.name] = getSortedGroupPlayers(group);
         });
         (tournamentState.knockout.repechage || []).forEach(match => {
             match.p1 = resolveGroupPlaceholderName(match.p1Source || match.p1, groupsTable);
@@ -3583,12 +3694,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.innerHTML = '<i class="ph ph-circle-notch animate-spin"></i> Salvando...';
 
             try {
-                // Update stats
-                updateGroupStats(selectedGroupIndex);
+                // Update stats (todos os grupos para classificação consistente)
+                (tournamentState.groups || []).forEach((_, idx) => updateGroupStats(idx));
+
+                const groupsFinished = (tournamentState.groups || []).every(group =>
+                    (group.matches || []).length > 0 &&
+                    (group.matches || []).every(m => m.gHome !== '' && m.gAway !== '')
+                );
+                if (groupsFinished) {
+                    await rebuildKnockoutFromGroups();
+                }
                 recalculateGeneralStats();
                 
                 // Persist
-                await persistCurrentTournament({ generalStats: tournamentState.generalStats });
+                await persistCurrentTournament({ groups: tournamentState.groups, knockout: tournamentState.knockout, generalStats: tournamentState.generalStats });
 
                 renderTournamentFromState();
                 document.getElementById('modal-jogos-grupo').classList.remove('active');
