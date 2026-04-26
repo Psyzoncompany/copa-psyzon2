@@ -591,6 +591,71 @@ body {
     color: var(--text-secondary);
 }
 
+.context-test-toolbar {
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.45), rgba(15, 23, 42, 0.35));
+}
+
+.context-test-title {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.78rem;
+    color: #c4b5fd;
+    font-weight: 700;
+}
+
+.context-test-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.btn-test-inline {
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    background: rgba(99, 102, 241, 0.14);
+    color: #c4b5fd;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    padding: 5px 8px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.btn-test-inline:hover {
+    background: rgba(99, 102, 241, 0.24);
+}
+
+.btn-test-inline.danger {
+    color: #fecaca;
+    border-color: rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.16);
+}
+
+.test-mini-log {
+    margin-top: 7px;
+    font-size: 0.72rem;
+    color: #bfdbfe;
+}
+
+.test-game-action {
+    margin-top: 6px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+    .context-test-toolbar {
+        padding: 8px;
+    }
+    .context-test-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
 /* ========================
    CODES
    ======================== */

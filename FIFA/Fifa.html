@@ -203,7 +203,7 @@
             <div class="card test-tools-card" id="card-test-tools" style="display:none;">
                 <div class="card-header">
                     <i class="ph-fill ph-test-tube"></i>
-                    <h3>Ferramentas de Teste</h3>
+                    <h3>Painel do modo teste</h3>
                 </div>
                 <div class="card-body">
                     <p class="test-tools-help">Use essas funções apenas para validar o fluxo do torneio sem impactar dados reais.</p>
@@ -222,9 +222,13 @@
                         <button class="btn btn-action btn-test-danger" id="btn-test-reset-all">Resetar teste completo</button>
                         <button class="btn btn-action btn-test" id="btn-test-generate-code">Gerar código teste</button>
                         <button class="btn btn-action btn-test" id="btn-test-save-firebase">Testar salvamento</button>
+                        <button class="btn btn-action btn-test" id="btn-test-read-firebase">Ler teste do Firebase</button>
+                        <button class="btn btn-action btn-test" id="btn-test-update-firebase">Atualizar teste no Firebase</button>
                         <button class="btn btn-action btn-test-danger" id="btn-test-remove-firebase">Remover teste do Firebase</button>
                         <button class="btn btn-action btn-test" id="btn-test-history">Testar histórico</button>
+                        <button class="btn btn-action btn-test-danger" id="btn-test-history-remove">Remover históricos teste</button>
                         <button class="btn btn-action btn-test" id="btn-test-ranking">Testar ranking geral</button>
+                        <button class="btn btn-action btn-test-danger" id="btn-test-ranking-clear">Limpar ranking teste</button>
                         <button class="btn btn-action btn-test" id="btn-test-next-phase">Avançar fase teste</button>
                         <button class="btn btn-action btn-test" id="btn-test-prev-phase">Voltar fase teste</button>
                     </div>
@@ -250,6 +254,7 @@
 
             <!-- TAB 1: FASE DE GRUPOS -->
             <div id="tab-grupos" class="tab-content active" style="display: block;">
+                <div id="test-toolbar-grupos" class="context-test-toolbar" style="display:none;"></div>
                 <!-- PRIZE BANNER -->
                 <div class="prize-banner" id="prize-banner" style="display:none;">
                     <i class="ph-fill ph-trophy"></i>
@@ -297,6 +302,7 @@
 
             <!-- TAB 2: MATA-MATA -->
             <div id="tab-mata-mata" class="tab-content" style="display: none;">
+                <div id="test-toolbar-mata-mata" class="context-test-toolbar" style="display:none;"></div>
                 <div class="mata-mata-tab">
                     <div class="bracket-scroll-area">
                         <div class="empty-state">
@@ -310,6 +316,7 @@
 
             <!-- TAB 3: RANKING -->
             <div id="tab-ranking" class="tab-content" style="display: none;">
+                <div id="test-toolbar-ranking" class="context-test-toolbar" style="display:none;"></div>
                 <div class="card" style="background: rgba(255,255,255,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.8); border-radius: 20px; padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,60,20,0.05);">
                     <div class="bracket-bar" style="margin-bottom: 1rem;">
                         <h2 style="color: #042D15;">Ranking Oficial</h2>
@@ -355,6 +362,7 @@
 
             <!-- TAB 4: HISTÓRICO E IMPORTAÇÃO -->
             <div id="tab-historico" class="tab-content" style="display: none;">
+                <div id="test-toolbar-historico" class="context-test-toolbar" style="display:none;"></div>
                 <div class="bracket-bar">
                     <h2>Histórico de Torneios</h2>
                 </div>
