@@ -3929,3 +3929,523 @@ body {
         overflow: visible;
     }
 }
+
+/* ================================================
+   FIFA Liquid Glass light refresh
+   Aligns FIFA with the Sinuca visual system
+   ================================================ */
+:root {
+    --bg-deep: transparent;
+    --bg-surface: rgba(255, 255, 255, 0.56);
+    --bg-card: rgba(255, 255, 255, 0.66);
+    --border-glass: rgba(255, 255, 255, 0.72);
+    --border-glass-hover: rgba(255, 255, 255, 0.96);
+    --shadow-card: 0 18px 45px rgba(16, 64, 32, 0.12);
+    --glass-bg: rgba(255, 255, 255, 0.66);
+    --glass-bg-strong: rgba(255, 255, 255, 0.84);
+    --glass-border: rgba(255, 255, 255, 0.72);
+    --glass-shadow: 0 18px 45px rgba(16, 64, 32, 0.12);
+    --psy-green: #0f8f45;
+    --psy-green-dark: #047857;
+    --psy-yellow: #f6c945;
+    --psy-blue: #2563eb;
+    --text-main: #0f172a;
+    --text-primary: #06351d;
+    --text-secondary: #51715c;
+    --text-muted: #64748b;
+}
+
+body {
+    background:
+        radial-gradient(circle at 7% 4%, rgba(255, 214, 64, 0.28), transparent 32%),
+        radial-gradient(circle at 92% 6%, rgba(0, 132, 255, 0.16), transparent 30%),
+        radial-gradient(circle at 78% 82%, rgba(15, 143, 69, 0.14), transparent 34%),
+        linear-gradient(135deg, #f8fff8 0%, #eefbea 46%, #f7fbff 100%) !important;
+    background-attachment: fixed !important;
+    color: #16351f;
+}
+
+.topbar,
+.tabs-nav,
+.card,
+.group-card,
+.group-card-modern,
+.ranking-shell,
+.ranking-top3-card,
+.ranking-highlight-card,
+.prize-banner,
+.bracket-match,
+.test-log-box,
+.context-test-toolbar,
+.glass-modal,
+.profile-card {
+    border-color: rgba(255, 255, 255, 0.72) !important;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.56)),
+        rgba(255, 255, 255, 0.62) !important;
+    box-shadow: 0 18px 45px rgba(16, 64, 32, 0.12) !important;
+    backdrop-filter: blur(22px) saturate(145%) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(145%) !important;
+}
+
+.card,
+.group-card-modern,
+.ranking-shell,
+.glass-modal {
+    border-radius: 24px;
+}
+
+.topbar-title h1,
+.card-header h3,
+.bracket-bar h2,
+.ranking-header-row h2,
+.group-card-modern .group-title,
+.header-info h2,
+.test-log-box h4 {
+    color: #06351d;
+}
+
+.topbar-game,
+.tab.active,
+.card-header i,
+.status-available,
+.pts-col,
+.ranking-player-position,
+.player-name-clickable:hover {
+    color: #0f8f45 !important;
+}
+
+.role-badge,
+.live-badge.live,
+.ranking-tab-btn.active,
+.fab,
+.btn-primary,
+.btn-green,
+.btn-test-toggle:hover,
+.btn-test:hover {
+    border-color: rgba(15, 143, 69, 0.28) !important;
+    background: linear-gradient(135deg, #0f8f45 0%, #22c55e 48%, #f6c945 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 12px 28px rgba(15, 143, 69, 0.20) !important;
+}
+
+.btn-secondary,
+.btn-blue,
+.btn-test,
+.btn-test-inline {
+    border: 1px solid rgba(37, 99, 235, 0.20) !important;
+    background: rgba(239, 246, 255, 0.78) !important;
+    color: #1d4ed8 !important;
+}
+
+.btn-accent,
+.btn-orange,
+.btn-test-toggle,
+.test-mode-indicator {
+    border: 1px solid rgba(246, 201, 69, 0.38) !important;
+    background: rgba(255, 251, 235, 0.78) !important;
+    color: #92400e !important;
+}
+
+.btn-red,
+.btn-red-outline,
+.btn-test-danger,
+.btn-test-inline.danger {
+    border: 1px solid rgba(239, 68, 68, 0.24) !important;
+    background: rgba(254, 226, 226, 0.72) !important;
+    color: #b91c1c !important;
+}
+
+.btn-outline,
+.btn-outline-full,
+.btn-orange-outline,
+#btn-export-json,
+#btn-preview-import,
+#btn-confirm-import,
+#btn-logout-organizer {
+    border: 1px solid rgba(255, 255, 255, 0.72) !important;
+    background: rgba(255, 255, 255, 0.58) !important;
+    color: #14532d !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.field input,
+.field select,
+.field textarea,
+.form-control,
+#sensitive-password-input,
+#next-phase-order-input,
+.match-score-input,
+.edit-player input,
+.legs-row input {
+    border: 1px solid rgba(255, 255, 255, 0.72) !important;
+    background: rgba(255, 255, 255, 0.64) !important;
+    color: #06351d !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.form-control:focus,
+.match-score-input:focus,
+.edit-player input:focus,
+.legs-row input:focus {
+    border-color: rgba(15, 143, 69, 0.58) !important;
+    box-shadow: 0 0 0 4px rgba(15, 143, 69, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+.context-test-title,
+.test-mini-log,
+.test-tools-help,
+.test-log-item,
+.test-log-empty,
+.bracket-status,
+.match-round,
+.knockout-scroll-indicator,
+.prize-text span,
+.header-info p {
+    color: #51715c !important;
+}
+
+#tab-mata-mata .bracket-stage,
+#tab-mata-mata .knockout-panel {
+    border: 1px solid rgba(255, 255, 255, 0.72) !important;
+    background:
+        radial-gradient(circle at top left, rgba(255, 214, 64, 0.18), transparent 32%),
+        radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 30%),
+        linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.58)) !important;
+    color: #16351f !important;
+    box-shadow: 0 18px 45px rgba(16, 64, 32, 0.12) !important;
+}
+
+#tab-mata-mata .bracket-overlay {
+    display: none;
+}
+
+#tab-mata-mata .bracket-toolbar,
+#tab-mata-mata .knockout-header,
+#tab-mata-mata .bracket-toolbar h2,
+#tab-mata-mata .knockout-header h2,
+#tab-mata-mata .match-id,
+#tab-mata-mata .match-title,
+#tab-mata-mata .team-name-bracket,
+#tab-mata-mata .knockout-player-row,
+#tab-mata-mata .knockout-phase-header,
+#tab-mata-mata .champion-card h4 {
+    color: #0f172a !important;
+}
+
+#tab-mata-mata .knockout-eyebrow,
+#tab-mata-mata .knockout-phase-header i,
+#tab-mata-mata .winner-tag {
+    color: #0f8f45 !important;
+}
+
+#tab-mata-mata .knockout-pill,
+#tab-mata-mata .glass-pill {
+    border-color: rgba(255, 255, 255, 0.72) !important;
+    background: rgba(255, 255, 255, 0.58) !important;
+    color: #14532d !important;
+}
+
+#tab-mata-mata .bracket-scroll,
+#tab-mata-mata .knockout-scroll-frame {
+    border-color: rgba(255, 255, 255, 0.72) !important;
+    background:
+        linear-gradient(90deg, rgba(37, 99, 235, 0.05), transparent 24%, transparent 76%, rgba(22, 163, 74, 0.07)),
+        rgba(255, 255, 255, 0.36) !important;
+}
+
+#tab-mata-mata .knockout-scroll-container .knockout-track {
+    width: max-content !important;
+    min-width: 100% !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 0 !important;
+    padding-bottom: 36px !important;
+}
+
+#tab-mata-mata .knockout-phase-column {
+    flex: 0 0 330px !important;
+    min-width: 330px !important;
+    display: grid !important;
+    align-content: start !important;
+    gap: 16px !important;
+}
+
+#tab-mata-mata .bracket-round-matches {
+    display: grid !important;
+    grid-auto-rows: var(--slot, 154px) !important;
+    gap: 0 !important;
+    align-items: center !important;
+}
+
+#tab-mata-mata .match-card,
+#tab-mata-mata .knockout-match-card,
+#tab-mata-mata .champion-card {
+    border-color: rgba(255, 255, 255, 0.74) !important;
+    background: rgba(255, 255, 255, 0.70) !important;
+    color: #16351f !important;
+    box-shadow: 0 16px 36px rgba(15, 45, 30, 0.10) !important;
+}
+
+#tab-mata-mata .match-header,
+#tab-mata-mata .bracket-match-head,
+#tab-mata-mata .knockout-card-footer,
+#tab-mata-mata .knockout-leg-summary {
+    border-color: rgba(226, 232, 240, 0.64) !important;
+    background: rgba(248, 250, 252, 0.66) !important;
+}
+
+#tab-mata-mata .match-team,
+#tab-mata-mata .knockout-player-row {
+    background: transparent !important;
+    border-color: rgba(226, 232, 240, 0.58) !important;
+}
+
+#tab-mata-mata .match-team-winner,
+#tab-mata-mata .knockout-player-row.winner {
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.16), rgba(250, 204, 21, 0.08)) !important;
+}
+
+#tab-mata-mata .score-display,
+#tab-mata-mata .knockout-score-pill {
+    border-color: rgba(15, 143, 69, 0.18) !important;
+    background: rgba(255, 255, 255, 0.72) !important;
+    color: #334155 !important;
+}
+
+#tab-mata-mata .match-team-winner .score-display,
+#tab-mata-mata .knockout-player-row.winner .knockout-score-pill {
+    border-color: rgba(15, 143, 69, 0.32) !important;
+    background: rgba(220, 252, 231, 0.76) !important;
+    color: #047857 !important;
+}
+
+#tab-mata-mata .team-avatar,
+#tab-mata-mata .knockout-avatar {
+    background: linear-gradient(145deg, #e0f2fe, #dcfce7) !important;
+    border-color: rgba(15, 143, 69, 0.18) !important;
+    color: #14532d !important;
+}
+
+#tab-mata-mata .team-subtitle,
+#tab-mata-mata .knockout-phase-header small,
+#tab-mata-mata .champion-card p,
+#tab-mata-mata .knockout-leg-row em {
+    color: #64748b !important;
+}
+
+#tab-mata-mata .bracket-connector-column {
+    flex: 0 0 88px !important;
+    min-width: 88px !important;
+    display: grid !important;
+    grid-auto-rows: calc(var(--slot, 154px) * 2) !important;
+    padding-top: 54px !important;
+    position: relative !important;
+}
+
+#tab-mata-mata .bracket-connector-column::before,
+#tab-mata-mata .bracket-connector,
+#tab-mata-mata .bracket-connector.top,
+#tab-mata-mata .bracket-connector.bottom {
+    display: none !important;
+}
+
+#tab-mata-mata .bracket-connector-pair {
+    position: relative;
+    display: block;
+}
+
+#tab-mata-mata .bracket-connector-pair::before,
+#tab-mata-mata .bracket-connector-pair::after,
+#tab-mata-mata .bracket-connector-pair i {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    border-color: rgba(15, 143, 69, 0.26);
+}
+
+#tab-mata-mata .bracket-connector-pair::before {
+    left: 0;
+    top: 25%;
+    width: 50%;
+    height: 50%;
+    border-top: 2px solid rgba(15, 143, 69, 0.26);
+    border-bottom: 2px solid rgba(15, 143, 69, 0.26);
+    border-right: 2px solid rgba(15, 143, 69, 0.26);
+    border-radius: 0 14px 14px 0;
+}
+
+#tab-mata-mata .bracket-connector-pair::after {
+    left: 50%;
+    top: 50%;
+    width: 50%;
+    border-top: 2px solid rgba(15, 143, 69, 0.26);
+}
+
+#tab-mata-mata .bracket-connector-pair i {
+    left: 0;
+    top: 25%;
+    width: 18px;
+    border-top: 2px solid rgba(15, 143, 69, 0.26);
+    box-shadow: 0 calc(var(--slot, 154px)) 0 rgba(15, 143, 69, 0.26);
+}
+
+#tab-mata-mata .champion-connector {
+    grid-auto-rows: var(--slot, 154px) !important;
+}
+
+#tab-mata-mata .bracket-champion-line {
+    position: relative;
+    display: block;
+}
+
+#tab-mata-mata .bracket-champion-line::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 2px solid rgba(15, 143, 69, 0.26);
+}
+
+.modal {
+    background: rgba(15, 45, 30, 0.24);
+}
+
+@media (max-width: 768px) {
+    body {
+        background:
+            radial-gradient(circle at 0% 0%, rgba(255, 214, 64, 0.24), transparent 32%),
+            radial-gradient(circle at 100% 4%, rgba(37, 99, 235, 0.14), transparent 30%),
+            linear-gradient(135deg, #f8fff8 0%, #eefbea 48%, #f7fbff 100%) !important;
+    }
+
+    .btn,
+    .btn-test-inline {
+        white-space: normal;
+    }
+
+    #tab-mata-mata .knockout-scroll-container .knockout-track {
+        width: 100% !important;
+        min-width: 0 !important;
+        display: grid !important;
+        gap: 20px !important;
+        padding-bottom: 40px !important;
+    }
+
+    #tab-mata-mata .knockout-phase-column {
+        width: 100% !important;
+        min-width: 0 !important;
+        display: grid !important;
+        gap: 12px !important;
+    }
+
+    #tab-mata-mata .bracket-round-matches {
+        grid-auto-rows: auto !important;
+        gap: 12px !important;
+    }
+
+    #tab-mata-mata .bracket-connector-column {
+        display: none !important;
+    }
+}
+
+/* Final scroll/background repair */
+html,
+body {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+}
+
+body {
+    min-height: 100dvh !important;
+    background-image:
+        radial-gradient(circle at 7% 4%, rgba(255, 214, 64, 0.28), transparent 32%),
+        radial-gradient(circle at 92% 6%, rgba(0, 132, 255, 0.16), transparent 30%),
+        linear-gradient(135deg, rgba(248, 255, 248, 0.78) 0%, rgba(238, 251, 234, 0.72) 46%, rgba(247, 251, 255, 0.78) 100%),
+        url('IMG/imagem de fundo pc FIFA.png') !important;
+    background-size: auto, auto, auto, cover !important;
+    background-position: center, center, center, center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+}
+
+.dashboard,
+.content-area,
+.tab-content,
+.mata-mata-tab,
+#tab-mata-mata,
+#tab-mata-mata .knockout-panel,
+#tab-mata-mata .bracket-stage {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+.dashboard {
+    align-items: flex-start !important;
+    padding-bottom: calc(120px + env(safe-area-inset-bottom)) !important;
+}
+
+.content-area,
+.tab-content {
+    min-width: 0 !important;
+}
+
+#tab-mata-mata {
+    padding-bottom: calc(140px + env(safe-area-inset-bottom)) !important;
+}
+
+#tab-mata-mata .knockout-panel,
+#tab-mata-mata .bracket-stage {
+    display: flex !important;
+    flex-direction: column !important;
+    padding-bottom: 42px !important;
+}
+
+#tab-mata-mata .bracket-scroll,
+#tab-mata-mata .knockout-scroll-frame,
+#tab-mata-mata .knockout-scroll-container,
+#tab-mata-mata .bracket-stage .knockout-scroll-container {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+}
+
+#tab-mata-mata .knockout-scroll-container,
+#tab-mata-mata .bracket-stage .knockout-scroll-container {
+    padding-bottom: 96px !important;
+    touch-action: pan-x pan-y !important;
+}
+
+@media (max-width: 768px) {
+    body {
+        background-image:
+            radial-gradient(circle at 0% 0%, rgba(255, 214, 64, 0.24), transparent 32%),
+            radial-gradient(circle at 100% 4%, rgba(37, 99, 235, 0.14), transparent 30%),
+            linear-gradient(135deg, rgba(248, 255, 248, 0.82) 0%, rgba(238, 251, 234, 0.78) 48%, rgba(247, 251, 255, 0.84) 100%),
+            url('IMG/Iimagem de fundo mobile FIFA.png') !important;
+        background-size: auto, auto, auto, cover !important;
+        background-position: center, center, center, center !important;
+        background-attachment: scroll !important;
+    }
+
+    .dashboard {
+        padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+    }
+
+    #tab-mata-mata .knockout-scroll-container,
+    #tab-mata-mata .bracket-stage .knockout-scroll-container {
+        overflow: visible !important;
+        padding-bottom: 64px !important;
+        touch-action: pan-y !important;
+    }
+}

@@ -1109,6 +1109,12 @@ td {
     display: none !important;
 }
 
+body:not(.is-organizer) #organizer-panel,
+body:not(.is-organizer) #btn-toggle-organizer,
+body:not(.is-organizer) #participant-form {
+    display: none !important;
+}
+
 @media (max-width: 900px) {
     body {
         height: auto;
@@ -1250,5 +1256,527 @@ td {
     .history-round {
         width: 100%;
         min-width: 0;
+    }
+}
+
+/* Sinuca liquid-glass refresh and scroll-safe bracket */
+html,
+body {
+    height: auto;
+    min-height: 100%;
+}
+
+body {
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background:
+        radial-gradient(circle at 7% 4%, rgba(255, 214, 64, 0.28), transparent 32%),
+        radial-gradient(circle at 92% 6%, rgba(0, 132, 255, 0.16), transparent 30%),
+        radial-gradient(circle at 78% 82%, rgba(15, 143, 69, 0.14), transparent 34%),
+        linear-gradient(135deg, #f8fff8 0%, #eefbea 46%, #f7fbff 100%);
+    background-attachment: fixed;
+    color: #16351f;
+}
+
+.topbar,
+.tabs-nav,
+.glass-card,
+.knockout-panel,
+.table-card,
+.history-card,
+.history-detail-card {
+    border-color: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.62);
+    box-shadow: 0 18px 45px rgba(16, 64, 32, 0.12);
+    backdrop-filter: blur(22px) saturate(145%);
+    -webkit-backdrop-filter: blur(22px) saturate(145%);
+}
+
+.sinuca-shell {
+    height: auto;
+    min-height: calc(100dvh - 112px);
+    align-items: flex-start;
+    overflow: visible;
+    padding-bottom: 140px;
+}
+
+.sidebar {
+    max-height: calc(100dvh - 132px);
+}
+
+.content-area {
+    overflow: visible;
+}
+
+.tab-content {
+    height: auto;
+    min-height: calc(100dvh - 156px);
+    overflow: visible;
+    padding-right: 0;
+    padding-bottom: 140px;
+}
+
+.btn.primary,
+.btn.success,
+.test-primary {
+    border-color: rgba(15, 143, 69, 0.28);
+    background: linear-gradient(135deg, #0f8f45 0%, #22c55e 48%, #f6c945 100%);
+    color: #fff;
+    box-shadow: 0 12px 28px rgba(15, 143, 69, 0.20);
+}
+
+.btn.secondary {
+    border-color: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.58);
+    color: #14532d;
+}
+
+.test-card {
+    display: grid;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.test-card .card-title-row {
+    margin-bottom: 0;
+}
+
+.test-card .card-title-row i {
+    color: #0f8f45;
+}
+
+.test-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.test-meta-grid span {
+    min-height: 82px;
+    display: grid;
+    align-content: center;
+    gap: 4px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.74);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.52);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.test-meta-grid i {
+    color: #2563eb;
+    font-size: 17px;
+}
+
+.test-meta-grid strong {
+    color: #06351d;
+    font-size: 12px;
+    font-weight: 950;
+    line-height: 1.15;
+}
+
+.test-meta-grid small {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.test-note {
+    color: #51715c;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.45;
+}
+
+#tab-mata-mata {
+    overflow: visible;
+    padding-bottom: 160px;
+}
+
+#tab-mata-mata .knockout-panel {
+    height: auto;
+    min-height: min(780px, calc(100dvh - 152px));
+    overflow: visible;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at top left, rgba(255, 214, 64, 0.18), transparent 32%),
+        radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 30%),
+        linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.56));
+    color: #16351f;
+    padding: 22px;
+    padding-bottom: 120px;
+}
+
+#tab-mata-mata .knockout-panel::before {
+    display: none;
+}
+
+#tab-mata-mata .knockout-header,
+#tab-mata-mata .knockout-header h1,
+#tab-mata-mata .bracket-round-title,
+#tab-mata-mata .match-id {
+    color: #0f172a;
+}
+
+#tab-mata-mata .eyebrow,
+#tab-mata-mata .bracket-round-title i {
+    color: #0f8f45;
+}
+
+#tab-mata-mata .glass-pill {
+    border-color: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.58);
+    color: #14532d;
+}
+
+#tab-mata-mata .knockout-scroll-frame {
+    flex: none;
+    min-height: 0;
+    overflow: visible;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 24px;
+    background:
+        linear-gradient(90deg, rgba(37, 99, 235, 0.05), transparent 24%, transparent 76%, rgba(22, 163, 74, 0.07)),
+        rgba(255, 255, 255, 0.36);
+}
+
+#tab-mata-mata .knockout-scroll-container {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    display: block;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 26px 28px 54px;
+    touch-action: pan-x pan-y;
+}
+
+#tab-mata-mata .bracket-tree {
+    width: max-content;
+    min-width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    padding-bottom: 36px;
+}
+
+#tab-mata-mata .bracket-round {
+    flex: 0 0 330px;
+    min-width: 330px;
+    display: grid;
+    align-content: start;
+    gap: 16px;
+}
+
+#tab-mata-mata .bracket-round-matches {
+    display: grid;
+    grid-auto-rows: var(--slot, 154px);
+    gap: 0;
+    align-items: center;
+}
+
+#tab-mata-mata .match-card {
+    width: 100%;
+    min-height: 132px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.74);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.70);
+    box-shadow: 0 16px 36px rgba(15, 45, 30, 0.10);
+    backdrop-filter: blur(18px) saturate(145%);
+    -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+
+#tab-mata-mata .match-card-header {
+    min-height: 40px;
+    background: rgba(248, 250, 252, 0.66);
+}
+
+#tab-mata-mata .match-team {
+    min-height: 54px;
+    grid-template-columns: minmax(0, 1fr) 42px auto;
+    gap: 10px;
+    background: transparent;
+}
+
+#tab-mata-mata .team-avatar {
+    background: linear-gradient(145deg, #e0f2fe, #dcfce7);
+    border-color: rgba(15, 143, 69, 0.18);
+    color: #14532d;
+}
+
+#tab-mata-mata .team-name-bracket {
+    color: #06351d;
+}
+
+#tab-mata-mata .team-subtitle,
+#tab-mata-mata .scroll-label,
+#tab-mata-mata .match-footer {
+    color: #64748b;
+}
+
+#tab-mata-mata .score-display {
+    min-width: 42px;
+    min-height: 34px;
+    border-color: rgba(15, 143, 69, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    color: #334155;
+}
+
+#tab-mata-mata .match-team-winner {
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.16), rgba(250, 204, 21, 0.08));
+}
+
+#tab-mata-mata .match-team-winner .score-display {
+    border-color: rgba(15, 143, 69, 0.32);
+    background: rgba(220, 252, 231, 0.76);
+    color: #047857;
+}
+
+#tab-mata-mata .match-status.done {
+    color: #047857;
+    border: 1px solid rgba(15, 143, 69, 0.22);
+    background: rgba(220, 252, 231, 0.76);
+}
+
+#tab-mata-mata .match-status.pending {
+    color: #92400e;
+    border: 1px solid rgba(250, 204, 21, 0.28);
+    background: rgba(254, 249, 195, 0.78);
+}
+
+#tab-mata-mata .match-status.waiting {
+    color: #2563eb;
+    border: 1px solid rgba(37, 99, 235, 0.18);
+    background: rgba(239, 246, 255, 0.82);
+}
+
+#tab-mata-mata .win-button {
+    min-width: 72px;
+    border-color: rgba(15, 143, 69, 0.26);
+    background: rgba(236, 253, 245, 0.86);
+    color: #047857;
+}
+
+#tab-mata-mata .bracket-connector-column {
+    flex: 0 0 88px;
+    min-width: 88px;
+    display: grid;
+    grid-auto-rows: calc(var(--slot, 154px) * 2);
+    padding-top: 54px;
+    position: relative;
+}
+
+#tab-mata-mata .bracket-connector-column::before,
+#tab-mata-mata .bracket-connector,
+#tab-mata-mata .bracket-connector.top,
+#tab-mata-mata .bracket-connector.bottom {
+    display: none;
+}
+
+#tab-mata-mata .bracket-connector-pair {
+    position: relative;
+    display: block;
+}
+
+#tab-mata-mata .bracket-connector-pair::before,
+#tab-mata-mata .bracket-connector-pair::after,
+#tab-mata-mata .bracket-connector-pair i {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    border-color: rgba(15, 143, 69, 0.26);
+}
+
+#tab-mata-mata .bracket-connector-pair::before {
+    left: 0;
+    top: 25%;
+    width: 50%;
+    height: 50%;
+    border-top: 2px solid rgba(15, 143, 69, 0.26);
+    border-bottom: 2px solid rgba(15, 143, 69, 0.26);
+    border-right: 2px solid rgba(15, 143, 69, 0.26);
+    border-radius: 0 14px 14px 0;
+}
+
+#tab-mata-mata .bracket-connector-pair::after {
+    left: 50%;
+    top: 50%;
+    width: 50%;
+    border-top: 2px solid rgba(15, 143, 69, 0.26);
+}
+
+#tab-mata-mata .bracket-connector-pair i {
+    left: 0;
+    top: 25%;
+    width: 18px;
+    border-top: 2px solid rgba(15, 143, 69, 0.26);
+    box-shadow: 0 calc(var(--slot, 154px)) 0 rgba(15, 143, 69, 0.26);
+}
+
+#tab-mata-mata .champion-connector {
+    grid-auto-rows: var(--slot, 154px);
+}
+
+#tab-mata-mata .bracket-champion-line {
+    position: relative;
+    display: block;
+}
+
+#tab-mata-mata .bracket-champion-line::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 2px solid rgba(15, 143, 69, 0.26);
+}
+
+#tab-mata-mata .champion-card {
+    min-height: 170px;
+    align-content: center;
+    border-color: rgba(250, 204, 21, 0.38);
+    background: linear-gradient(145deg, rgba(255, 251, 235, 0.88), rgba(255, 255, 255, 0.64));
+    color: #92400e;
+    box-shadow: 0 16px 36px rgba(146, 64, 14, 0.10);
+}
+
+@media (max-width: 900px) {
+    body {
+        background:
+            radial-gradient(circle at 0% 0%, rgba(255, 214, 64, 0.24), transparent 32%),
+            radial-gradient(circle at 100% 4%, rgba(37, 99, 235, 0.14), transparent 30%),
+            linear-gradient(135deg, #f8fff8 0%, #eefbea 48%, #f7fbff 100%);
+    }
+
+    .sinuca-shell,
+    .tab-content,
+    #tab-mata-mata {
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+        padding-bottom: 120px;
+    }
+
+    .sidebar {
+        max-height: 100dvh;
+    }
+
+    .test-meta-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #tab-mata-mata .knockout-panel {
+        min-height: 0;
+        overflow: visible;
+        padding: 14px;
+        padding-bottom: 90px;
+    }
+
+    #tab-mata-mata .knockout-scroll-frame,
+    #tab-mata-mata .knockout-scroll-container {
+        overflow: visible;
+    }
+
+    #tab-mata-mata .knockout-scroll-container {
+        display: block;
+        padding: 0;
+        touch-action: pan-y;
+    }
+
+    #tab-mata-mata .bracket-tree {
+        width: 100%;
+        min-width: 0;
+        display: grid;
+        gap: 20px;
+        padding-bottom: 40px;
+    }
+
+    #tab-mata-mata .bracket-round {
+        width: 100%;
+        min-width: 0;
+        display: grid;
+        gap: 12px;
+    }
+
+    #tab-mata-mata .bracket-round-matches {
+        display: grid;
+        grid-auto-rows: auto;
+        gap: 12px;
+    }
+
+    #tab-mata-mata .bracket-connector-column {
+        display: none;
+    }
+
+    #tab-mata-mata .match-card {
+        min-height: 0;
+    }
+
+    #tab-mata-mata .match-team {
+        grid-template-columns: minmax(0, 1fr) 42px;
+    }
+
+    #tab-mata-mata .win-button {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-height: 42px;
+    }
+}
+
+/* Final test-card safety: keep the Sinuca test panel fully visible */
+.sinuca-shell .test-card {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding-bottom: 24px;
+    margin-bottom: 24px;
+}
+
+.sinuca-shell .test-card .test-meta-grid {
+    overflow: visible;
+}
+
+.sinuca-shell .test-card .btn {
+    min-height: 44px;
+    white-space: normal;
+}
+
+@media (max-width: 900px) {
+    .sinuca-shell .test-card {
+        width: 100%;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+}
+
+/* Final background repair: keep the image behind the light Liquid Glass layer */
+body {
+    background-image:
+        radial-gradient(circle at 7% 4%, rgba(255, 214, 64, 0.28), transparent 32%),
+        radial-gradient(circle at 92% 6%, rgba(0, 132, 255, 0.16), transparent 30%),
+        linear-gradient(135deg, rgba(248, 255, 248, 0.78) 0%, rgba(238, 251, 234, 0.72) 46%, rgba(247, 251, 255, 0.80) 100%),
+        url('imgs/sinuca-fundo-pc.png') !important;
+    background-size: auto, auto, auto, cover !important;
+    background-position: center, center, center, center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+}
+
+@media (max-width: 900px) {
+    body {
+        background-image:
+            radial-gradient(circle at 0% 0%, rgba(255, 214, 64, 0.24), transparent 32%),
+            radial-gradient(circle at 100% 4%, rgba(37, 99, 235, 0.14), transparent 30%),
+            linear-gradient(135deg, rgba(248, 255, 248, 0.82) 0%, rgba(238, 251, 234, 0.78) 48%, rgba(247, 251, 255, 0.84) 100%),
+            url('imgs/sinuca-fundo-mobile.png') !important;
+        background-size: auto, auto, auto, cover !important;
+        background-position: center, center, center, center !important;
+        background-attachment: scroll !important;
     }
 }

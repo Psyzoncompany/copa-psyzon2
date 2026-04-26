@@ -74,13 +74,23 @@
                 <button class="btn danger" id="btn-reset-tournament"><i class="ph ph-trash"></i> Resetar torneio</button>
             </section>
 
-            <section class="glass-card">
+            <section class="glass-card test-card">
                 <div class="card-title-row">
                     <i class="ph-fill ph-flask"></i>
-                    <h2>Teste</h2>
+                    <h2>Modo Teste - Sinuca</h2>
                 </div>
-                <button class="btn secondary" id="btn-test-players"><i class="ph ph-users-three"></i> Gerar jogadores teste</button>
+                <div class="test-meta-grid">
+                    <span><i class="ph ph-pulse"></i><strong id="test-status">Aguardando</strong><small>Status</small></span>
+                    <span><i class="ph ph-users-three"></i><strong id="test-participants">0</strong><small>Simulados</small></span>
+                    <span><i class="ph ph-tree-structure"></i><strong>Mata-mata direto</strong><small>Formato</small></span>
+                    <span><i class="ph ph-prohibit"></i><strong>Sem grupos</strong><small>Fase</small></span>
+                    <span><i class="ph ph-medal"></i><strong>Vitoria/Derrota</strong><small>Resultado</small></span>
+                </div>
+                <p class="test-note">Use o modo teste para validar o chaveamento antes do torneio oficial.</p>
+                <button class="btn primary test-primary" id="btn-test-players"><i class="ph ph-users-three"></i> Gerar participantes teste</button>
+                <button class="btn secondary" id="btn-start-test-bracket"><i class="ph ph-play-circle"></i> Iniciar mata-mata teste</button>
                 <button class="btn secondary" id="btn-test-results"><i class="ph ph-beaker"></i> Gerar resultados teste</button>
+                <button class="btn danger" id="btn-clear-test"><i class="ph ph-eraser"></i> Limpar teste</button>
             </section>
         </aside>
 
@@ -143,10 +153,10 @@
                                 <th>Jogos</th>
                                 <th>Vitórias</th>
                                 <th>Derrotas</th>
+                                <th>Aprov.</th>
                                 <th>Títulos</th>
                                 <th>Finais</th>
                                 <th>Semis</th>
-                                <th>Pts</th>
                             </tr>
                         </thead>
                         <tbody id="ranking-body"></tbody>

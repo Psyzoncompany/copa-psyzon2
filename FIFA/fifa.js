@@ -2011,8 +2011,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return 'is-waiting';
                 }
 
-                function connectorColumn() {
-                    return `<div class="bracket-connector-column" aria-hidden="true"><span class="bracket-connector top"></span><span class="bracket-connector join"></span><span class="bracket-connector bottom"></span></div>`;
+                const slotBase = 154;
+                function connectorColumn(round, rIdx) {
+                    const slot = slotBase * (2 ** Math.max(0, rIdx));
+                    const pairs = Math.max(1, Math.ceil(((round?.matches || []).length || 1) / 2));
+                    return `<div class="bracket-connector-column" style="--slot:${slot}px" aria-hidden="true">
+                        ${Array.from({ length: pairs }, () => `<span class="bracket-connector-pair"><i></i></span>`).join('')}
+                    </div>`;
                 }
 
                 function renderBracketMatch(match, type, rIdx, mIdx, label) {
@@ -2063,18 +2068,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
-                    bracketHTML += `<section class="bracket-round knockout-phase-column"><div class="bracket-round-title knockout-phase-header"><i class="ph ph-flag-checkered"></i><span>Repescagem</span></div><div class="bracket-round-matches">`;
+                    bracketHTML += `<section class="bracket-round knockout-phase-column" style="--slot:${slotBase}px"><div class="bracket-round-title knockout-phase-header"><i class="ph ph-flag-checkered"></i><span>Repescagem</span></div><div class="bracket-round-matches">`;
                     tournamentState.knockout.repechage.forEach((match, mIdx) => {
                         bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx, `Repescagem ${mIdx + 1}`);
                     });
-                    bracketHTML += `</div></section>${connectorColumn()}`;
+                    bracketHTML += `</div></section>${connectorColumn({ matches: tournamentState.knockout.repechage }, 0)}`;
                 }
 
                 if (tournamentState.knockout.rounds) {
                     tournamentState.knockout.rounds.forEach((round, rIdx) => {
                         const totalMatches = (round.matches || []).length;
                         const isFinal = rIdx === tournamentState.knockout.rounds.length - 1;
-                        bracketHTML += `<section class="bracket-round knockout-phase-column"><div class="bracket-round-title knockout-phase-header"><i class="ph ${isFinal ? 'ph-trophy' : 'ph-soccer-ball'}"></i><span>${round.name}</span><small>${totalMatches} jogos</small></div><div class="bracket-round-matches">`;
+                        const visualIndex = (tournamentState.knockout.repechage?.length ? rIdx + 1 : rIdx);
+                        bracketHTML += `<section class="bracket-round knockout-phase-column" style="--slot:${slotBase * (2 ** visualIndex)}px"><div class="bracket-round-title knockout-phase-header"><i class="ph ${isFinal ? 'ph-trophy' : 'ph-soccer-ball'}"></i><span>${round.name}</span><small>${totalMatches} jogos</small></div><div class="bracket-round-matches">`;
                         if (testModeActive && role === 'organizador' && !isPreview) {
                             bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
                                 <button class="btn-test-inline" data-test-action="knockout-phase-sim" data-r="${rIdx}">Simular esta fase</button>
@@ -2085,12 +2091,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         round.matches.forEach((match, mIdx) => {
                             bracketHTML += renderBracketMatch(match, 'round', rIdx, mIdx, `${round.name} ${mIdx + 1}`);
                         });
-                        bracketHTML += `</div></section>${rIdx < tournamentState.knockout.rounds.length - 1 ? connectorColumn() : ''}`;
+                        bracketHTML += `</div></section>${rIdx < tournamentState.knockout.rounds.length - 1 ? connectorColumn(round, visualIndex) : ''}`;
                     });
                 }
 
                 if (champion) {
-                    bracketHTML += `<section class="bracket-round knockout-phase-column champion-column">
+                    const championVisualIndex = (tournamentState.knockout.repechage?.length ? tournamentState.knockout.rounds.length : tournamentState.knockout.rounds.length - 1);
+                    bracketHTML += `<div class="bracket-connector-column champion-connector" style="--slot:${slotBase * (2 ** Math.max(0, championVisualIndex))}px" aria-hidden="true"><span class="bracket-champion-line"></span></div>
+                    <section class="bracket-round knockout-phase-column champion-column" style="--slot:${slotBase * (2 ** Math.max(0, championVisualIndex))}px">
                         <div class="bracket-round-title knockout-phase-header champion-title"><i class="ph-fill ph-crown-simple"></i><span>Campeão</span></div>
                         <div class="champion-card">
                             <span class="champion-icon"><i class="ph-fill ph-trophy"></i></span>
@@ -2409,9 +2417,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     function makeRandomTestPlayers(count) {
         return Array.from({ length: count }, (_, i) => {
             const label = i + 1;
-            const natural = TEST_NAMES_POOL[i % TEST_NAMES_POOL.length];
-            return { name: `${natural} (Teste ${String(label).padStart(2, '0')})`, isTestMode: true };
+            return {
+                id: `fifa-test-${String(label).padStart(2, '0')}`,
+                name: `Participante Teste ${String(label).padStart(2, '0')}`,
+                isTestMode: true,
+                modality: 'fifa'
+            };
         });
+    }
+
+    function getSelectedTestParticipantLimit() {
+        const value = parseInt(participantsInput?.value, 10);
+        return Math.min(64, Math.max(2, Number.isFinite(value) ? value : 16));
     }
 
     async function enterTestMode() {
@@ -2462,20 +2479,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         askSensitivePassword(fn);
     }
 
-    async function addRandomPlayersForTest(count, askConfirm = true) {
+    async function addRandomPlayersForTest(count = getSelectedTestParticipantLimit(), askConfirm = true) {
         if (!testModeActive) return;
+        const amount = Math.min(64, Math.max(2, Number(count) || getSelectedTestParticipantLimit()));
         const existing = tournamentState.registeredPlayers || [];
         if (askConfirm && existing.length && !confirm('Já existem jogadores cadastrados. Deseja substituir pelos jogadores de teste?')) return;
-        const players = makeRandomTestPlayers(count);
+        const players = makeRandomTestPlayers(amount);
         tournamentState.registeredPlayers = players;
-        tournamentState.participants = count;
+        tournamentState.participants = amount;
         tournamentState.status = 'ativo';
         tournamentState.isTestMode = true;
-        if (participantsInput) participantsInput.value = String(count);
+        if (participantsInput) participantsInput.value = String(amount);
         buildTournamentState(players, tournamentState.format || 'grupos-mata-mata');
         renderTournamentFromState();
         updateStatus('ativo');
-        addTestModeLog(`${count} jogadores adicionados para teste`);
+        addTestModeLog(`${amount} participantes adicionados para teste`);
     }
 
     async function simulateGroupPhaseTest() {
@@ -2938,13 +2956,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function bindTestModeButtons() {
         const handlers = {
-            'btn-test-add-random': () => addRandomPlayersForTest(parseInt(participantsInput?.value, 10) || 16),
-            'btn-test-add-8': () => addRandomPlayersForTest(8),
-            'btn-test-add-16': () => addRandomPlayersForTest(16),
-            'btn-test-add-32': () => addRandomPlayersForTest(32),
-            'btn-test-add-64': () => addRandomPlayersForTest(64),
+            'btn-test-add-random': () => addRandomPlayersForTest(getSelectedTestParticipantLimit()),
+            'btn-test-add-8': () => addRandomPlayersForTest(getSelectedTestParticipantLimit()),
+            'btn-test-add-16': () => addRandomPlayersForTest(getSelectedTestParticipantLimit()),
+            'btn-test-add-32': () => addRandomPlayersForTest(getSelectedTestParticipantLimit()),
+            'btn-test-add-64': () => addRandomPlayersForTest(getSelectedTestParticipantLimit()),
             'btn-test-generate-bracket': async () => {
-                if (!(tournamentState.registeredPlayers || []).length) await addRandomPlayersForTest(parseInt(participantsInput?.value, 10) || 16, false);
+                if (!(tournamentState.registeredPlayers || []).length) await addRandomPlayersForTest(getSelectedTestParticipantLimit(), false);
                 buildTournamentState(tournamentState.registeredPlayers, tournamentState.format || 'grupos-mata-mata');
                 renderTournamentFromState();
                 addTestModeLog('Chaveamento de teste gerado');

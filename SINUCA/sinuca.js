@@ -26,6 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const role = params.get('role') || localStorage.getItem('copaRole') || 'visitante';
     const isOrganizer = role === 'organizador';
+    document.body.classList.toggle('is-organizer', isOrganizer);
+    document.body.classList.toggle('is-visitor', !isOrganizer);
 
     const defaultState = {
         name: 'COPA PSYZON SINUCA',
@@ -140,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setRanking(ranking) {
-        localStorage.setItem(RANKING_KEY, JSON.stringify(ranking));
+        localStorage.setItem(RANKING_KEY, JSON.stringify(normalizeSinucaRanking(ranking)));
     }
 
     function cloneData(value) {
@@ -176,6 +178,74 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function isRealPlayer(value) {
         return !!value && !isBye(value) && !isPlaceholder(value);
+    }
+
+    function normalizeName(value) {
+        return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    function activeParticipantNames() {
+        return new Set((state.participants || []).map(player => normalizeName(player.name)).filter(Boolean));
+    }
+
+    function getSelectedParticipantLimit() {
+        const value = Number($('#participant-limit')?.value || state.participantLimit || 16);
+        return Math.min(64, Math.max(2, Number.isFinite(value) ? value : 16));
+    }
+
+    function isTestParticipant(player) {
+        return !!player?.isTestMode || /^Participante Teste \d+$/i.test(String(player?.name || ''));
+    }
+
+    function normalizeSinucaRanking(ranking = {}) {
+        return Object.fromEntries(Object.entries(ranking || {}).map(([key, row]) => {
+            const cleanRow = { ...row };
+            delete cleanRow.pts;
+            delete cleanRow.pontos;
+            return [key, cleanRow];
+        }));
+    }
+
+    function purgeRankingForNames(namesToRemove) {
+        const removeSet = new Set([...namesToRemove].map(normalizeName).filter(Boolean));
+        if (!removeSet.size) return;
+        const ranking = getRanking();
+        Object.keys(ranking).forEach(key => {
+            const row = ranking[key] || {};
+            if (removeSet.has(normalizeName(row.name || key))) delete ranking[key];
+        });
+        setRanking(ranking);
+    }
+
+    function syncRankingWithActiveParticipants() {
+        const activeNames = activeParticipantNames();
+        if (!activeNames.size) {
+            setRanking({});
+            return;
+        }
+
+        const ranking = getRanking();
+        Object.keys(ranking).forEach(key => {
+            const row = ranking[key] || {};
+            if (!activeNames.has(normalizeName(row.name || key))) delete ranking[key];
+        });
+        setRanking(ranking);
+    }
+
+    function winRate(row) {
+        const jogos = Number(row?.jogos || 0);
+        if (!jogos) return 0;
+        return Number(row?.vitorias || 0) / jogos;
+    }
+
+    function sinucaRankingSort(a, b) {
+        return (b.vitorias || 0) - (a.vitorias || 0) ||
+            winRate(b) - winRate(a) ||
+            (a.derrotas || 0) - (b.derrotas || 0) ||
+            (b.titulos || 0) - (a.titulos || 0) ||
+            (b.finais || 0) - (a.finais || 0) ||
+            (b.semifinais || 0) - (a.semifinais || 0) ||
+            String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR');
     }
 
     function isDoubleBye(match) {
@@ -255,6 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildBracket() {
+        if (!isOrganizer) return;
         const names = state.participants.map(p => p.name).filter(Boolean);
         if (names.length < 2) {
             alert('Adicione pelo menos 2 participantes.');
@@ -362,6 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetResults() {
+        if (!isOrganizer) return;
         if (!state.bracket?.rounds) return;
         state.bracket.rounds.forEach((round, rIdx) => {
             round.matches.forEach((match) => {
@@ -386,11 +458,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function calculateCurrentTournamentRanking(baseRanking = {}) {
         if (!state.bracket?.rounds?.length) return baseRanking;
-        const ranking = cloneData(baseRanking) || {};
+        const ranking = normalizeSinucaRanking(cloneData(baseRanking) || {});
         const ensure = (name) => {
             if (!isRealPlayer(name)) return null;
             if (!ranking[name]) {
-                ranking[name] = { name, jogos: 0, vitorias: 0, derrotas: 0, titulos: 0, finais: 0, semifinais: 0, pts: 0 };
+                ranking[name] = { name, jogos: 0, vitorias: 0, derrotas: 0, titulos: 0, finais: 0, semifinais: 0 };
             }
             return ranking[name];
         };
@@ -406,7 +478,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (w) {
                     w.jogos += 1;
                     w.vitorias += 1;
-                    w.pts += 3;
                     if (rIdx === state.bracket.rounds.length - 1) {
                         w.titulos += 1;
                         w.finais += 1;
@@ -431,6 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function finishTournament() {
+        if (!isOrganizer) return;
         if (!state.champion) {
             alert('Defina o campeão antes de encerrar.');
             return;
@@ -441,12 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateRankingFromCurrentTournament();
-        const tournamentRanking = Object.values(calculateCurrentTournamentRanking({})).sort((a, b) =>
-            (b.titulos || 0) - (a.titulos || 0) ||
-            (b.pts || 0) - (a.pts || 0) ||
-            (b.vitorias || 0) - (a.vitorias || 0) ||
-            a.name.localeCompare(b.name, 'pt-BR')
-        );
+        const tournamentRanking = Object.values(calculateCurrentTournamentRanking({})).sort(sinucaRankingSort);
         const history = getHistory();
         const item = {
             id: `sinuca-${Date.now()}`,
@@ -471,6 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function generateCodes() {
+        if (!isOrganizer) return;
         const amount = Math.max(2, Number(state.participantLimit) || 16);
         const existingSnap = await get(ref(db, 'codes/pool'));
         const existingCodes = existingSnap.exists() ? (existingSnap.val().codes || []) : [];
@@ -582,8 +650,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if (ownerId || ownerName) {
+            const removedNames = [
+                ...(state.participants || []),
+                ...(state.registeredPlayers || [])
+            ].filter(player => !removeOwner(player)).map(player => player.name);
             state.participants = (state.participants || []).filter(removeOwner);
             state.registeredPlayers = (state.registeredPlayers || []).filter(removeOwner);
+            purgeRankingForNames(ownerName ? [ownerName, ...removedNames] : removedNames);
             if (state.bracket?.rounds?.length) {
                 state.bracket = null;
                 state.champion = null;
@@ -612,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addParticipant(name) {
+        if (!isOrganizer) return;
         const clean = name.trim().replace(/\s+/g, ' ');
         if (!clean) return;
         if (state.participants.length >= Number(state.participantLimit || 16)) {
@@ -630,30 +704,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function generateTestPlayers() {
+        if (!isOrganizer) return;
         if (state.participants.length && !confirm('Substituir os participantes atuais por jogadores de teste?')) return;
-        const names = [
-            'Lucas Falcao', 'Rafael Costa', 'Bruno Lima', 'Marcos Vieira',
-            'Thiago Rocha', 'Pedro Nunes', 'Andre Martins', 'Felipe Souza',
-            'Diego Alves', 'Victor Hugo', 'Caio Ribeiro', 'Renan Lopes',
-            'Gustavo Melo', 'Joao Pedro', 'Daniel Torres', 'Matheus Reis'
-        ];
-        const amount = Math.min(Number(state.participantLimit) || 16, names.length);
-        state.participants = names.slice(0, amount).map((name, index) => ({
-            id: `test-${Date.now()}-${index}`,
-            name
+        const amount = getSelectedParticipantLimit();
+        state.participantLimit = amount;
+        const removedNames = (state.participants || []).map(player => player.name);
+        state.participants = Array.from({ length: amount }, (_, index) => ({
+            id: `sinuca-test-${String(index + 1).padStart(2, '0')}`,
+            name: `Participante Teste ${String(index + 1).padStart(2, '0')}`,
+            isTestMode: true,
+            modality: 'sinuca'
         }));
-        state.registeredPlayers = state.participants;
+        state.registeredPlayers = cloneData(state.participants);
         state.bracket = null;
         state.champion = null;
         state.finishedHistoryId = null;
         state.status = 'teste';
+        purgeRankingForNames(removedNames);
         persist();
         syncTournamentToFirebase();
         renderAll();
-        alert(`${amount} jogadores de teste gerados.`);
+        alert(`${amount} participantes de teste gerados.`);
     }
 
     function generateTestResults() {
+        if (!isOrganizer) return;
         if (!state.participants.length) generateTestPlayers();
         if (!state.bracket?.rounds?.length) buildBracket();
         if (!state.bracket?.rounds?.length) return;
@@ -684,53 +759,49 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Resultados de teste gerados. Agora voce pode clicar em Encerrar e salvar.');
     }
 
-    function removeParticipant(id) {
-        if (state.bracket?.rounds?.length && !confirm('Remover participante pode invalidar o mata-mata atual. Continuar?')) return;
-        state.participants = state.participants.filter(p => p.id !== id);
-        state.registeredPlayers = state.participants;
+    function startTestBracket() {
+        if (!isOrganizer) return;
+        if (!state.participants.length) generateTestPlayers();
+        if (!state.bracket?.rounds?.length) buildBracket();
+        state.status = 'teste';
+        persist();
+        syncTournamentToFirebase();
+        renderAll();
+        switchTab('mata-mata');
+    }
+
+    function clearTestMode() {
+        if (!isOrganizer) return;
+        if (!confirm('Limpar participantes, resultados e chaveamento de teste da Sinuca?')) return;
+        const removedNames = (state.participants || []).filter(isTestParticipant).map(player => player.name);
+        state.participants = (state.participants || []).filter(player => !isTestParticipant(player));
+        state.registeredPlayers = (state.registeredPlayers || []).filter(player => !isTestParticipant(player));
+        state.bracket = null;
+        state.champion = null;
+        state.finishedHistoryId = null;
+        state.status = 'aguardando';
+        purgeRankingForNames(removedNames);
         persist();
         syncTournamentToFirebase();
         renderAll();
     }
 
-    function renderParticipants() {
-        $('#participant-count').textContent = `${state.participants.length} inscritos`;
-        const list = $('#participants-list');
-        if (!state.participants.length) {
-            list.innerHTML = `<div class="empty-state">Nenhum participante cadastrado ainda.</div>`;
-            return;
+    function removeParticipant(id) {
+        if (!isOrganizer) return;
+        if (state.bracket?.rounds?.length && !confirm('Remover participante pode invalidar o mata-mata atual. Continuar?')) return;
+        const removed = (state.participants || []).find(p => String(p.id) === String(id));
+        state.participants = (state.participants || []).filter(p => String(p.id) !== String(id));
+        state.registeredPlayers = (state.registeredPlayers || []).filter(p => String(p.id) !== String(id) && normalizeName(p.name) !== normalizeName(removed?.name));
+        if (removed?.name) purgeRankingForNames([removed.name]);
+        if (state.bracket?.rounds?.length) {
+            state.bracket = null;
+            state.champion = null;
+            state.finishedHistoryId = null;
+            state.status = 'aguardando';
         }
-        list.innerHTML = state.participants.map((p, idx) => `
-            <div class="participant-item">
-                <span class="participant-avatar">${initials(p.name)}</span>
-                <span class="participant-name">${idx + 1}. ${escapeHtml(p.name)}</span>
-                ${isOrganizer ? `<button class="remove-participant" data-remove-id="${escapeHtml(p.id)}" title="Remover"><i class="ph ph-trash"></i></button>` : ''}
-                </div>
-                <div class="code-actions">
-                    <button type="button" class="code-action" data-copy-code="${escapeHtml(item.code)}" title="Copiar codigo"><i class="ph ph-copy"></i></button>
-                    ${unavailable && isOrganizer ? `<button type="button" class="code-action danger" data-reset-code="${escapeHtml(item.code)}" title="Resetar codigo"><i class="ph ph-arrow-counter-clockwise"></i></button>` : ''}
-                </div>
-            </div>
-        </div>`;
-        }).join('');
-    }
-
-    function renderCodes() {
-        const list = $('#codes-list');
-        if (!state.codes?.length) {
-            list.innerHTML = `<div class="empty-state">Nenhum código gerado.</div>`;
-            return;
-        }
-        list.innerHTML = state.codes.map(item => {
-            const unavailable = item.used || item.status === 'used';
-            item.used = unavailable;
-            return `
-            <div class="code-chip ${unavailable ? 'is-unavailable' : ''}">
-                <div class="code-main">
-                    <strong>${escapeHtml(item.code)}</strong>
-                <span>${item.used ? 'Usado' : 'Disponível'}</span>
-            </div>
-        `).join('');
+        persist();
+        syncTournamentToFirebase();
+        renderAll();
     }
 
     function matchStatus(match) {
@@ -779,10 +850,19 @@ document.addEventListener('DOMContentLoaded', () => {
             ? `<div class="alert"><i class="ph ph-crown-simple"></i> Campeão definido: ${escapeHtml(state.champion)}.</div>`
             : '';
 
-        const connectorColumn = () => `<div class="bracket-connector-column" aria-hidden="true"><span class="bracket-connector top"></span><span class="bracket-connector join"></span><span class="bracket-connector bottom"></span></div>`;
+        const slotBase = 154;
+        const connectorColumn = (round, rIdx) => {
+            const slot = slotBase * (2 ** rIdx);
+            const pairs = Math.ceil(round.matches.length / 2);
+            return `
+                <div class="bracket-connector-column" style="--slot:${slot}px" aria-hidden="true">
+                    ${Array.from({ length: pairs }, () => `<span class="bracket-connector-pair"><i></i></span>`).join('')}
+                </div>
+            `;
+        };
         container.innerHTML = `<div class="bracket-tree">
             ${state.bracket.rounds.map((round, rIdx) => `
-                <section class="phase-column bracket-round">
+                <section class="phase-column bracket-round" style="--slot:${slotBase * (2 ** rIdx)}px">
                     <div class="phase-title bracket-round-title">
                         <span><i class="ph ${rIdx === state.bracket.rounds.length - 1 ? 'ph-trophy' : 'ph-billiards'}"></i> ${escapeHtml(round.name)}</span>
                         <small>${round.matches.length} jogos</small>
@@ -807,15 +887,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     }).join('')}
                     </div>
                 </section>
-                ${rIdx < state.bracket.rounds.length - 1 ? connectorColumn() : ''}
+                ${rIdx < state.bracket.rounds.length - 1 ? connectorColumn(round, rIdx) : ''}
             `).join('')}
             ${state.champion ? `
-                <section class="phase-column bracket-round champion-column">
+                <div class="bracket-connector-column champion-connector" style="--slot:${slotBase * (2 ** (state.bracket.rounds.length - 1))}px" aria-hidden="true">
+                    <span class="bracket-champion-line"></span>
+                </div>
+                <section class="phase-column bracket-round champion-column" style="--slot:${slotBase * (2 ** (state.bracket.rounds.length - 1))}px">
                     <div class="phase-title"><span><i class="ph-fill ph-crown-simple"></i> Campeão</span></div>
-                    <div class="champion-card">
-                        <i class="ph-fill ph-trophy"></i>
-                        <strong>${escapeHtml(state.champion)}</strong>
-                        <span>Título confirmado</span>
+                    <div class="bracket-round-matches">
+                        <div class="champion-card">
+                            <i class="ph-fill ph-trophy"></i>
+                            <strong>${escapeHtml(state.champion)}</strong>
+                            <span>Título confirmado</span>
+                        </div>
                     </div>
                 </section>
             ` : ''}
@@ -832,12 +917,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderRanking() {
-        const ranking = Object.values(getRanking()).sort((a, b) =>
-            (b.titulos || 0) - (a.titulos || 0) ||
-            (b.pts || 0) - (a.pts || 0) ||
-            (b.vitorias || 0) - (a.vitorias || 0) ||
-            a.name.localeCompare(b.name, 'pt-BR')
-        );
+        syncRankingWithActiveParticipants();
+        const activeNames = activeParticipantNames();
+        const ranking = Object.values(getRanking())
+            .filter(row => activeNames.has(normalizeName(row.name)))
+            .sort(sinucaRankingSort);
         const body = $('#ranking-body');
         if (!ranking.length) {
             body.innerHTML = `<tr><td colspan="9">Nenhum ranking salvo ainda.</td></tr>`;
@@ -850,10 +934,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${row.jogos || 0}</td>
                 <td>${row.vitorias || 0}</td>
                 <td>${row.derrotas || 0}</td>
+                <td>${Math.round(winRate(row) * 100)}%</td>
                 <td>${row.titulos || 0}</td>
                 <td>${row.finais || 0}</td>
                 <td>${row.semifinais || 0}</td>
-                <td>${row.pts || 0}</td>
             </tr>
         `).join('');
     }
@@ -959,7 +1043,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="history-ranking-row">
                         <span>#${index + 1}</span>
                         <strong>${escapeHtml(row.name)}</strong>
-                        <small>${row.pts || 0} pts - ${row.vitorias || 0}V - ${row.derrotas || 0}D</small>
+                        <small>${row.vitorias || 0}V - ${row.derrotas || 0}D - ${Math.round(winRate(row) * 100)}% aprov.</small>
                     </div>
                 `).join('')}
             </div>
@@ -1018,6 +1102,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderRole() {
         $('#role-badge').textContent = role.toUpperCase();
+        $('#organizer-panel').hidden = !isOrganizer;
+        $('#btn-toggle-organizer').hidden = !isOrganizer;
+        $('#participant-form').hidden = !isOrganizer;
         $('#organizer-panel').style.display = isOrganizer ? 'flex' : 'none';
         $('#btn-toggle-organizer').style.display = isOrganizer ? '' : 'none';
         $('#participant-form').style.display = isOrganizer ? 'grid' : 'none';
@@ -1025,8 +1112,16 @@ document.addEventListener('DOMContentLoaded', () => {
         $('#participant-limit').value = state.participantLimit;
     }
 
+    function renderTestPanel() {
+        const statusEl = $('#test-status');
+        const participantsEl = $('#test-participants');
+        if (statusEl) statusEl.textContent = state.champion ? 'Finalizado' : (state.status || 'Aguardando');
+        if (participantsEl) participantsEl.textContent = String(state.participants?.length || 0);
+    }
+
     function renderAll() {
         renderRole();
+        renderTestPanel();
         renderParticipants();
         renderCodes();
         renderBracket();
@@ -1044,12 +1139,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     $('#btn-toggle-organizer').addEventListener('click', (event) => {
+        if (!isOrganizer) return;
         event.stopPropagation();
         $('#organizer-panel').classList.toggle('active');
     });
 
     $('#participant-form').addEventListener('submit', event => {
         event.preventDefault();
+        if (!isOrganizer) return;
         addParticipant($('#participant-name').value);
         $('#participant-name').value = '';
     });
@@ -1107,7 +1204,9 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#btn-generate-codes').addEventListener('click', generateCodes);
     $('#btn-generate-bracket').addEventListener('click', buildBracket);
     $('#btn-test-players').addEventListener('click', generateTestPlayers);
+    $('#btn-start-test-bracket').addEventListener('click', startTestBracket);
     $('#btn-test-results').addEventListener('click', generateTestResults);
+    $('#btn-clear-test').addEventListener('click', clearTestMode);
     $('#btn-reset-results').addEventListener('click', () => {
         if (confirm('Resetar resultados do mata-mata da Sinuca?')) resetResults();
     });
@@ -1125,5 +1224,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderCodes();
     }, 10000);
 
-    loadTournamentFromFirebase().finally(renderAll);
+    loadTournamentFromFirebase().finally(() => {
+        renderAll();
+        if (!isOrganizer) switchTab('mata-mata');
+    });
 });
