@@ -91,6 +91,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Inicializa o módulo de Ranking
     initRankingSystem(db, role);
+    document.getElementById('ranking-view-current')?.addEventListener('click', () => {
+        rankingViewMode = 'current';
+        document.getElementById('ranking-view-current')?.classList.add('active');
+        document.getElementById('ranking-view-general')?.classList.remove('active');
+        renderRanking();
+    });
+    document.getElementById('ranking-view-general')?.addEventListener('click', () => {
+        rankingViewMode = 'general';
+        document.getElementById('ranking-view-general')?.classList.add('active');
+        document.getElementById('ranking-view-current')?.classList.remove('active');
+        renderRanking();
+    });
+    document.getElementById('ranking-player-search')?.addEventListener('input', (e) => {
+        rankingSearchTerm = e.target.value || '';
+        renderRanking();
+    });
+    document.getElementById('ranking-modality-filter')?.addEventListener('change', () => {
+        if (rankingViewMode === 'general') renderRanking();
+    });
 
     // ========== TOURNAMENT STATE (Firebase-Ready) ==========
     let tournamentState = {
@@ -153,6 +172,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     let testModeActive = false;
     let testModeBackupState = null;
     let testModeLogEntries = [];
+    let rankingViewMode = 'current';
+    let rankingSearchTerm = '';
+    let generalRankingCache = [];
 
     function isBye(value) {
         return typeof value === 'string' && value.trim().toUpperCase() === 'BYE';
@@ -276,11 +298,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         return null;
     }
 
-    function recalculateGeneralStats() {
+    function recalculateCurrentCupRanking() {
         const stats = {};
         const ensure = (name) => {
             if (!name || isPlaceholder(name)) return null;
-            if (!stats[name]) stats[name] = { name, pts: 0, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, avancos: 0 };
+            if (!stats[name]) stats[name] = { name, pts: 0, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, avancos: 0, phaseScore: 0, phase: 'Fase de Grupos', status: 'Na fase de grupos' };
             return stats[name];
         };
         const apply = (home, away, gh, ga, knockout = false) => {
@@ -326,11 +348,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const pWinner = ensure(winner);
                 if (pWinner) pWinner.avancos += 1;
             });
+            (tournamentState.knockout.rounds || []).forEach((round, idx) => {
+                const phasePoints = idx + 1;
+                (round.matches || []).forEach((m) => {
+                    const winner = getKnockoutMatchWinner(m);
+                    if (isRealPlayer(winner)) {
+                        const p = ensure(winner);
+                        if (p && phasePoints >= p.phaseScore) {
+                            p.phaseScore = phasePoints;
+                            p.phase = round.name;
+                        }
+                    }
+                });
+            });
         }
 
-        Object.values(stats).forEach(p => p.sg = p.gp - p.gc);
+        Object.values(stats).forEach(p => {
+            p.sg = p.gp - p.gc;
+            p.apr = p.j ? ((p.pts / (p.j * 3)) * 100) : 0;
+            if (tournamentState.top3?.first === p.name) p.status = 'Campeão';
+            else if (tournamentState.top3?.second === p.name) p.status = 'Finalista';
+            else if ((p.phase || '').toLowerCase().includes('semifinal')) p.status = 'Semifinalista';
+            else if (p.avancos > 0) p.status = 'Classificado';
+            else p.status = 'Eliminado';
+        });
         tournamentState.generalStats = stats;
         return stats;
+    }
+
+    function recalculateGeneralStats() {
+        return recalculateCurrentCupRanking();
     }
 
     function isMatchResolvedForProgression(match) {
@@ -369,6 +416,41 @@ document.addEventListener('DOMContentLoaded', async () => {
             set(ref(db, 'tournaments/current'), payload),
             tournamentState.tournamentCode ? set(ref(db, `tournaments/${tournamentState.tournamentCode}`), payload) : Promise.resolve()
         ]);
+    }
+
+    async function recalculateGeneralRanking() {
+        if (!db) {
+            generalRankingCache = [];
+            return generalRankingCache;
+        }
+        const snap = await get(ref(db, 'imports'));
+        const stats = {};
+        if (snap.exists()) {
+            snap.forEach(child => {
+                const item = child.val() || {};
+                if (item?.isTestMode === true || item?.isTestData === true) return;
+                if (item?.modality && rankingViewMode === 'general') {
+                    const filter = document.getElementById('ranking-modality-filter')?.value || 'todos';
+                    if (filter !== 'todos' && item.modality !== filter) return;
+                }
+                const ranking = item.rankingFinal || Object.values(item.generalStats || {});
+                ranking.forEach((row, idx) => {
+                    const name = row.name;
+                    if (!isRealPlayer(name)) return;
+                    if (!stats[name]) stats[name] = { name, titulos: 0, finais: 0, semifinais: 0, copas: 0, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0, apr: 0 };
+                    const s = stats[name];
+                    s.copas += 1;
+                    s.j += row.j || 0; s.v += row.v || 0; s.e += row.e || 0; s.d += row.d || 0;
+                    s.gp += row.gp || 0; s.gc += row.gc || 0; s.pts += row.pts || 0;
+                    if (idx === 0 || item.champion === name) s.titulos += 1;
+                    if (idx <= 1 || item.vice === name) s.finais += 1;
+                    if (idx <= 3) s.semifinais += 1;
+                });
+            });
+        }
+        generalRankingCache = Object.values(stats).map(s => ({ ...s, sg: s.gp - s.gc, apr: s.j ? (s.pts / (s.j * 3)) * 100 : 0 }))
+            .sort((a, b) => b.titulos - a.titulos || b.finais - a.finais || b.semifinais - a.semifinais || b.pts - a.pts || b.v - a.v || b.sg - a.sg || b.gp - a.gp || a.name.localeCompare(b.name, 'pt-BR'));
+        return generalRankingCache;
     }
 
     function openKnockoutEdit(type, rIdx, mIdx) {
@@ -1292,6 +1374,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    async function renderRanking() {
+        const tbody = document.getElementById('ranking-tbody');
+        const highlights = document.getElementById('ranking-highlights');
+        const cards = document.getElementById('ranking-cards');
+        const top3 = document.getElementById('ranking-top3');
+        const headRow = document.getElementById('ranking-head-row');
+        if (!tbody || !highlights || !cards || !headRow) return;
+
+        const search = (rankingSearchTerm || '').toLowerCase();
+        let rows = [];
+        if (rankingViewMode === 'current') {
+            const stats = Object.values(recalculateCurrentCupRanking() || {});
+            rows = stats.sort((a, b) => b.pts - a.pts || b.v - a.v || b.sg - a.sg || b.gp - a.gp || a.gc - b.gc || (b.phaseScore || 0) - (a.phaseScore || 0) || a.name.localeCompare(b.name, 'pt-BR'));
+            headRow.innerHTML = `<th>#</th><th style="text-align:left;">Jogador</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th>PTS</th><th>APR</th><th>Fase</th><th>Status</th>`;
+        } else {
+            rows = await recalculateGeneralRanking();
+            headRow.innerHTML = `<th>#</th><th style="text-align:left;">Jogador</th><th>🏆</th><th>Finais</th><th>Semis</th><th>Copas</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th>PTS</th><th>APR</th>`;
+        }
+        if (search) rows = rows.filter(r => (r.name || '').toLowerCase().includes(search));
+
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;">Sem dados de ranking.</td></tr>';
+            cards.innerHTML = '';
+            top3.innerHTML = '';
+            highlights.innerHTML = '';
+            return;
+        }
+        tbody.innerHTML = rows.map((r, i) => rankingViewMode === 'current'
+            ? `<tr><td>${i + 1}</td><td style="text-align:left;">${formatName(r.name)}</td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.d}</td><td>${r.gp}</td><td>${r.gc}</td><td>${r.sg > 0 ? '+' : ''}${r.sg}</td><td>${r.pts}</td><td>${(r.apr || 0).toFixed(1)}%</td><td>${r.phase || '—'}</td><td>${r.status || '—'}</td></tr>`
+            : `<tr><td>${i + 1}</td><td style="text-align:left;">${formatName(r.name)}</td><td>${r.titulos}</td><td>${r.finais}</td><td>${r.semifinais}</td><td>${r.copas}</td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.d}</td><td>${r.gp}</td><td>${r.gc}</td><td>${r.sg > 0 ? '+' : ''}${r.sg}</td><td>${r.pts}</td><td>${(r.apr || 0).toFixed(1)}%</td></tr>`
+        ).join('');
+        cards.innerHTML = rows.map((r, i) => `<article class="ranking-player-card"><div class="ranking-player-top"><div class="ranking-player-position">#${i + 1}</div><strong>${formatName(r.name)}</strong></div><div class="ranking-player-stats"><span class="ranking-chip">PTS: ${r.pts || 0}</span><span class="ranking-chip">J: ${r.j || 0}</span><span class="ranking-chip">V: ${r.v || 0}</span><span class="ranking-chip">SG: ${(r.sg || 0) > 0 ? '+' : ''}${r.sg || 0}</span></div></article>`).join('');
+        top3.innerHTML = rows.slice(0, 3).map((r, i) => `<div class="ranking-top3-card pos-${i + 1}">${['🥇','🥈','🥉'][i]} ${formatName(r.name)}</div>`).join('');
+        highlights.innerHTML = `<div class="ranking-highlight-card"><span>Jogadores</span><strong>${rows.length}</strong></div><div class="ranking-highlight-card"><span>Jogos</span><strong>${rows.reduce((n, r) => n + (r.j || 0), 0)}</strong></div><div class="ranking-highlight-card"><span>Gols</span><strong>${rows.reduce((n, r) => n + (r.gp || 0), 0)}</strong></div><div class="ranking-highlight-card"><span>Líder</span><strong>${formatName(rows[0].name)}</strong></div>`;
+    }
+
     function renderTournamentFromState(isPreview = false) {
         // Groups
         groupsContainer.innerHTML = '';
@@ -1403,9 +1521,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Mata-mata
         const mataMataContainer = document.getElementById('tab-mata-mata');
         if (mataMataContainer) {
+            const groupsPending = (tournamentState.groups || []).some(group => (group.matches || []).some(m => m.gHome === '' || m.gAway === ''));
+            const repechagePending = (tournamentState.knockout?.repechage || []).some(m => !isMatchResolvedForProgression(m));
             if (tournamentState.knockout) {
-                let bracketHTML = `<div class="mata-mata-tab"><div class="bracket-scroll-area"><div class="bracket-scroll-shell"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
+                let bracketHTML = `<div class="mata-mata-tab"><div class="knockout-scroll-indicator">Arraste para o lado para ver as próximas fases</div><div class="knockout-scroll-container"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
                                     ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
+                if ((tournamentState.groups || []).length && groupsPending) {
+                    bracketHTML += `<div class="empty-state"><i class="ph ph-warning-circle"></i><h3>Mata-mata bloqueado</h3><p>Finalize todos os jogos da fase de grupos para gerar o mata-mata.</p></div>`;
+                    mataMataContainer.innerHTML = bracketHTML + `</div></div></div>`;
+                    renderRanking();
+                    return;
+                }
+                if ((tournamentState.knockout?.repechage || []).length && repechagePending) {
+                    bracketHTML += `<div class="empty-state"><i class="ph ph-warning-circle"></i><h3>Repescagem pendente</h3><p>Finalize a repescagem para definir os classificados do mata-mata.</p></div>`;
+                    mataMataContainer.innerHTML = bracketHTML + `</div></div></div>`;
+                    renderRanking();
+                    return;
+                }
                 
                 // Helper: render a single bracket match card
                 function renderBracketMatch(match, type, rIdx, mIdx) {
@@ -1437,7 +1569,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ? `<button class="btn-test-inline" data-test-action="knockout-match-sim" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}">Simular confronto</button>`
                         : '';
                     return `
-                        <div class="bracket-match ${hasResult ? 'has-result' : ''}">
+                        <div class="bracket-match ${hasResult ? 'has-result' : ''} ${winner ? 'finished' : ''}">
                             <span class="bracket-status">${statusText}</span>
                             <div class="${p1Class}">
                                 <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${formatName(displayParticipantName(match.p1))}</span>
@@ -1448,6 +1580,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <span class="slot-score">${score2}</span>
                             </div>
                             ${penaltyBadge}
+                            ${match.walkover && winner ? `<div class="penalty-badge">Classificado automaticamente: ${formatName(winner)}</div>` : ''}
                             ${testSimBtn}
                             ${showBtn ? `<button class="btn-edit-knockout" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar Resultado"><i class="ph ph-pencil-simple"></i></button>` : ''}
                         </div>`;
@@ -1486,7 +1619,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 }
                 
-                bracketHTML += `</div></div></div></div>`;
+                bracketHTML += `</div></div></div>`;
                 mataMataContainer.innerHTML = bracketHTML;
 
                 // Add Listeners
@@ -1499,10 +1632,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 });
             } else {
-                mataMataContainer.innerHTML = `<div class="mata-mata-tab"><div class="bracket-scroll-area"><div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div></div></div>`;
+                mataMataContainer.innerHTML = `<div class="mata-mata-tab"><div class="knockout-scroll-container"><div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div></div></div>`;
             }
             checkAndOpenNextPhaseModal();
         }
+        renderRanking();
     }
 
     // ========== TABS NAVIGATION ==========
@@ -1737,6 +1871,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function exitTestMode(clearData = false) {
         if (!testModeActive) return;
+        tournamentState.isTestMode = false;
+        tournamentState.testPanelOpen = false;
+        tournamentState.selectedTestAction = null;
+        tournamentState.testToolbarVisible = false;
+        tournamentState.testLogsCollapsed = false;
+        tournamentState.currentTestOverlay = null;
+        document.body.classList.remove('test-mode', 'test-mode-active');
+        document.querySelectorAll('.test-mode-overlay, .test-warning-banner').forEach(el => el.remove());
         if (clearData && testModeBackupState) {
             tournamentState = JSON.parse(JSON.stringify(testModeBackupState));
             renderTournamentFromState();
@@ -1747,7 +1889,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         testModeActive = false;
         testModeBackupState = null;
+        await persistCurrentTournament({ isTestMode: false, __allowPersistInTestMode: true });
         renderTestModeUI();
+        renderTournamentFromState();
     }
 
     async function withSensitiveGuard(actionId, fn) {

@@ -21,6 +21,7 @@ export function initRankingSystem(db, role) {
     const rankingTbody = document.getElementById('ranking-tbody');
     const rankingHighlights = document.getElementById('ranking-highlights');
     const rankingCards = document.getElementById('ranking-cards');
+    const customCupRankingUI = !!document.getElementById('ranking-view-current');
 
     let currentParsedData = null;
 
@@ -385,7 +386,7 @@ export function initRankingSystem(db, role) {
         `;
     }
 
-    if (rankingModalityFilter) {
+    if (rankingModalityFilter && !customCupRankingUI) {
         rankingModalityFilter.addEventListener('change', (e) => {
             loadRanking(e.target.value);
         });
@@ -479,6 +480,8 @@ export function initRankingSystem(db, role) {
     });
 
     // Initialize initial loads
-    loadRanking('fifa');
+    if (!customCupRankingUI) {
+        loadRanking('fifa');
+    }
     loadImportHistory();
 }

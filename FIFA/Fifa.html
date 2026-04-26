@@ -317,42 +317,47 @@
             <!-- TAB 3: RANKING -->
             <div id="tab-ranking" class="tab-content" style="display: none;">
                 <div id="test-toolbar-ranking" class="context-test-toolbar" style="display:none;"></div>
-                <div class="card" style="background: rgba(255,255,255,0.55); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.8); border-radius: 20px; padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,60,20,0.05);">
-                    <div class="bracket-bar" style="margin-bottom: 1rem;">
-                        <h2 style="color: #042D15;">Ranking Oficial</h2>
-                        <select id="ranking-modality-filter" class="form-control" style="max-width: 200px; background: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.9); border-radius: 12px; padding: 0.6rem 1rem; color: #042D15; font-weight: 600; font-size: 0.85rem;">
-                            <option value="fifa" selected>FIFA</option>
-                            <option value="geral">Geral (Todos)</option>
+                <div class="ranking-shell">
+                    <div class="ranking-header-row">
+                        <h2>Ranking Oficial</h2>
+                        <div class="ranking-segmented">
+                            <button id="ranking-view-current" class="ranking-tab-btn active" data-ranking-view="current">Copa Atual</button>
+                            <button id="ranking-view-general" class="ranking-tab-btn" data-ranking-view="general">Ranking Geral</button>
+                        </div>
+                    </div>
+                    <div class="ranking-toolbar">
+                        <select id="ranking-modality-filter" class="form-control ranking-filter-select">
+                            <option value="todos" selected>Todos</option>
+                            <option value="fifa">FIFA</option>
                             <option value="sinuca">Sinuca</option>
-                            <option value="cs">Counter-Strike</option>
+                            <option value="cs">CS</option>
                         </select>
+                        <input id="ranking-player-search" class="form-control ranking-search-input" type="search" placeholder="Buscar jogador...">
                     </div>
+                    <div class="ranking-highlights" id="ranking-highlights"></div>
+                    <div id="ranking-top3" class="ranking-top3"></div>
 
-                    <div class="ranking-highlights" id="ranking-highlights">
-                        <!-- Cards de destaque: Maior Campeão, Artilheiro, Melhor Defesa -->
-                    </div>
-
-                    <div class="table-responsive" style="overflow-x: auto;">
-                        <table class="group-table ranking-table" style="min-width: 800px;">
+                    <div class="table-responsive ranking-table-wrap">
+                        <table class="group-table ranking-table ranking-table-modern">
                             <thead>
-                                <tr>
+                                <tr id="ranking-head-row">
                                     <th>#</th>
                                     <th style="text-align:left;">Jogador</th>
-                                    <th>🏆 Títulos</th>
-                                    <th>PTS</th>
                                     <th>J</th>
                                     <th>V</th>
                                     <th>E</th>
                                     <th>D</th>
-                                    <th>GM</th>
-                                    <th>GS</th>
+                                    <th>GP</th>
+                                    <th>GC</th>
                                     <th>SG</th>
-                                    <th>% Aprov</th>
+                                    <th>PTS</th>
+                                    <th>APR</th>
+                                    <th>Fase</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody id="ranking-tbody">
-                                <!-- Tabela Injetada -->
-                                <tr><td colspan="12" style="text-align:center;">Carregando ranking...</td></tr>
+                                <tr><td colspan="13" style="text-align:center;">Carregando ranking...</td></tr>
                             </tbody>
                         </table>
                     </div>
