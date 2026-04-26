@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, get, set, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCL2u-oSlw8EWQ96atPI9Tc-0cIl2k9K6M",
@@ -16,6 +16,49 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 document.addEventListener('DOMContentLoaded', () => {
+    const CODE_REGEX_BY_MODALITY = {
+        fifa: /^[F][A-Z0-9]{4}$/,
+        sinuca: /^[S][A-Z0-9]{4}$/,
+        cs: /^[C][A-Z0-9]{4}$/
+    };
+
+    async function sha256Hex(value) {
+        const encoded = new TextEncoder().encode(value);
+        const hash = await crypto.subtle.digest('SHA-256', encoded);
+        return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function createParticipantId() {
+        return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function normalizeParticipant(raw = {}) {
+        return {
+            id: raw.id || raw.participantId || null,
+            name: raw.name || raw.nome || '',
+            nick: raw.nick || '',
+            cpfHash: raw.cpfHash || null,
+            whatsapp: raw.whatsapp || raw.whats || '',
+            instagram: raw.instagram || raw.insta || '',
+            flagId: raw.flagId || raw.teamName || raw.flag || 'br',
+            countryCode: (raw.countryCode || 'br').toLowerCase(),
+            photoUrl: raw.photoUrl || raw.photo || raw.fotoURL || null,
+            createdAt: raw.createdAt || new Date().toISOString()
+        };
+    }
+
+    function normalizeCodeEntry(raw) {
+        const status = raw.status || (raw.used ? 'used' : 'available');
+        return {
+            ...raw,
+            status,
+            used: status === 'used',
+            participantId: raw.participantId || raw.usedBy || null,
+            usedBy: raw.usedBy || raw.participantId || null,
+            usedAt: raw.usedAt || null
+        };
+    }
+
     // TELA 0: CÓDIGO
     const formCodigo = document.getElementById('form-codigo');
     const inputCodigo = document.getElementById('participante-codigo');
@@ -170,6 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (formCpfDireto) {
         formCpfDireto.addEventListener('submit', async (e) => {
             e.preventDefault();
+            alert('Por segurança, o acesso direto por CPF foi desativado. Use o código de acesso do organizador.');
+            return;
             const cpfRaw = cpfDiretoInput.value.replace(/\D/g, '');
             if (cpfRaw.length !== 11) {
                 alert('Por favor, informe um CPF válido (11 dígitos).');
@@ -182,13 +227,17 @@ document.addEventListener('DOMContentLoaded', () => {
             btnSubmit.disabled = true;
 
             try {
-                const docRef = ref(db, 'participants/' + cpfRaw);
+                const cpfHash = await sha256Hex(cpfRaw);
+                const idxSnap = await get(ref(db, 'participantsByCpfHash/' + cpfHash));
+                const participantId = idxSnap.exists() ? idxSnap.val() : null;
+                const docRef = participantId ? ref(db, 'participants/' + participantId) : ref(db, 'participants/' + cpfRaw);
                 const docSnap = await get(docRef);
 
                 if (docSnap.exists()) {
-                    const data = docSnap.val();
+                    const data = normalizeParticipant(docSnap.val());
+                    const publicId = data.id || participantId || cpfRaw;
                     // Redirecionar para a área do participante
-                    window.location.href = `FIFA/Fifa.html?role=participante&id=${cpfRaw}&name=${encodeURIComponent(data.nome)}`;
+                    window.location.href = `FIFA/Fifa.html?role=participante&id=${encodeURIComponent(publicId)}&name=${encodeURIComponent(data.name)}`;
                 } else {
                     alert('CPF não encontrado. Você precisa de um código de acesso para se cadastrar primeiro.');
                 }
@@ -211,6 +260,10 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const code = inputCodigo.value.trim().toUpperCase();
         if (!code) return;
+        if (!CODE_REGEX_BY_MODALITY.fifa.test(code)) {
+            alert('Código inválido para FIFA. Use o formato F1234.');
+            return;
+        }
 
         const btnSubmit = formCodigo.querySelector('button[type="submit"]');
         const originalText = btnSubmit.textContent;
@@ -223,12 +276,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (docSnap.exists()) {
                 const data = docSnap.val();
-                const codesArray = data.codes || [];
-                
+                const codesArray = (data.codes || []).map(normalizeCodeEntry);
                 const codeObj = codesArray.find(c => c.code === code);
                 
                 if (codeObj) {
-                    if (codeObj.used) {
+                    if (codeObj.status === 'used') {
                         alert('Este código já foi utilizado.');
                     } else {
                         validCodeData = code;
@@ -306,13 +358,16 @@ document.addEventListener('DOMContentLoaded', () => {
             btnSubmit.disabled = true;
 
             try {
-                const docRef = ref(db, 'participants/' + cpfRaw);
+                const cpfHash = await sha256Hex(cpfRaw);
+                const idxSnap = await get(ref(db, 'participantsByCpfHash/' + cpfHash));
+                const participantId = idxSnap.exists() ? idxSnap.val() : null;
+                const docRef = participantId ? ref(db, 'participants/' + participantId) : ref(db, 'participants/' + cpfRaw);
                 const docSnap = await get(docRef);
 
                 if (docSnap.exists()) {
-                    const existingData = docSnap.val();
+                    const existingData = normalizeParticipant(docSnap.val());
                     await markCodeAsUsed(validCodeData, existingData);
-                    window.location.href = `FIFA/Fifa.html?role=participante&id=${cpfRaw}`;
+                    window.location.href = `FIFA/Fifa.html?role=participante&id=${encodeURIComponent(existingData.id || participantId || cpfRaw)}`;
                 } else {
                     if (confirm('Não encontramos seu cadastro. Verifique o CPF ou faça um novo cadastro.\nDeseja fazer um novo cadastro agora?')) {
                         screenLogin.style.display = 'none';
@@ -355,10 +410,14 @@ document.addEventListener('DOMContentLoaded', () => {
             btnSubmit.disabled = true;
 
             try {
+                const participantId = createParticipantId();
+                const cpfHash = await sha256Hex(cpfRaw);
+
                 // Check CPF
-                const docRef = ref(db, 'participants/' + cpfRaw);
-                const docSnap = await get(docRef);
-                if (docSnap.exists()) {
+                const hashIdxRef = ref(db, 'participantsByCpfHash/' + cpfHash);
+                const hashIdxSnap = await get(hashIdxRef);
+                const legacySnap = await get(ref(db, 'participants/' + cpfRaw));
+                if (hashIdxSnap.exists() || legacySnap.exists()) {
                     alert('Este CPF já está cadastrado!');
                     btnSubmit.textContent = originalText;
                     btnSubmit.disabled = false;
@@ -398,24 +457,34 @@ document.addEventListener('DOMContentLoaded', () => {
             const countryCode = countryCodeMap[document.getElementById('reg-pais').value] || 'br';
 
             // Save
-            const newParticipant = {
+            const normalized = normalizeParticipant({
+                id: participantId,
+                name: nome,
+                nick,
+                cpfHash,
+                whatsapp: whats,
+                instagram: insta,
+                flagId: flag,
+                teamName: flag,
+                countryCode,
+                photoUrl: photoBase64,
+                createdAt: new Date().toISOString(),
+                // compatibilidade legada
                 nome,
                 cpf: cpfRaw,
-                flag, // Team name
-                countryCode,
+                flag,
                 insta,
                 whats,
-                nick,
-                photo: photoBase64,
-                createdAt: new Date().toISOString()
-            };
+                photo: photoBase64
+            });
 
-                await set(docRef, newParticipant);
+                await set(ref(db, 'participants/' + participantId), normalized);
+                await set(hashIdxRef, participantId);
                 
-                await markCodeAsUsed(validCodeData, newParticipant);
+                await markCodeAsUsed(validCodeData, normalized);
 
                 alert('Cadastro realizado com sucesso!');
-                window.location.href = `FIFA/Fifa.html?role=participante&id=${cpfRaw}`;
+                window.location.href = `FIFA/Fifa.html?role=participante&id=${encodeURIComponent(participantId)}`;
                 
             } catch (error) {
                 console.error('Erro no cadastro:', error);
@@ -426,9 +495,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    async function consumeAccessCodeAtomically(codeStr, participantId) {
+        if (!codeStr) return true;
+        const cRef = ref(db, 'codes/pool');
+        const tx = await runTransaction(cRef, (current) => {
+            if (!current || !Array.isArray(current.codes)) return current;
+            const normalizedCodes = current.codes.map(normalizeCodeEntry);
+            const idx = normalizedCodes.findIndex(c => c.code === codeStr);
+            if (idx < 0) return;
+            if (normalizedCodes[idx].status === 'used') return;
+            normalizedCodes[idx] = {
+                ...normalizedCodes[idx],
+                status: 'used',
+                used: true,
+                participantId,
+                usedBy: participantId,
+                usedAt: new Date().toISOString()
+            };
+            current.codes = normalizedCodes;
+            return current;
+        });
+        return !!tx.committed;
+    }
+
     async function markCodeAsUsed(codeStr, participantData) {
         if (!codeStr) return;
         try {
+            const codeConsumed = await consumeAccessCodeAtomically(codeStr, participantData?.id || participantData?.cpf);
+            if (!codeConsumed) {
+                alert('Este código foi utilizado por outro participante. Solicite um novo código ao organizador.');
+                return;
+            }
+
             // 2. Adicionar ao torneio e encaixar no chaveamento
             if (participantData) {
                 const tRef = ref(db, 'tournaments/current');
@@ -438,33 +536,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     let regPlayers = tData.registeredPlayers || [];
 
                     // Evitar duplicidade
-                    if (regPlayers.find(p => p.id === participantData.cpf)) {
+                    const participantId = participantData.id || participantData.cpf;
+                    if (regPlayers.find(p => p.id === participantId)) {
                         alert('Você já está inscrito neste torneio!');
                         return; // Não marca o código como usado nem faz nada
                     }
 
-                    // 1. Marcar código como usado (moved after check)
-                    const cRef = ref(db, 'codes/pool');
-                    const cSnap = await get(cRef);
-                    if (cSnap.exists()) {
-                        const data = cSnap.val();
-                        const codesArray = data.codes || [];
-                        const updatedCodes = codesArray.map(c => {
-                            if (c.code === codeStr) {
-                                return { ...c, used: true, usedBy: participantData.cpf };
-                            }
-                            return c;
-                        });
-                        await update(cRef, { codes: updatedCodes });
-                    }
-
                     regPlayers.push({
-                            id: participantData.cpf,
-                            name: participantData.nome,
+                            id: participantId,
+                            name: participantData.name || participantData.nome,
                             nick: participantData.nick || "",
-                            flagId: participantData.flag || "br",
+                            flagId: participantData.flagId || participantData.flag || "br",
                             countryCode: participantData.countryCode || "br",
-                            photo: participantData.photo || null
+                            photo: participantData.photoUrl || participantData.photo || null
                         });
 
                         // 3. ENCAIXAR NO CHAVEAMENTO — Fase de Grupos
@@ -473,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             for (let g = 0; g < tData.groups.length && !placed; g++) {
                                 for (let p = 0; p < tData.groups[g].players.length && !placed; p++) {
                                     if (tData.groups[g].players[p].name.startsWith('A definir')) {
-                                        tData.groups[g].players[p].name = participantData.nome;
+                                        tData.groups[g].players[p].name = participantData.name || participantData.nome;
                                         placed = true;
                                     }
                                 }
@@ -486,10 +570,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (firstRound && firstRound.matches) {
                                 for (let m = 0; m < firstRound.matches.length && !placed; m++) {
                                     if (firstRound.matches[m].p1.startsWith('A definir') || firstRound.matches[m].p1.startsWith('Classificado')) {
-                                        firstRound.matches[m].p1 = participantData.nome;
+                                        firstRound.matches[m].p1 = participantData.name || participantData.nome;
                                         placed = true;
                                     } else if (firstRound.matches[m].p2.startsWith('A definir') || firstRound.matches[m].p2.startsWith('Classificado')) {
-                                        firstRound.matches[m].p2 = participantData.nome;
+                                        firstRound.matches[m].p2 = participantData.name || participantData.nome;
                                         placed = true;
                                     }
                                 }
@@ -511,7 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             await update(ref(db, 'tournaments/' + tData.tournamentCode), updateData);
                         }
 
-                        console.log(`✅ ${participantData.nome} encaixado no chaveamento!`);
+                        console.log(`✅ ${participantData.name || participantData.nome} encaixado no chaveamento!`);
                     }
                 }
             } catch(e) {

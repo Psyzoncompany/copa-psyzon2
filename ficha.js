@@ -23,10 +23,33 @@ const statCodesAvail = document.getElementById('stat-codes-avail');
 
 let allParticipants = [];
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function normalizeParticipant(raw = {}) {
+    return {
+        id: raw.id || raw.participantId || raw.cpf || '',
+        nome: raw.nome || raw.name || 'Sem nome',
+        nick: raw.nick || '',
+        cpf: raw.cpf || '',
+        whats: raw.whatsapp || raw.whats || '',
+        insta: raw.instagram || raw.insta || '',
+        countryCode: (raw.countryCode || 'br').toLowerCase(),
+        photo: raw.photoUrl || raw.photo || raw.fotoURL || null,
+        createdAt: raw.createdAt || null
+    };
+}
+
 // ========== FLAG MAP ==========
 const flagNames = {
     br: 'Brasil', ar: 'Argentina', fr: 'França', de: 'Alemanha',
-    es: 'Espanha', en: 'Inglaterra', it: 'Itália', pt: 'Portugal',
+    es: 'Espanha', gb: 'Inglaterra', it: 'Itália', pt: 'Portugal',
     nl: 'Holanda', uy: 'Uruguai'
 };
 
@@ -50,15 +73,15 @@ function renderFichas(list) {
         return;
     }
 
-    list.forEach(p => {
+    list.map(normalizeParticipant).forEach(p => {
         const card = document.createElement('div');
         card.className = 'ficha-card';
 
-        const avatarContent = p.fotoURL
-            ? `<img src="${p.fotoURL}" alt="${p.nome}">`
+        const avatarContent = p.photo
+            ? `<img src="${p.photo}" alt="${escapeHtml(p.nome)}">`
             : `<i class="ph-fill ph-user"></i>`;
 
-        const flagCode = p.flag || 'br';
+        const flagCode = (p.countryCode || 'br').toLowerCase();
         const flagName = flagNames[flagCode] || flagCode.toUpperCase();
 
         const createdDate = p.createdAt
@@ -69,12 +92,12 @@ function renderFichas(list) {
             <div class="ficha-card-header">
                 <div class="ficha-avatar">${avatarContent}</div>
                 <div class="ficha-name-block">
-                    <div class="ficha-name">${p.nome || 'Sem nome'}</div>
-                    <div class="ficha-nick">${p.nick || 'Sem nick'}</div>
+                    <div class="ficha-name">${escapeHtml(p.nome || 'Sem nome')}</div>
+                    <div class="ficha-nick">${escapeHtml(p.nick || 'Sem nick')}</div>
                 </div>
                 <div class="ficha-flag-badge">
                     <img src="https://flagcdn.com/24x18/${flagCode}.png" alt="${flagName}">
-                    ${flagName}
+                    ${escapeHtml(flagName)}
                 </div>
                 <button class="btn-delete-ficha" data-cpf="${p.cpf}" title="Apagar Cadastro">
                     <i class="ph ph-trash"></i>
@@ -87,11 +110,11 @@ function renderFichas(list) {
                 </div>
                 <div class="ficha-detail">
                     <i class="ph ph-whatsapp-logo"></i>
-                    <span>${p.whats || '—'}</span>
+                    <span>${escapeHtml(p.whats || '—')}</span>
                 </div>
                 <div class="ficha-detail">
                     <i class="ph ph-instagram-logo"></i>
-                    <span>${p.insta || '—'}</span>
+                    <span>${escapeHtml(p.insta || '—')}</span>
                 </div>
                 <div class="ficha-date">Cadastrado em: ${createdDate}</div>
             </div>
@@ -102,12 +125,13 @@ function renderFichas(list) {
         if (deleteBtn) {
             deleteBtn.addEventListener('click', async () => {
                 const cpf = deleteBtn.dataset.cpf;
-                if (!cpf) return;
+                const participantId = p.id || cpf;
+                if (!participantId) return;
 
                 if (confirm(`🚨 ATENÇÃO: Deseja apagar permanentemente o cadastro de ${p.nome}?\n\nIsso removerá o jogador do sistema, liberará o código de acesso e o removerá de torneios ativos.`)) {
                     try {
                         // 1. Remover de participants/
-                        await remove(ref(db, 'participants/' + cpf));
+                        await remove(ref(db, 'participants/' + participantId));
 
                         // 2. Liberar código em codes/pool
                         const poolSnap = await get(ref(db, 'codes/pool'));
@@ -115,7 +139,9 @@ function renderFichas(list) {
                             const poolData = poolSnap.val();
                             const codes = poolData.codes || [];
                             const updatedCodes = codes.map(c => {
-                                if (c.usedBy === cpf) return { ...c, used: false, usedBy: null };
+                                if (c.usedBy === participantId || c.participantId === participantId) {
+                                    return { ...c, status: 'available', used: false, usedBy: null, participantId: null, usedAt: null };
+                                }
                                 return c;
                             });
                             await update(ref(db, 'codes/pool'), { codes: updatedCodes });
@@ -127,7 +153,7 @@ function renderFichas(list) {
                         if (tSnap.exists()) {
                             const tData = tSnap.val();
                             const regPlayers = tData.registeredPlayers || [];
-                            const filtered = regPlayers.filter(pl => pl.id !== cpf);
+                            const filtered = regPlayers.filter(pl => pl.id !== participantId);
                             if (filtered.length !== regPlayers.length) {
                                 await update(tRef, { registeredPlayers: filtered });
                             }
