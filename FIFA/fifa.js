@@ -6,6 +6,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { initRankingSystem } from './ranking.js';
 
 const firebaseConfig = {
@@ -21,11 +22,13 @@ const firebaseConfig = {
 
 let db = null;
 let analytics = null;
+let auth = null;
 try {
     if (firebaseConfig.apiKey !== "SUA_API_KEY") {
         const app = initializeApp(firebaseConfig);
         analytics = getAnalytics(app);
         db = getDatabase(app);
+        auth = getAuth(app);
         console.log("🔥 Firebase inicializado!");
     } else {
         console.warn("⚠️ Firebase: Configure sua API Key no fifa.js para ativar a nuvem.");
@@ -38,7 +41,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ========== ROLE DETECTION ==========
     const urlParams = new URLSearchParams(window.location.search);
-    const role = urlParams.get('role') || 'visitante';
+    const requestedRole = urlParams.get('role') || 'visitante';
+    let role = requestedRole;
     const participantId = urlParams.get('id') || null;
     const participantName = urlParams.get('name') ? decodeURIComponent(urlParams.get('name')) : null;
 
@@ -46,6 +50,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const organizerPanel = document.getElementById('organizer-panel');
     const btnExitTopbar = document.getElementById('btn-exit-topbar');
     const btnToggleOrganizer = document.getElementById('btn-toggle-organizer');
+    let isOrganizerAuthorized = false;
+
+    if (requestedRole === 'organizador') {
+        role = 'visitante';
+    }
 
     if (role === 'organizador') {
         if (organizerPanel) organizerPanel.style.display = 'flex';
@@ -85,8 +94,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     badge.style.background = s.bg;
     badge.style.color = s.color;
 
-    if (role === 'organizador') {
-        organizerPanel.style.display = 'flex';
+    const applyRoleUI = (nextRole) => {
+        role = nextRole;
+        if (role === 'organizador') {
+            if (organizerPanel) organizerPanel.style.display = 'flex';
+            if (btnExitTopbar) btnExitTopbar.style.display = 'none';
+            if (btnToggleOrganizer) btnToggleOrganizer.style.display = 'flex';
+        } else {
+            if (organizerPanel) organizerPanel.style.display = 'none';
+            if (btnExitTopbar) btnExitTopbar.style.display = 'flex';
+            if (btnToggleOrganizer) btnToggleOrganizer.style.display = 'none';
+        }
+
+        if (role === 'participante' && participantName) {
+            badge.textContent = participantName;
+        } else {
+            badge.textContent = role.toUpperCase();
+        }
+        const currentRoleStyle = roleStyles[role] || roleStyles.visitante;
+        badge.style.background = currentRoleStyle.bg;
+        badge.style.color = currentRoleStyle.color;
+    };
+
+    if (requestedRole === 'organizador' && auth) {
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                isOrganizerAuthorized = false;
+                window.location.href = '../index.html';
+                return;
+            }
+            isOrganizerAuthorized = true;
+            applyRoleUI('organizador');
+        });
     }
 
     // Inicializa o módulo de Ranking
@@ -135,15 +174,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editS1 = document.getElementById('edit-s1');
     const editS2 = document.getElementById('edit-s2');
     const btnSaveKnockout = document.getElementById('btn-save-knockout');
-    const SENSITIVE_PASSWORD = '153090';
     const SENSITIVE_IDS = new Set([
         'btn-encerrar', 'btn-resetar', 'btn-resetar-tudo', 'btn-apagar-cadastro', 'btn-resetar-codigos',
         'btn-toggle-test-mode', 'btn-test-exit-clear', 'btn-test-sim-full', 'btn-test-reset-all',
         'btn-test-save-firebase', 'btn-test-remove-firebase', 'btn-test-history-remove', 'btn-test-ranking-clear'
     ]);
     const modalSensitivePassword = document.getElementById('modal-sensitive-password');
-    const sensitivePasswordInput = document.getElementById('sensitive-password-input');
-    const sensitivePasswordError = document.getElementById('sensitive-password-error');
     const btnConfirmSensitivePassword = document.getElementById('btn-confirm-sensitive-password');
     const modalNextPhase = document.getElementById('modal-next-phase');
     const nextPhaseOrderInput = document.getElementById('next-phase-order-input');
@@ -491,6 +527,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isRealPlayer(match.winner)) return match.winner;
         const byeWinner = getByeAutoWinner(match);
         if (byeWinner) return byeWinner;
+        const hasHomeAway = tournamentState.homeAway &&
+            match.idaS1 !== '' && match.idaS2 !== '' && match.voltaS1 !== '' && match.voltaS2 !== '' &&
+            match.idaS1 != null && match.idaS2 != null && match.voltaS1 != null && match.voltaS2 != null;
+        if (hasHomeAway) {
+            const ida1 = parseInt(match.idaS1);
+            const ida2 = parseInt(match.idaS2);
+            const volta1 = parseInt(match.voltaS1);
+            const volta2 = parseInt(match.voltaS2);
+            if ([ida1, ida2, volta1, volta2].some(Number.isNaN)) return null;
+            const agg1 = ida1 + volta2;
+            const agg2 = ida2 + volta1;
+            if (agg1 > agg2) return match.p1;
+            if (agg2 > agg1) return match.p2;
+            if (match.pen1 != null && match.pen2 != null && match.pen1 !== '' && match.pen2 !== '') {
+                const pen1 = parseInt(match.pen1);
+                const pen2 = parseInt(match.pen2);
+                if (Number.isNaN(pen1) || Number.isNaN(pen2) || pen1 === pen2) return null;
+                return pen1 > pen2 ? match.p1 : match.p2;
+            }
+            return null;
+        }
         const hasResult = match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null;
         if (!hasResult) return null;
         const s1 = parseInt(match.s1);
@@ -612,7 +669,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         const knockoutDone = knockoutMatches.length === 0 || knockoutMatches.every(m => {
             if (isDoubleByeMatch(m)) return true;
-            return m.s1 !== '' && m.s2 !== '' && getKnockoutMatchWinner(m);
+            if (tournamentState.homeAway) {
+                const hasLegs = m.idaS1 !== '' && m.idaS2 !== '' && m.voltaS1 !== '' && m.voltaS2 !== '';
+                return hasLegs && !!getKnockoutMatchWinner(m);
+            }
+            return m.s1 !== '' && m.s2 !== '' && !!getKnockoutMatchWinner(m);
         });
         return groupsDone && knockoutDone;
     }
@@ -2263,6 +2324,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function withSensitiveGuard(actionId, fn) {
+        if (requestedRole === 'organizador' && !isOrganizerAuthorized) {
+            window.location.href = '../index.html';
+            return;
+        }
         if (!SENSITIVE_IDS.has(actionId)) {
             await fn();
             return;
@@ -3095,20 +3160,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const textEl = document.querySelector('#modal-sensitive-password .modal-header p');
         const actionLabel = ACTION_LABELS[actionFn?.actionId] || 'Ação administrativa';
         if (titleEl) titleEl.textContent = 'Confirmar ação administrativa';
-        if (textEl) textEl.textContent = `Essa ação é sensível e precisa da senha do organizador (${actionLabel}).`;
-        if (sensitivePasswordInput) sensitivePasswordInput.value = '';
-        if (sensitivePasswordError) sensitivePasswordError.style.display = 'none';
+        if (textEl) textEl.textContent = `Confirme para executar: ${actionLabel}.`;
         modalSensitivePassword?.classList.add('active');
-        setTimeout(() => sensitivePasswordInput?.focus(), 30);
     }
 
     btnConfirmSensitivePassword?.addEventListener('click', async () => {
         if (!pendingSensitiveAction) {
             modalSensitivePassword?.classList.remove('active');
-            return;
-        }
-        if ((sensitivePasswordInput?.value || '').trim() !== SENSITIVE_PASSWORD) {
-            if (sensitivePasswordError) sensitivePasswordError.style.display = 'block';
             return;
         }
         modalSensitivePassword?.classList.remove('active');
@@ -3473,13 +3531,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     Object.entries(actions).forEach(([id, fn]) => {
         const btn = document.getElementById(id);
         if (!btn) return;
-        btn.addEventListener('click', () => {
-            if (SENSITIVE_IDS.has(id)) {
-                fn.actionId = id;
-                askSensitivePassword(fn);
-            } else {
-                fn();
-            }
+        btn.addEventListener('click', async () => {
+            await withSensitiveGuard(id, async () => fn());
         });
     });
 

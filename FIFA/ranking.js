@@ -25,6 +25,15 @@ export function initRankingSystem(db, role) {
 
     let currentParsedData = null;
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     // ----- IMPORT LOGIC -----
     if (btnPreviewImport && importFileInput) {
         btnPreviewImport.addEventListener('click', () => {
@@ -112,20 +121,20 @@ export function initRankingSystem(db, role) {
                     </div>
                 </div>
 
-                <button class="btn btn-primary" id="btn-confirm-import" style="width: 100%; background: #22c55e;">
+                <button class="btn btn-primary" id="btn-confirm-ranking-import" style="width: 100%; background: #22c55e;">
                     <i class="ph-bold ph-check"></i> Confirmar e Importar para o Ranking
                 </button>
             </div>
         `;
         importPreviewArea.style.display = 'block';
 
-        document.getElementById('btn-confirm-import').addEventListener('click', executeImport);
+        document.getElementById('btn-confirm-ranking-import').addEventListener('click', executeImport);
     }
 
     async function executeImport() {
         if (!currentParsedData) return;
         
-        const btn = document.getElementById('btn-confirm-import');
+        const btn = document.getElementById('btn-confirm-ranking-import');
         btn.disabled = true;
         btn.textContent = "Importando...";
 
@@ -134,7 +143,9 @@ export function initRankingSystem(db, role) {
         const semi1Id = document.getElementById('import-semi1').value;
         const semi2Id = document.getElementById('import-semi2').value;
 
-        const importId = currentParsedData.name.replace(/\s+/g, '_').toLowerCase();
+        const safeName = (currentParsedData.name || 'torneio').replace(/\s+/g, '_').toLowerCase();
+        const dateKey = new Date().toISOString().slice(0, 10);
+        const importId = `${safeName}_${currentParsedData.modality}_${dateKey}`;
         
         try {
             // Check if already imported
@@ -310,10 +321,10 @@ export function initRankingSystem(db, role) {
                     <td style="font-weight:bold; color: #042D15;">${medal}</td>
                     <td style="text-align:left; display:flex; align-items:center; gap:12px;">
                         <div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; background: #eee; flex-shrink: 0; border: 2px solid rgba(22,163,74,0.1); display: flex; align-items: center; justify-content: center;">
-                            ${p.photo ? `<img src="${p.photo}" style="width:100%; height:100%; object-fit:cover;">` : `<img src="https://flagcdn.com/w80/${p.countryCode || 'br'}.png" style="transform:scale(1.6); width:100%; height:100%; object-fit:cover;">`}
+                            ${(p.photo || p.fotoURL) ? `<img src="${p.photo || p.fotoURL}" style="width:100%; height:100%; object-fit:cover;">` : `<img src="https://flagcdn.com/w80/${(p.countryCode || 'br').toLowerCase()}.png" style="transform:scale(1.6); width:100%; height:100%; object-fit:cover;">`}
                         </div>
                         <div style="display:flex; flex-direction:column;">
-                            <span style="font-weight:600; color:#042D15;">${formatName(p.name)}</span>
+                            <span style="font-weight:600; color:#042D15;">${escapeHtml(formatName(p.name))}</span>
                         </div>
                     </td>
                     <td style="color:#D97706; font-weight:bold;">${s.titles > 0 ? s.titles : '-'}</td>
@@ -345,7 +356,7 @@ export function initRankingSystem(db, role) {
                     <article class="ranking-player-card">
                         <div class="ranking-player-top">
                             <div class="ranking-player-position">#${i + 1}</div>
-                            <strong>${formatName(p.name)}</strong>
+                            <strong>${escapeHtml(formatName(p.name))}</strong>
                             <span>${s.pts} pts</span>
                         </div>
                         <div class="ranking-player-stats">
@@ -369,17 +380,17 @@ export function initRankingSystem(db, role) {
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
                 <div style="background: rgba(217,119,6,0.1); padding: 15px; border-radius: 16px; border: 1px solid rgba(217,119,6,0.15); backdrop-filter: blur(8px);">
                     <div style="font-size:12px; color:#D97706; font-weight:bold; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">MAIOR CAMPEÃO</div>
-                    <div style="color:#042D15; font-size:18px; font-weight:800;">${formatName(list[0].name)}</div>
+                    <div style="color:#042D15; font-size:18px; font-weight:800;">${escapeHtml(formatName(list[0].name))}</div>
                     <div style="color:#51715C; font-size:13px;">${list[0].currentStats.titles} Títulos / ${list[0].currentStats.pts} PTS</div>
                 </div>
                 <div style="background: rgba(13,110,253,0.08); padding: 15px; border-radius: 16px; border: 1px solid rgba(13,110,253,0.12); backdrop-filter: blur(8px);">
                     <div style="font-size:12px; color:#0D6EFD; font-weight:bold; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">MÁQUINA DE GOLS</div>
-                    <div style="color:#042D15; font-size:18px; font-weight:800;">${formatName(topScorer.name)}</div>
+                    <div style="color:#042D15; font-size:18px; font-weight:800;">${escapeHtml(formatName(topScorer.name))}</div>
                     <div style="color:#51715C; font-size:13px;">${topScorer.currentStats.gp} Gols Marcados</div>
                 </div>
                 <div style="background: rgba(22,163,74,0.08); padding: 15px; border-radius: 16px; border: 1px solid rgba(22,163,74,0.12); backdrop-filter: blur(8px);">
                     <div style="font-size:12px; color:#16A34A; font-weight:bold; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">MELHOR DEFESA</div>
-                    <div style="color:#042D15; font-size:18px; font-weight:800;">${formatName(topDefense.name)}</div>
+                    <div style="color:#042D15; font-size:18px; font-weight:800;">${escapeHtml(formatName(topDefense.name))}</div>
                     <div style="color:#51715C; font-size:13px;">Apenas ${topDefense.currentStats.gc} Gols Sofridos</div>
                 </div>
             </div>

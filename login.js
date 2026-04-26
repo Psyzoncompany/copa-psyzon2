@@ -75,8 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const btnVisitante = document.querySelectorAll('.btn-role')[0]; // Participante is an <a> tag now, so btn-role[0] is Visitante
-    if (btnVisitante && btnVisitante.textContent.includes('Visitante')) {
+    const btnVisitante = document.getElementById('btn-visitante');
+    if (btnVisitante) {
         btnVisitante.addEventListener('click', () => {
             window.location.href = 'FIFA/Fifa.html?role=visitante';
         });
