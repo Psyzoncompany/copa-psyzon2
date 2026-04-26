@@ -1780,3 +1780,62 @@ body {
         background-attachment: scroll !important;
     }
 }
+
+/* Final transparency tuning: show the Sinuca background image through the glass */
+body {
+    background-image:
+        radial-gradient(circle at 7% 4%, rgba(255, 214, 64, 0.10), transparent 32%),
+        radial-gradient(circle at 92% 6%, rgba(0, 132, 255, 0.08), transparent 30%),
+        linear-gradient(135deg, rgba(248, 255, 248, 0.16) 0%, rgba(238, 251, 234, 0.12) 46%, rgba(247, 251, 255, 0.14) 100%),
+        url('imgs/sinuca-fundo-pc.png') !important;
+}
+
+.topbar,
+.tabs-nav,
+.glass-card,
+.knockout-panel,
+.table-card,
+.history-card,
+.history-detail-card,
+.participant-panel {
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.10)),
+        rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.46) !important;
+    box-shadow: 0 14px 32px rgba(15, 45, 30, 0.08) !important;
+    backdrop-filter: blur(16px) saturate(145%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(145%) !important;
+}
+
+#tab-mata-mata .knockout-scroll-frame,
+#tab-mata-mata .knockout-scroll-container,
+.participants-list,
+.codes-list,
+.history-list {
+    background:
+        linear-gradient(90deg, rgba(37, 99, 235, 0.025), transparent 24%, transparent 76%, rgba(22, 163, 74, 0.035)),
+        rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.38) !important;
+}
+
+#tab-mata-mata .match-card,
+#tab-mata-mata .champion-card,
+.participant-item,
+.code-chip,
+.history-ranking-row,
+.test-meta-grid span {
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.10)),
+        rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.42) !important;
+}
+
+@media (max-width: 900px) {
+    body {
+        background-image:
+            radial-gradient(circle at 0% 0%, rgba(255, 214, 64, 0.10), transparent 32%),
+            radial-gradient(circle at 100% 4%, rgba(37, 99, 235, 0.08), transparent 30%),
+            linear-gradient(135deg, rgba(248, 255, 248, 0.16) 0%, rgba(238, 251, 234, 0.12) 48%, rgba(247, 251, 255, 0.14) 100%),
+            url('imgs/sinuca-fundo-mobile.png') !important;
+    }
+}

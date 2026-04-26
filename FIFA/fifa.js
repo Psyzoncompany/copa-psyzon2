@@ -2195,9 +2195,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         scroller.addEventListener('wheel', (event) => {
             if (!isManualDragEnabled()) return;
             if (!canScrollHorizontally()) return;
-            if (!event.shiftKey) return;
-            if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-            scroller.scrollLeft += event.deltaY;
+            const wantsHorizontal = event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY);
+            if (!wantsHorizontal) return;
+            scroller.scrollLeft += event.shiftKey ? event.deltaY : event.deltaX;
             event.preventDefault();
         }, { passive: false });
     }

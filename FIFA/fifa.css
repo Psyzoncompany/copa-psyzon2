@@ -4423,7 +4423,8 @@ body {
 #tab-mata-mata .knockout-scroll-container,
 #tab-mata-mata .bracket-stage .knockout-scroll-container {
     padding-bottom: 96px !important;
-    touch-action: pan-x pan-y !important;
+    overscroll-behavior: auto !important;
+    touch-action: auto !important;
 }
 
 @media (max-width: 768px) {
@@ -4446,6 +4447,173 @@ body {
     #tab-mata-mata .bracket-stage .knockout-scroll-container {
         overflow: visible !important;
         padding-bottom: 64px !important;
+        overscroll-behavior: auto !important;
         touch-action: pan-y !important;
+    }
+}
+
+/* Final glass treatment for FIFA groups and knockout surfaces */
+#tab-grupos,
+#tab-mata-mata .knockout-panel,
+#tab-mata-mata .bracket-stage,
+#tab-historico .bracket-bar,
+#tab-historico #imported-tournaments-list {
+    border: 1px solid rgba(255, 255, 255, 0.72) !important;
+    border-radius: 28px !important;
+    background:
+        radial-gradient(circle at top left, rgba(255, 214, 64, 0.12), transparent 34%),
+        radial-gradient(circle at top right, rgba(37, 99, 235, 0.10), transparent 32%),
+        linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.30)) !important;
+    box-shadow: 0 18px 45px rgba(16, 64, 32, 0.12) !important;
+    backdrop-filter: blur(24px) saturate(145%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(145%) !important;
+}
+
+#tab-grupos {
+    padding: 22px !important;
+    margin-bottom: 32px !important;
+}
+
+#tab-grupos .groups-grid,
+#tab-mata-mata .bracket-scroll,
+#tab-mata-mata .knockout-scroll-frame,
+#tab-mata-mata .knockout-scroll-container,
+#tab-mata-mata .bracket-stage .knockout-scroll-container {
+    border: 1px solid rgba(255, 255, 255, 0.66) !important;
+    border-radius: 24px !important;
+    background:
+        linear-gradient(90deg, rgba(37, 99, 235, 0.05), transparent 24%, transparent 76%, rgba(22, 163, 74, 0.07)),
+        rgba(255, 255, 255, 0.22) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+    backdrop-filter: blur(18px) saturate(135%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(135%) !important;
+}
+
+#tab-grupos .groups-grid {
+    padding: 18px !important;
+}
+
+#tab-grupos .group-card-modern,
+#tab-grupos .group-card,
+#tab-grupos .podium-card,
+#tab-grupos .prize-banner,
+#tab-mata-mata .knockout-match-card,
+#tab-mata-mata .match-card,
+#tab-mata-mata .champion-card,
+#tab-mata-mata .knockout-alert {
+    border: 1px solid rgba(255, 255, 255, 0.76) !important;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.38)),
+        rgba(255, 255, 255, 0.46) !important;
+    box-shadow: 0 16px 36px rgba(15, 45, 30, 0.10) !important;
+    backdrop-filter: blur(20px) saturate(145%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(145%) !important;
+}
+
+#tab-grupos .group-header,
+#tab-grupos .group-footer,
+#tab-mata-mata .bracket-match-head,
+#tab-mata-mata .match-header,
+#tab-mata-mata .knockout-card-footer,
+#tab-mata-mata .knockout-leg-summary,
+#tab-mata-mata .penalty-badge {
+    background: rgba(255, 255, 255, 0.34) !important;
+    border-color: rgba(255, 255, 255, 0.58) !important;
+    backdrop-filter: blur(14px) saturate(135%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(135%) !important;
+}
+
+#tab-grupos .table-container,
+#tab-grupos .modern-table tbody tr,
+#tab-mata-mata .knockout-player-row,
+#tab-mata-mata .match-team {
+    background: rgba(255, 255, 255, 0.18) !important;
+}
+
+@media (max-width: 768px) {
+    #tab-grupos {
+        padding: 12px !important;
+        border-radius: 20px !important;
+    }
+
+    #tab-grupos .groups-grid {
+        padding: 10px !important;
+        border-radius: 18px !important;
+    }
+}
+
+/* Final transparency tuning: show the background image through the glass */
+body {
+    background-image:
+        radial-gradient(circle at 7% 4%, rgba(255, 214, 64, 0.10), transparent 32%),
+        radial-gradient(circle at 92% 6%, rgba(0, 132, 255, 0.08), transparent 30%),
+        linear-gradient(135deg, rgba(248, 255, 248, 0.16) 0%, rgba(238, 251, 234, 0.12) 46%, rgba(247, 251, 255, 0.14) 100%),
+        url('IMG/imagem de fundo pc FIFA.png') !important;
+}
+
+#tab-grupos,
+#tab-mata-mata .knockout-panel,
+#tab-mata-mata .bracket-stage,
+#tab-historico .bracket-bar,
+#tab-historico #imported-tournaments-list {
+    background:
+        radial-gradient(circle at top left, rgba(255, 214, 64, 0.08), transparent 34%),
+        radial-gradient(circle at top right, rgba(37, 99, 235, 0.06), transparent 32%),
+        linear-gradient(145deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08)) !important;
+    border-color: rgba(255, 255, 255, 0.44) !important;
+    box-shadow: 0 18px 45px rgba(16, 64, 32, 0.08) !important;
+    backdrop-filter: blur(14px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(140%) !important;
+}
+
+#tab-grupos .groups-grid,
+#tab-mata-mata .bracket-scroll,
+#tab-mata-mata .knockout-scroll-frame,
+#tab-mata-mata .knockout-scroll-container,
+#tab-mata-mata .bracket-stage .knockout-scroll-container {
+    background:
+        linear-gradient(90deg, rgba(37, 99, 235, 0.025), transparent 24%, transparent 76%, rgba(22, 163, 74, 0.035)),
+        rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.38) !important;
+}
+
+#tab-grupos .group-card-modern,
+#tab-grupos .group-card,
+#tab-grupos .podium-card,
+#tab-grupos .prize-banner,
+#tab-mata-mata .knockout-match-card,
+#tab-mata-mata .match-card,
+#tab-mata-mata .champion-card,
+#tab-mata-mata .knockout-alert {
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.10)),
+        rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.46) !important;
+    box-shadow: 0 14px 32px rgba(15, 45, 30, 0.08) !important;
+    backdrop-filter: blur(16px) saturate(145%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(145%) !important;
+}
+
+#tab-grupos .group-header,
+#tab-grupos .group-footer,
+#tab-mata-mata .bracket-match-head,
+#tab-mata-mata .match-header,
+#tab-mata-mata .knockout-card-footer,
+#tab-mata-mata .knockout-leg-summary,
+#tab-mata-mata .penalty-badge,
+#tab-grupos .table-container,
+#tab-mata-mata .knockout-player-row,
+#tab-mata-mata .match-team {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+@media (max-width: 768px) {
+    body {
+        background-image:
+            radial-gradient(circle at 0% 0%, rgba(255, 214, 64, 0.10), transparent 32%),
+            radial-gradient(circle at 100% 4%, rgba(37, 99, 235, 0.08), transparent 30%),
+            linear-gradient(135deg, rgba(248, 255, 248, 0.16) 0%, rgba(238, 251, 234, 0.12) 48%, rgba(247, 251, 255, 0.14) 100%),
+            url('IMG/Iimagem de fundo mobile FIFA.png') !important;
     }
 }
