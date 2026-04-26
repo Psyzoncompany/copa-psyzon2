@@ -91,6 +91,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Inicializa o módulo de Ranking
     initRankingSystem(db, role);
+    document.getElementById('ranking-view-current')?.addEventListener('click', () => {
+        rankingViewMode = 'current';
+        document.getElementById('ranking-view-current')?.classList.add('active');
+        document.getElementById('ranking-view-general')?.classList.remove('active');
+        renderRanking();
+    });
+    document.getElementById('ranking-view-general')?.addEventListener('click', () => {
+        rankingViewMode = 'general';
+        document.getElementById('ranking-view-general')?.classList.add('active');
+        document.getElementById('ranking-view-current')?.classList.remove('active');
+        renderRanking();
+    });
+    document.getElementById('ranking-player-search')?.addEventListener('input', (e) => {
+        rankingSearchTerm = e.target.value || '';
+        renderRanking();
+    });
+    document.getElementById('ranking-modality-filter')?.addEventListener('change', () => {
+        if (rankingViewMode === 'general') renderRanking();
+    });
 
     // ========== TOURNAMENT STATE (Firebase-Ready) ==========
     let tournamentState = {
@@ -153,6 +172,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     let testModeActive = false;
     let testModeBackupState = null;
     let testModeLogEntries = [];
+    let rankingViewMode = 'current';
+    let rankingSearchTerm = '';
+    let generalRankingCache = [];
 
     function isBye(value) {
         return typeof value === 'string' && value.trim().toUpperCase() === 'BYE';
@@ -276,11 +298,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         return null;
     }
 
-    function recalculateGeneralStats() {
+    function recalculateCurrentCupRanking() {
         const stats = {};
         const ensure = (name) => {
             if (!name || isPlaceholder(name)) return null;
-            if (!stats[name]) stats[name] = { name, pts: 0, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, avancos: 0 };
+            if (!stats[name]) stats[name] = { name, pts: 0, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, avancos: 0, phaseScore: 0, phase: 'Fase de Grupos', status: 'Na fase de grupos' };
             return stats[name];
         };
         const apply = (home, away, gh, ga, knockout = false) => {
@@ -318,19 +340,54 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ...((tournamentState.knockout.rounds || []).flatMap(r => (r.matches || []).map(m => ({ ...m, roundName: r.name }))))
             ];
             allRounds.forEach(m => {
-                if (m.s1 === '' || m.s2 === '') return;
-                const s1 = parseInt(m.s1);
-                const s2 = parseInt(m.s2);
-                if (!Number.isNaN(s1) && !Number.isNaN(s2)) apply(m.p1, m.p2, s1, s2, true);
+                if (tournamentState.homeAway && m.idaS1 != null && m.idaS2 != null && m.voltaS1 != null && m.voltaS2 != null && m.idaS1 !== '' && m.idaS2 !== '' && m.voltaS1 !== '' && m.voltaS2 !== '') {
+                    const ida1 = parseInt(m.idaS1);
+                    const ida2 = parseInt(m.idaS2);
+                    const volta1 = parseInt(m.voltaS1);
+                    const volta2 = parseInt(m.voltaS2);
+                    if (!Number.isNaN(ida1) && !Number.isNaN(ida2)) apply(m.p1, m.p2, ida1, ida2, true);
+                    if (!Number.isNaN(volta1) && !Number.isNaN(volta2)) apply(m.p2, m.p1, volta1, volta2, true);
+                } else if (m.s1 !== '' && m.s2 !== '') {
+                    const s1 = parseInt(m.s1);
+                    const s2 = parseInt(m.s2);
+                    if (!Number.isNaN(s1) && !Number.isNaN(s2)) apply(m.p1, m.p2, s1, s2, true);
+                } else {
+                    return;
+                }
                 const winner = getKnockoutMatchWinner(m);
                 const pWinner = ensure(winner);
                 if (pWinner) pWinner.avancos += 1;
             });
+            (tournamentState.knockout.rounds || []).forEach((round, idx) => {
+                const phasePoints = idx + 1;
+                (round.matches || []).forEach((m) => {
+                    const winner = getKnockoutMatchWinner(m);
+                    if (isRealPlayer(winner)) {
+                        const p = ensure(winner);
+                        if (p && phasePoints >= p.phaseScore) {
+                            p.phaseScore = phasePoints;
+                            p.phase = round.name;
+                        }
+                    }
+                });
+            });
         }
 
-        Object.values(stats).forEach(p => p.sg = p.gp - p.gc);
+        Object.values(stats).forEach(p => {
+            p.sg = p.gp - p.gc;
+            p.apr = p.j ? ((p.pts / (p.j * 3)) * 100) : 0;
+            if (tournamentState.top3?.first === p.name) p.status = 'Campeão';
+            else if (tournamentState.top3?.second === p.name) p.status = 'Finalista';
+            else if ((p.phase || '').toLowerCase().includes('semifinal')) p.status = 'Semifinalista';
+            else if (p.avancos > 0) p.status = 'Classificado';
+            else p.status = 'Eliminado';
+        });
         tournamentState.generalStats = stats;
         return stats;
+    }
+
+    function recalculateGeneralStats() {
+        return recalculateCurrentCupRanking();
     }
 
     function isMatchResolvedForProgression(match) {
@@ -369,6 +426,41 @@ document.addEventListener('DOMContentLoaded', async () => {
             set(ref(db, 'tournaments/current'), payload),
             tournamentState.tournamentCode ? set(ref(db, `tournaments/${tournamentState.tournamentCode}`), payload) : Promise.resolve()
         ]);
+    }
+
+    async function recalculateGeneralRanking() {
+        if (!db) {
+            generalRankingCache = [];
+            return generalRankingCache;
+        }
+        const snap = await get(ref(db, 'imports'));
+        const stats = {};
+        if (snap.exists()) {
+            snap.forEach(child => {
+                const item = child.val() || {};
+                if (item?.isTestMode === true || item?.isTestData === true) return;
+                if (item?.modality && rankingViewMode === 'general') {
+                    const filter = document.getElementById('ranking-modality-filter')?.value || 'todos';
+                    if (filter !== 'todos' && item.modality !== filter) return;
+                }
+                const ranking = item.rankingFinal || Object.values(item.generalStats || {});
+                ranking.forEach((row, idx) => {
+                    const name = row.name;
+                    if (!isRealPlayer(name)) return;
+                    if (!stats[name]) stats[name] = { name, titulos: 0, finais: 0, semifinais: 0, copas: 0, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0, apr: 0 };
+                    const s = stats[name];
+                    s.copas += 1;
+                    s.j += row.j || 0; s.v += row.v || 0; s.e += row.e || 0; s.d += row.d || 0;
+                    s.gp += row.gp || 0; s.gc += row.gc || 0; s.pts += row.pts || 0;
+                    if (idx === 0 || item.champion === name) s.titulos += 1;
+                    if (idx <= 1 || item.vice === name) s.finais += 1;
+                    if (idx <= 3) s.semifinais += 1;
+                });
+            });
+        }
+        generalRankingCache = Object.values(stats).map(s => ({ ...s, sg: s.gp - s.gc, apr: s.j ? (s.pts / (s.j * 3)) * 100 : 0 }))
+            .sort((a, b) => b.titulos - a.titulos || b.finais - a.finais || b.semifinais - a.semifinais || b.pts - a.pts || b.v - a.v || b.sg - a.sg || b.gp - a.gp || a.name.localeCompare(b.name, 'pt-BR'));
+        return generalRankingCache;
     }
 
     function openKnockoutEdit(type, rIdx, mIdx) {
@@ -419,7 +511,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Check if repechage tie → show penalty
                 const agg1 = ida1 + volta1;
                 const agg2 = ida2 + volta2;
-                if (type === 'repechage' && agg1 === agg2 && (document.getElementById('edit-ida-s1').value !== '' || document.getElementById('edit-volta-s1').value !== '')) {
+                if (agg1 === agg2 && (document.getElementById('edit-ida-s1').value !== '' || document.getElementById('edit-volta-s1').value !== '')) {
                     penaltyEl.style.display = 'block';
                     document.getElementById('pen-p1-name').textContent = formatName(displayParticipantName(match.p1));
                     document.getElementById('pen-p2-name').textContent = formatName(displayParticipantName(match.p2));
@@ -448,7 +540,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             function checkSinglePenalty() {
                 const v1 = parseInt(editS1.value);
                 const v2 = parseInt(editS2.value);
-                if (type === 'repechage' && !isNaN(v1) && !isNaN(v2) && v1 === v2 && editS1.value !== '') {
+                if (!isNaN(v1) && !isNaN(v2) && v1 === v2 && editS1.value !== '') {
                     penaltyEl.style.display = 'block';
                     document.getElementById('pen-p1-name').textContent = formatName(displayParticipantName(match.p1));
                     document.getElementById('pen-p2-name').textContent = formatName(displayParticipantName(match.p2));
@@ -712,12 +804,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 winner = match.p2;
             } else {
                 // EMPATE
-                if (type === 'repechage') {
+                if (type === 'repechage' || isHomeAway) {
                     // Repescagem: empate vai pra pênaltis
                     const pen1 = document.getElementById('edit-pen1').value;
                     const pen2 = document.getElementById('edit-pen2').value;
                     if (pen1 === '' || pen2 === '') {
-                        alert('Empate na repescagem! Preencha os pênaltis.');
+                        alert('Empate no agregado! Preencha os pênaltis/desempate.');
                         return;
                     }
                     const p1Pen = parseInt(pen1);
@@ -770,35 +862,104 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // ROUND ROBIN MATCH GENERATION
-    function generateRoundRobin(playersNames, idaVolta = false) {
-        const matches = [];
-        const n = playersNames.length;
-        if (n < 2) return [];
+    function hasAnyRecordedScores() {
+        const groupsHasScores = (tournamentState.groups || []).some(g => (g.matches || []).some(m => m.gHome !== '' || m.gAway !== ''));
+        const knockoutHasScores = (tournamentState.knockout?.repechage || []).some(m => m.s1 !== '' || m.s2 !== '' || m.idaS1 != null || m.voltaS1 != null)
+            || (tournamentState.knockout?.rounds || []).some(r => (r.matches || []).some(m => m.s1 !== '' || m.s2 !== '' || m.idaS1 != null || m.voltaS1 != null));
+        return groupsHasScores || knockoutHasScores;
+    }
 
-        for (let i = 0; i < n; i++) {
-            for (let j = i + 1; j < n; j++) {
-                matches.push({
-                    id: `m_${Date.now()}_${i}_${j}`,
-                    home: playersNames[i],
-                    away: playersNames[j],
-                    gHome: "",
-                    gAway: ""
-                });
+    function generateRoundRobinSchedule(playersNames) {
+        const list = [...playersNames];
+        if (list.length < 2) return [];
+        const hasBye = list.length % 2 === 1;
+        if (hasBye) list.push('BYE');
+        const rounds = list.length - 1;
+        const half = list.length / 2;
+        const rotation = [...list];
+        const schedule = [];
+
+        for (let round = 0; round < rounds; round++) {
+            const roundMatches = [];
+            for (let i = 0; i < half; i++) {
+                const a = rotation[i];
+                const b = rotation[rotation.length - 1 - i];
+                if (!isBye(a) && !isBye(b)) {
+                    const swap = round % 2 === 1;
+                    roundMatches.push({
+                        id: `m_${Date.now()}_${round}_${i}`,
+                        home: swap ? b : a,
+                        away: swap ? a : b,
+                        gHome: '',
+                        gAway: '',
+                        round: round + 1,
+                        leg: 'ida',
+                        isHomeAway: false
+                    });
+                }
+            }
+            schedule.push(...roundMatches);
+            rotation.splice(1, 0, rotation.pop());
+        }
+        return schedule;
+    }
+
+    function generateDoubleRoundRobinSchedule(playersNames) {
+        const firstLeg = generateRoundRobinSchedule(playersNames);
+        const roundOffset = Math.max(...firstLeg.map(m => m.round || 1), 0);
+        const secondLeg = firstLeg.map((m, idx) => ({
+            ...m,
+            id: `${m.id}_v`,
+            home: m.away,
+            away: m.home,
+            gHome: '',
+            gAway: '',
+            round: (m.round || 1) + roundOffset,
+            leg: 'volta',
+            isHomeAway: true
+        }));
+        return [...firstLeg.map(m => ({ ...m, isHomeAway: true })), ...secondLeg];
+    }
+
+    function generateGroupMatchesHomeAway(playersNames, homeAwayEnabled) {
+        return homeAwayEnabled ? generateDoubleRoundRobinSchedule(playersNames) : generateRoundRobinSchedule(playersNames);
+    }
+
+    function generateKnockoutMatchesHomeAway() {
+        if (!tournamentState.knockout) return;
+        (tournamentState.knockout.repechage || []).forEach(match => {
+            clearMatchResultFields(match);
+        });
+        (tournamentState.knockout.rounds || []).forEach(round => {
+            (round.matches || []).forEach(match => {
+                clearMatchResultFields(match);
+                resolveByeMatchOutcome(match);
+            });
+        });
+    }
+
+    async function toggleHomeAwayMode(enabled) {
+        if (role !== 'organizador') return;
+        const hasScores = hasAnyRecordedScores();
+        if (hasScores) {
+            const msg = enabled
+                ? 'Ativar Casa e Fora vai recriar os jogos da fase atual. Resultados existentes podem ser apagados. Deseja continuar?'
+                : 'Desativar Casa e Fora vai remover os jogos de volta. Deseja continuar?';
+            if (!confirm(msg)) {
+                const input = document.getElementById('tourney-home-away');
+                if (input) input.checked = !enabled;
+                return;
             }
         }
-
-        if (idaVolta) {
-            const returnMatches = matches.map(m => ({
-                id: m.id + '_r',
-                home: m.away,
-                away: m.home,
-                gHome: "",
-                gAway: ""
-            }));
-            return [...matches, ...returnMatches];
-        }
-        return matches;
+        tournamentState.homeAway = enabled;
+        (tournamentState.groups || []).forEach(group => {
+            const names = (group.players || []).map(p => p.name);
+            group.matches = generateGroupMatchesHomeAway(names, enabled);
+        });
+        generateKnockoutMatchesHomeAway();
+        recalculateCurrentCupRanking();
+        await persistCurrentTournament({ homeAway: enabled, groups: tournamentState.groups, knockout: tournamentState.knockout, generalStats: tournamentState.generalStats });
+        renderTournamentFromState();
     }
 
     function openGroupMatches(index) {
@@ -809,13 +970,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Initialize matches if not exist
         if (!group.matches || group.matches.length === 0) {
             const names = group.players.map(p => p.name);
-            group.matches = generateRoundRobin(names, false);
-            document.getElementById('chk-ida-volta').checked = false;
+            group.matches = generateGroupMatchesHomeAway(names, !!tournamentState.homeAway);
+            document.getElementById('chk-ida-volta').checked = !!tournamentState.homeAway;
         } else {
-            // Detect if idaVolta is active based on match count
-            const n = group.players.length;
-            const expectedSingle = (n * (n - 1)) / 2;
-            document.getElementById('chk-ida-volta').checked = group.matches.length > expectedSingle;
+            document.getElementById('chk-ida-volta').checked = !!tournamentState.homeAway;
         }
 
         const controlsHost = document.getElementById('group-matches-stats');
@@ -853,14 +1011,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         countEl.textContent = group.matches.length;
         container.innerHTML = group.matches.map((m, i) => `
             <div class="match-card">
+                <div class="match-meta">
+                    <span class="match-round">Rodada ${m.round || 1}</span>
+                    <span class="match-leg-badge ${m.leg === 'volta' ? 'volta' : 'ida'}">${m.leg === 'volta' ? 'VOLTA' : 'IDA'}</span>
+                </div>
                 <div class="match-team home">
-                    <span>${formatName(m.home)}</span>
+                    <span>${formatName(m.home)} <small>(Casa)</small></span>
                 </div>
                 <input type="number" min="0" class="match-score-input" value="${m.gHome}" data-idx="${i}" data-side="home" placeholder="0">
                 <span class="match-vs">VS</span>
                 <input type="number" min="0" class="match-score-input" value="${m.gAway}" data-idx="${i}" data-side="away" placeholder="0">
                 <div class="match-team away">
-                    <span>${formatName(m.away)}</span>
+                    <span>${formatName(m.away)} <small>(Fora)</small></span>
                 </div>
                 ${(testModeActive && role === 'organizador') ? `<div class="test-game-action"><button class="btn-test-inline" data-test-action="group-match-sim" data-group-index="${selectedGroupIndex}" data-match-index="${i}">⚡ Simular jogo</button></div>` : ''}
             </div>
@@ -1048,9 +1210,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const homeAwayInput = document.getElementById('tourney-home-away');
     if (homeAwayInput) {
-        homeAwayInput.addEventListener('change', () => {
+        homeAwayInput.addEventListener('change', async () => {
             if (homeAwayInput.checked && formatSelect) {
                 formatSelect.value = 'grupos-mata-mata';
+            }
+            if ((tournamentState.groups || []).length || tournamentState.knockout) {
+                await toggleHomeAwayMode(homeAwayInput.checked);
             }
             updatePreview();
         });
@@ -1199,7 +1364,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const playerName = groupPlayers[p] ? groupPlayers[p].name : `A definir (Slot ${p + 1})`;
                     players.push({ name: playerName, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0 });
                 }
-                tournamentState.groups.push({ name: `Grupo ${letter}`, players });
+                const matches = generateGroupMatchesHomeAway(players.map(p => p.name), !!tournamentState.homeAway);
+                tournamentState.groups.push({ name: `Grupo ${letter}`, players, matches });
             }
         }
 
@@ -1290,6 +1456,42 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
         });
+    }
+
+    async function renderRanking() {
+        const tbody = document.getElementById('ranking-tbody');
+        const highlights = document.getElementById('ranking-highlights');
+        const cards = document.getElementById('ranking-cards');
+        const top3 = document.getElementById('ranking-top3');
+        const headRow = document.getElementById('ranking-head-row');
+        if (!tbody || !highlights || !cards || !headRow) return;
+
+        const search = (rankingSearchTerm || '').toLowerCase();
+        let rows = [];
+        if (rankingViewMode === 'current') {
+            const stats = Object.values(recalculateCurrentCupRanking() || {});
+            rows = stats.sort((a, b) => b.pts - a.pts || b.v - a.v || b.sg - a.sg || b.gp - a.gp || a.gc - b.gc || (b.phaseScore || 0) - (a.phaseScore || 0) || a.name.localeCompare(b.name, 'pt-BR'));
+            headRow.innerHTML = `<th>#</th><th style="text-align:left;">Jogador</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th>PTS</th><th>APR</th><th>Fase</th><th>Status</th>`;
+        } else {
+            rows = await recalculateGeneralRanking();
+            headRow.innerHTML = `<th>#</th><th style="text-align:left;">Jogador</th><th>🏆</th><th>Finais</th><th>Semis</th><th>Copas</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th>PTS</th><th>APR</th>`;
+        }
+        if (search) rows = rows.filter(r => (r.name || '').toLowerCase().includes(search));
+
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;">Sem dados de ranking.</td></tr>';
+            cards.innerHTML = '';
+            top3.innerHTML = '';
+            highlights.innerHTML = '';
+            return;
+        }
+        tbody.innerHTML = rows.map((r, i) => rankingViewMode === 'current'
+            ? `<tr><td>${i + 1}</td><td style="text-align:left;">${formatName(r.name)}</td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.d}</td><td>${r.gp}</td><td>${r.gc}</td><td>${r.sg > 0 ? '+' : ''}${r.sg}</td><td>${r.pts}</td><td>${(r.apr || 0).toFixed(1)}%</td><td>${r.phase || '—'}</td><td>${r.status || '—'}</td></tr>`
+            : `<tr><td>${i + 1}</td><td style="text-align:left;">${formatName(r.name)}</td><td>${r.titulos}</td><td>${r.finais}</td><td>${r.semifinais}</td><td>${r.copas}</td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.d}</td><td>${r.gp}</td><td>${r.gc}</td><td>${r.sg > 0 ? '+' : ''}${r.sg}</td><td>${r.pts}</td><td>${(r.apr || 0).toFixed(1)}%</td></tr>`
+        ).join('');
+        cards.innerHTML = rows.map((r, i) => `<article class="ranking-player-card"><div class="ranking-player-top"><div class="ranking-player-position">#${i + 1}</div><strong>${formatName(r.name)}</strong></div><div class="ranking-player-stats"><span class="ranking-chip">PTS: ${r.pts || 0}</span><span class="ranking-chip">J: ${r.j || 0}</span><span class="ranking-chip">V: ${r.v || 0}</span><span class="ranking-chip">SG: ${(r.sg || 0) > 0 ? '+' : ''}${r.sg || 0}</span></div></article>`).join('');
+        top3.innerHTML = rows.slice(0, 3).map((r, i) => `<div class="ranking-top3-card pos-${i + 1}">${['🥇','🥈','🥉'][i]} ${formatName(r.name)}</div>`).join('');
+        highlights.innerHTML = `<div class="ranking-highlight-card"><span>Jogadores</span><strong>${rows.length}</strong></div><div class="ranking-highlight-card"><span>Jogos</span><strong>${rows.reduce((n, r) => n + (r.j || 0), 0)}</strong></div><div class="ranking-highlight-card"><span>Gols</span><strong>${rows.reduce((n, r) => n + (r.gp || 0), 0)}</strong></div><div class="ranking-highlight-card"><span>Líder</span><strong>${formatName(rows[0].name)}</strong></div>`;
     }
 
     function renderTournamentFromState(isPreview = false) {
@@ -1403,90 +1605,144 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Mata-mata
         const mataMataContainer = document.getElementById('tab-mata-mata');
         if (mataMataContainer) {
+            const groupsPending = (tournamentState.groups || []).some(group => (group.matches || []).some(m => m.gHome === '' || m.gAway === ''));
+            const repechagePending = (tournamentState.knockout?.repechage || []).some(m => !isMatchResolvedForProgression(m));
             if (tournamentState.knockout) {
-                let bracketHTML = `<div class="mata-mata-tab"><div class="bracket-scroll-area"><div class="bracket-scroll-shell"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
-                                    ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
-                
-                // Helper: render a single bracket match card
-                function renderBracketMatch(match, type, rIdx, mIdx) {
+                const allBracketMatches = [
+                    ...(tournamentState.knockout.repechage || []),
+                    ...((tournamentState.knockout.rounds || []).flatMap(round => round.matches || []))
+                ];
+                const finalizedCount = allBracketMatches.filter(match => !!getKnockoutMatchWinner(match)).length;
+                const pendingCount = Math.max(0, allBracketMatches.length - finalizedCount);
+                const firstPendingRound = (tournamentState.knockout.rounds || []).find(round => (round.matches || []).some(match => !getKnockoutMatchWinner(match)));
+                const currentPhase = firstPendingRound?.name || ((tournamentState.knockout.rounds || []).length ? 'Finalizado' : 'Aguardando');
+                const finalRound = tournamentState.knockout.rounds?.[tournamentState.knockout.rounds.length - 1];
+                const champion = finalRound?.matches?.[0] ? getKnockoutMatchWinner(finalRound.matches[0]) : null;
+                let bracketHTML = `<div class="mata-mata-tab">
+                    <div class="knockout-summary-pills">
+                        <span class="knockout-pill"><i class="ph ph-check-circle"></i> Finalizadas: ${finalizedCount}</span>
+                        <span class="knockout-pill"><i class="ph ph-clock"></i> Pendentes: ${pendingCount}</span>
+                        <span class="knockout-pill"><i class="ph ph-flag"></i> Fase atual: ${currentPhase}</span>
+                        ${champion ? `<span class="knockout-pill champion"><i class="ph-fill ph-trophy"></i> Campeão: ${formatName(champion)}</span>` : ''}
+                    </div>
+                    <div class="knockout-scroll-indicator">Arraste para o lado para ver as próximas fases</div>
+                    <div class="knockout-scroll-container"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
+                    ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
+                if ((tournamentState.groups || []).length && groupsPending) {
+                    bracketHTML += `<div class="empty-state"><i class="ph ph-warning-circle"></i><h3>Mata-mata bloqueado</h3><p>Finalize todos os jogos da fase de grupos para gerar o mata-mata.</p></div>`;
+                    mataMataContainer.innerHTML = bracketHTML + `</div></div></div>`;
+                    renderRanking();
+                    return;
+                }
+                if ((tournamentState.knockout?.repechage || []).length && repechagePending) {
+                    bracketHTML += `<div class="empty-state"><i class="ph ph-warning-circle"></i><h3>Repescagem pendente</h3><p>Finalize a repescagem para definir os classificados do mata-mata.</p></div>`;
+                    mataMataContainer.innerHTML = bracketHTML + `</div></div></div>`;
+                    renderRanking();
+                    return;
+                }
+
+                function playerBadge(name) {
+                    const cleaned = formatName(displayParticipantName(name || 'A definir'));
+                    const initials = cleaned.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0].toUpperCase()).join('') || '?';
+                    return `<span class="knockout-avatar">${initials}</span><span class="player-name-clickable" onclick="openPlayerProfile('${name || ''}')">${cleaned}</span>`;
+                }
+
+                function matchStatus(match, winner, isTwoLegged) {
+                    if (match.walkover && winner) return 'Avançou por BYE';
+                    if (!isRealPlayer(match.p1) || !isRealPlayer(match.p2)) return 'A definir';
+                    if (winner) return 'Finalizado';
+                    const singleFilled = match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null;
+                    const legFilled = match.idaS1 !== '' && match.idaS2 !== '' && match.voltaS1 !== '' && match.voltaS2 !== '' && match.idaS1 != null && match.idaS2 != null && match.voltaS1 != null && match.voltaS2 != null;
+                    if (isTwoLegged && legFilled && !winner) return 'Desempate necessário';
+                    if (singleFilled || match.status === 'in-progress') return 'Em andamento';
+                    if ((String(match.p1 || '') + String(match.p2 || '')).includes('Vencedor')) return 'Aguardando vencedor anterior';
+                    return 'Pendente';
+                }
+
+                function renderBracketMatch(match, type, rIdx, mIdx, label) {
                     const showBtn = role === 'organizador' && !isPreview;
-                    const hasResult = (match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null) || !!match.completed;
                     const winner = getKnockoutMatchWinner(match);
-
-                    const p1Win = winner === match.p1;
-                    const p2Win = winner === match.p2;
-                    const p1Class = p1Win ? 'bracket-slot winner' : (p2Win ? 'bracket-slot loser' : 'bracket-slot');
-                    const p2Class = p2Win ? 'bracket-slot winner' : (p1Win ? 'bracket-slot loser' : 'bracket-slot');
-
-                    // Score display
-                    let score1 = match.s1 || '—';
-                    let score2 = match.s2 || '—';
-                    if (match.walkover && winner) {
-                        score1 = match.p1 === winner ? 'WO' : '—';
-                        score2 = match.p2 === winner ? 'WO' : '—';
-                    }
-                    
-                    // Penalty indicator
-                    let penaltyBadge = '';
-                    if (match.pen1 && match.pen2) {
-                        penaltyBadge = `<div class="penalty-badge"><i class="ph-fill ph-soccer-ball"></i> Pên: ${match.pen1} x ${match.pen2}</div>`;
-                    }
-                    const statusText = match.walkover ? 'walkover' : (winner ? 'concluído' : (match.status === 'in-progress' ? 'em andamento' : 'pendente'));
+                    const isTwoLegged = !!tournamentState.homeAway && !match.walkover && !isBye(match.p1) && !isBye(match.p2);
+                    const hasResult = (match.s1 !== '' && match.s2 !== '' && match.s1 != null && match.s2 != null) || !!match.completed || !!winner;
+                    const statusText = matchStatus(match, winner, isTwoLegged);
+                    const p1Class = winner === match.p1 ? 'bracket-slot winner' : (winner === match.p2 ? 'bracket-slot loser' : 'bracket-slot');
+                    const p2Class = winner === match.p2 ? 'bracket-slot winner' : (winner === match.p1 ? 'bracket-slot loser' : 'bracket-slot');
+                    const agg1 = (parseInt(match.idaS1 || 0, 10) || 0) + (parseInt(match.voltaS1 || 0, 10) || 0);
+                    const agg2 = (parseInt(match.idaS2 || 0, 10) || 0) + (parseInt(match.voltaS2 || 0, 10) || 0);
+                    const score1 = match.walkover && winner ? (match.p1 === winner ? 'WO' : '—') : (hasResult ? (isTwoLegged ? String(agg1) : String(match.s1 ?? '—')) : '—');
+                    const score2 = match.walkover && winner ? (match.p2 === winner ? 'WO' : '—') : (hasResult ? (isTwoLegged ? String(agg2) : String(match.s2 ?? '—')) : '—');
+                    const idaScore = (match.idaS1 != null && match.idaS1 !== '' && match.idaS2 != null && match.idaS2 !== '') ? `${match.idaS1} x ${match.idaS2}` : '—';
+                    const voltaScore = (match.voltaS1 != null && match.voltaS1 !== '' && match.voltaS2 != null && match.voltaS2 !== '') ? `${match.voltaS1} x ${match.voltaS2}` : '—';
 
                     const testSimBtn = (testModeActive && role === 'organizador' && !isPreview)
                         ? `<button class="btn-test-inline" data-test-action="knockout-match-sim" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}">Simular confronto</button>`
                         : '';
                     return `
-                        <div class="bracket-match ${hasResult ? 'has-result' : ''}">
-                            <span class="bracket-status">${statusText}</span>
+                        <div class="bracket-match modern ${hasResult ? 'has-result' : ''} ${winner ? 'finished' : ''}">
+                            <div class="bracket-match-head">
+                                <span class="match-title">${label}</span>
+                                ${showBtn ? `<button class="btn-edit-knockout" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar resultado"><i class="ph ph-pencil-simple"></i> Editar</button>` : ''}
+                            </div>
                             <div class="${p1Class}">
-                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p1}')">${formatName(displayParticipantName(match.p1))}</span>
+                                <span class="player-line">${playerBadge(match.p1)}</span>
                                 <span class="slot-score">${score1}</span>
                             </div>
                             <div class="${p2Class}">
-                                <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${formatName(displayParticipantName(match.p2))}</span>
+                                <span class="player-line">${playerBadge(match.p2)}</span>
                                 <span class="slot-score">${score2}</span>
                             </div>
-                            ${penaltyBadge}
+                            ${isTwoLegged ? `<div class="knockout-legs-inline">
+                                <span><strong>IDA</strong> ${formatName(displayParticipantName(match.p1))} ${idaScore} ${formatName(displayParticipantName(match.p2))}</span>
+                                <span><strong>VOLTA</strong> ${formatName(displayParticipantName(match.p2))} ${voltaScore} ${formatName(displayParticipantName(match.p1))}</span>
+                                <span><strong>AGREGADO</strong> ${formatName(displayParticipantName(match.p1))} ${agg1} x ${agg2} ${formatName(displayParticipantName(match.p2))}</span>
+                            </div>` : ''}
+                            ${match.pen1 && match.pen2 ? `<div class="penalty-badge"><i class="ph-fill ph-soccer-ball"></i> Pênaltis: ${match.pen1} x ${match.pen2}</div>` : ''}
+                            <div class="knockout-card-footer">
+                                <span class="bracket-status">${statusText}</span>
+                                ${winner ? `<span class="winner-tag"><i class="ph-fill ph-seal-check"></i> Classificado: ${formatName(winner)}</span>` : ''}
+                            </div>
                             ${testSimBtn}
-                            ${showBtn ? `<button class="btn-edit-knockout" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar Resultado"><i class="ph ph-pencil-simple"></i></button>` : ''}
                         </div>`;
                 }
 
                 if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
-                    bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">Repescagem</div>`;
-                    if (testModeActive && role === 'organizador' && !isPreview) {
-                        bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
-                            <button class="btn-test-inline" data-test-action="repechage-sim-all">Simular repescagem completa</button>
-                            <button class="btn-test-inline danger" data-test-action="repechage-clear">Limpar repescagem</button>
-                            <button class="btn-test-inline" data-test-action="repechage-advance">Avançar vencedores</button>
-                            <button class="btn-test-inline" data-test-action="repechage-next-phase">Gerar próxima fase</button>
-                        </div>`;
-                    }
+                    bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">🏁 Repescagem</div>`;
                     tournamentState.knockout.repechage.forEach((match, mIdx) => {
-                        bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx);
+                        bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx, `Repescagem ${mIdx + 1}`);
                     });
-                    bracketHTML += `</div>`;
+                    bracketHTML += `</div><div class="bracket-round-gap"><i class="ph ph-arrow-right"></i></div>`;
                 }
 
                 if (tournamentState.knockout.rounds) {
                     tournamentState.knockout.rounds.forEach((round, rIdx) => {
-                        bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">${round.name}</div>`;
+                        const totalMatches = (round.matches || []).length;
+                        bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">🏆 ${round.name} <small>${totalMatches} jogos</small></div>`;
                         if (testModeActive && role === 'organizador' && !isPreview) {
                             bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
                                 <button class="btn-test-inline" data-test-action="knockout-phase-sim" data-r="${rIdx}">Simular esta fase</button>
                                 <button class="btn-test-inline danger" data-test-action="knockout-phase-clear" data-r="${rIdx}">Limpar esta fase</button>
-                                <button class="btn-test-inline" data-test-action="knockout-phase-advance" data-r="${rIdx}">Avançar vencedores desta fase</button>
+                                <button class="btn-test-inline" data-test-action="knockout-phase-advance" data-r="${rIdx}">Avançar vencedores</button>
                             </div>`;
                         }
                         round.matches.forEach((match, mIdx) => {
-                            bracketHTML += renderBracketMatch(match, 'round', rIdx, mIdx);
+                            bracketHTML += renderBracketMatch(match, 'round', rIdx, mIdx, `${round.name} ${mIdx + 1}`);
                         });
-                        bracketHTML += `</div>`;
+                        bracketHTML += `</div>${rIdx < tournamentState.knockout.rounds.length - 1 ? '<div class="bracket-round-gap"><i class="ph ph-arrow-right"></i></div>' : ''}`;
                     });
                 }
-                
-                bracketHTML += `</div></div></div></div>`;
+
+                if (champion) {
+                    bracketHTML += `<div class="bracket-round champion-column">
+                        <div class="bracket-round-title">CAMPEÃO</div>
+                        <div class="champion-card">
+                            <span class="champion-icon">🏆</span>
+                            <h4>${formatName(champion)}</h4>
+                            <p>Título confirmado</p>
+                        </div>
+                    </div>`;
+                }
+
+                bracketHTML += `</div></div></div>`;
                 mataMataContainer.innerHTML = bracketHTML;
 
                 // Add Listeners
@@ -1499,10 +1755,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 });
             } else {
-                mataMataContainer.innerHTML = `<div class="mata-mata-tab"><div class="bracket-scroll-area"><div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div></div></div>`;
+                mataMataContainer.innerHTML = `<div class="mata-mata-tab"><div class="knockout-scroll-container"><div class="empty-state"><i class="ph ph-tree-structure"></i><h3>Mata-Mata desativado</h3><p>O formato atual não inclui eliminatórias.</p></div></div></div>`;
             }
             checkAndOpenNextPhaseModal();
         }
+        renderRanking();
     }
 
     // ========== TABS NAVIGATION ==========
@@ -1737,6 +1994,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function exitTestMode(clearData = false) {
         if (!testModeActive) return;
+        tournamentState.isTestMode = false;
+        tournamentState.testPanelOpen = false;
+        tournamentState.selectedTestAction = null;
+        tournamentState.testToolbarVisible = false;
+        tournamentState.testLogsCollapsed = false;
+        tournamentState.currentTestOverlay = null;
+        document.body.classList.remove('test-mode', 'test-mode-active');
+        document.querySelectorAll('.test-mode-overlay, .test-warning-banner').forEach(el => el.remove());
         if (clearData && testModeBackupState) {
             tournamentState = JSON.parse(JSON.stringify(testModeBackupState));
             renderTournamentFromState();
@@ -1747,7 +2012,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         testModeActive = false;
         testModeBackupState = null;
+        await persistCurrentTournament({ isTestMode: false, __allowPersistInTestMode: true });
         renderTestModeUI();
+        renderTournamentFromState();
     }
 
     async function withSensitiveGuard(actionId, fn) {
@@ -3298,18 +3565,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ========== GROUP MATCHES MODAL LISTENERS ==========
     const chkIdaVolta = document.getElementById('chk-ida-volta');
     if (chkIdaVolta) {
-        chkIdaVolta.addEventListener('change', (e) => {
+        chkIdaVolta.addEventListener('change', async (e) => {
             if (selectedGroupIndex === null) return;
-            const group = tournamentState.groups[selectedGroupIndex];
-            const hasScores = (group.matches || []).some(m => m.gHome !== "" || m.gAway !== "");
-            
-            if (hasScores && !confirm('Isso vai resetar os placares atuais. Continuar?')) {
-                e.target.checked = !e.target.checked;
-                return;
-            }
-
-            const names = group.players.map(p => p.name);
-            group.matches = generateRoundRobin(names, e.target.checked);
+            await toggleHomeAwayMode(e.target.checked);
             renderGroupMatchesList();
         });
     }
