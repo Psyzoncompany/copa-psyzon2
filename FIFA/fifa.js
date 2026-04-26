@@ -524,7 +524,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function getKnockoutMatchWinner(match) {
         if (!match) return null;
-        if (isRealPlayer(match.winner)) return match.winner;
         const byeWinner = getByeAutoWinner(match);
         if (byeWinner) return byeWinner;
         const hasHomeAway = tournamentState.homeAway &&
@@ -536,8 +535,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const volta1 = parseInt(match.voltaS1);
             const volta2 = parseInt(match.voltaS2);
             if ([ida1, ida2, volta1, volta2].some(Number.isNaN)) return null;
-            const agg1 = ida1 + volta2;
-            const agg2 = ida2 + volta1;
+            const agg1 = ida1 + volta1;
+            const agg2 = ida2 + volta2;
             if (agg1 > agg2) return match.p1;
             if (agg2 > agg1) return match.p2;
             if (match.pen1 != null && match.pen2 != null && match.pen1 !== '' && match.pen2 !== '') {
@@ -558,7 +557,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (match.pen1 != null && match.pen2 != null && match.pen1 !== '' && match.pen2 !== '') {
             return parseInt(match.pen1) > parseInt(match.pen2) ? match.p1 : match.p2;
         }
-        return null;
+        return isRealPlayer(match.winner) ? match.winner : null;
     }
 
     function recalculateCurrentCupRanking() {
