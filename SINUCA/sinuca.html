@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sinuca - Copa Psyzon</title>
+    <link rel="stylesheet" href="sinuca.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header class="topbar">
+        <a class="brand" href="../escolhaojogo.html">
+            <img src="../imgs/logo/logo svg psyzon e prefeitura.svg" alt="Copa Psyzon">
+            <span>
+                <strong>Copa Psyzon</strong>
+                <small>Sinuca</small>
+            </span>
+        </a>
+        <div class="top-actions">
+            <span id="role-badge" class="role-badge">VISITANTE</span>
+            <a href="../escolhaojogo.html" class="icon-button" title="Escolher jogo"><i class="ph ph-squares-four"></i></a>
+            <a href="../index.html" class="icon-button" title="Sair"><i class="ph ph-sign-out"></i></a>
+        </div>
+    </header>
+
+    <nav class="tabs-nav">
+        <button class="tab active" data-tab="participantes"><i class="ph-fill ph-users-three"></i> Participantes</button>
+        <button class="tab" data-tab="mata-mata"><i class="ph-fill ph-tree-structure"></i> Mata-mata</button>
+        <button class="tab" data-tab="ranking"><i class="ph-fill ph-trophy"></i> Ranking</button>
+        <button class="tab" data-tab="historico"><i class="ph-fill ph-clock-counter-clockwise"></i> Histórico</button>
+    </nav>
+
+    <main class="sinuca-shell">
+        <aside class="sidebar" id="organizer-panel">
+            <section class="glass-card">
+                <div class="card-title-row">
+                    <i class="ph-fill ph-gear-six"></i>
+                    <h2>Configurações</h2>
+                </div>
+                <label class="field">
+                    <span>Nome do torneio</span>
+                    <input id="tourney-name" type="text" value="COPA PSYZON SINUCA">
+                </label>
+                <label class="field">
+                    <span>Limite de participantes</span>
+                    <input id="participant-limit" type="number" min="2" max="64" value="16">
+                </label>
+                <button class="btn primary" id="btn-save-config"><i class="ph ph-check-circle"></i> Salvar configuração</button>
+            </section>
+
+            <section class="glass-card">
+                <div class="card-title-row">
+                    <i class="ph-fill ph-ticket"></i>
+                    <h2>Códigos</h2>
+                </div>
+                <button class="btn secondary" id="btn-generate-codes"><i class="ph ph-hash"></i> Gerar códigos S</button>
+                <div id="codes-list" class="codes-list"></div>
+            </section>
+
+            <section class="glass-card">
+                <div class="card-title-row">
+                    <i class="ph-fill ph-lightning"></i>
+                    <h2>Ações</h2>
+                </div>
+                <button class="btn primary" id="btn-generate-bracket"><i class="ph ph-tree-structure"></i> Gerar mata-mata</button>
+                <button class="btn secondary" id="btn-reset-results"><i class="ph ph-arrow-counter-clockwise"></i> Resetar resultados</button>
+                <button class="btn success" id="btn-finish-tournament"><i class="ph ph-flag-checkered"></i> Encerrar e salvar</button>
+                <button class="btn danger" id="btn-reset-tournament"><i class="ph ph-trash"></i> Resetar torneio</button>
+            </section>
+        </aside>
+
+        <section class="content-area">
+            <section id="tab-participantes" class="tab-content active">
+                <div class="section-header">
+                    <div>
+                        <span class="eyebrow">Inscrições</span>
+                        <h1>Participantes</h1>
+                    </div>
+                    <span id="participant-count" class="glass-pill">0 inscritos</span>
+                </div>
+
+                <div class="participant-panel glass-card">
+                    <form id="participant-form" class="participant-form">
+                        <label class="field">
+                            <span>Nome do jogador</span>
+                            <input id="participant-name" type="text" placeholder="Ex: Rodrigo Alves" autocomplete="off">
+                        </label>
+                        <button class="btn primary" type="submit"><i class="ph ph-plus-circle"></i> Adicionar</button>
+                    </form>
+                    <div id="participants-list" class="participants-list"></div>
+                </div>
+            </section>
+
+            <section id="tab-mata-mata" class="tab-content">
+                <div class="knockout-panel">
+                    <div class="knockout-header">
+                        <div>
+                            <span class="eyebrow">Fase eliminatória</span>
+                            <h1>Mata-mata oficial</h1>
+                        </div>
+                        <div class="status-badges">
+                            <span id="badge-finalized" class="glass-pill"><i class="ph ph-check-circle"></i> Finalizadas: 0</span>
+                            <span id="badge-pending" class="glass-pill"><i class="ph ph-clock"></i> Pendentes: 0</span>
+                            <span id="badge-phase" class="glass-pill"><i class="ph ph-flag"></i> Fase atual: Aguardando</span>
+                        </div>
+                    </div>
+                    <div id="knockout-alerts" class="alerts-stack"></div>
+                    <div class="scroll-label"><i class="ph ph-arrows-left-right"></i> Linha de fases da Sinuca</div>
+                    <div class="knockout-scroll-frame">
+                        <div id="bracket-container" class="knockout-scroll-container"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-ranking" class="tab-content">
+                <div class="section-header">
+                    <div>
+                        <span class="eyebrow">Ranking</span>
+                        <h1>Ranking da Sinuca</h1>
+                    </div>
+                </div>
+                <div class="table-card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Jogador</th>
+                                <th>Jogos</th>
+                                <th>Vitórias</th>
+                                <th>Derrotas</th>
+                                <th>Títulos</th>
+                                <th>Finais</th>
+                                <th>Semis</th>
+                                <th>Pts</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ranking-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="tab-historico" class="tab-content">
+                <div class="section-header">
+                    <div>
+                        <span class="eyebrow">Arquivo</span>
+                        <h1>Histórico da Sinuca</h1>
+                    </div>
+                </div>
+                <div id="history-list" class="history-list"></div>
+            </section>
+        </section>
+    </main>
+
+    <script type="module" src="sinuca.js"></script>
+</body>
+
+</html>

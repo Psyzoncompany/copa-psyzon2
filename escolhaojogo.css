@@ -1,0 +1,217 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    min-height: 100dvh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #042d15;
+    background-color: #edf5f0;
+    background-image: url('imgs/imagem de fundo-pc.webp');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    overflow-x: hidden;
+}
+
+.game-choice-page {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+}
+
+.game-choice-card {
+    width: min(100%, 520px);
+    padding: 28px;
+    border-radius: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.64);
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.50)),
+        rgba(255, 255, 255, 0.62);
+    box-shadow: 0 24px 60px rgba(4, 45, 21, 0.16), inset 0 1px 0 rgba(255,255,255,0.78);
+    backdrop-filter: blur(26px) saturate(140%);
+    -webkit-backdrop-filter: blur(26px) saturate(140%);
+}
+
+.choice-header {
+    text-align: center;
+}
+
+.choice-logo {
+    width: min(220px, 76vw);
+    height: auto;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 8px 18px rgba(0,0,0,0.14));
+}
+
+.choice-kicker {
+    display: block;
+    color: #16a34a;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+.choice-header h1 {
+    margin-top: 4px;
+    color: #042d15;
+    font-size: clamp(32px, 7vw, 48px);
+    font-weight: 950;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.choice-header p {
+    margin: 10px auto 24px;
+    max-width: 360px;
+    color: #51715c;
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.game-list {
+    display: grid;
+    gap: 12px;
+}
+
+.game-option {
+    width: 100%;
+    min-height: 82px;
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.68);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.62);
+    color: #042d15;
+    box-shadow: 0 12px 26px rgba(15, 45, 30, 0.08), inset 0 1px 0 rgba(255,255,255,0.76);
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.game-option:hover:not(.disabled) {
+    transform: translateY(-2px);
+    border-color: rgba(22, 163, 74, 0.36);
+    box-shadow: 0 18px 34px rgba(15, 45, 30, 0.13), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+.game-option:active:not(.disabled) {
+    transform: scale(0.99);
+}
+
+.game-option.disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.game-icon {
+    width: 54px;
+    height: 54px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    color: #fff;
+    font-size: 26px;
+}
+
+.game-icon.fifa { background: linear-gradient(135deg, #16a34a, #047857); }
+.game-icon.sinuca { background: linear-gradient(135deg, #2563eb, #16a34a); }
+.game-icon.cs { background: linear-gradient(135deg, #64748b, #1e293b); }
+.game-icon.futsal { background: linear-gradient(135deg, #facc15, #d97706); }
+
+.game-copy {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+    text-align: left;
+}
+
+.game-copy strong {
+    font-size: 18px;
+    font-weight: 950;
+    text-transform: uppercase;
+}
+
+.game-copy small {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.game-option > .ph-arrow-right {
+    color: #16a34a;
+    font-size: 22px;
+}
+
+.soon-pill {
+    justify-self: end;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(250, 204, 21, 0.5);
+    background: rgba(254, 249, 195, 0.72);
+    color: #854d0e;
+    font-size: 11px;
+    font-weight: 950;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.choice-footer {
+    margin-top: 18px;
+}
+
+.back-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    border-radius: 999px;
+    color: #064e3b;
+    background: rgba(255,255,255,0.52);
+    border: 1px solid rgba(255,255,255,0.7);
+    text-decoration: none;
+    font-weight: 850;
+}
+
+@media (max-width: 640px) {
+    body {
+        background-image: url('imgs/imagem de fundo-mobile.webp');
+        background-attachment: scroll;
+    }
+
+    .game-choice-page {
+        align-items: start;
+        padding: 16px;
+    }
+
+    .game-choice-card {
+        padding: 20px;
+        border-radius: 28px;
+    }
+
+    .game-option {
+        grid-template-columns: 48px minmax(0, 1fr);
+        min-height: 76px;
+    }
+
+    .game-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 16px;
+    }
+
+    .game-option > .ph-arrow-right,
+    .soon-pill {
+        grid-column: 2;
+        justify-self: start;
+    }
+}

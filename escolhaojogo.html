@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Escolha o jogo - Copa Psyzon</title>
+    <link rel="stylesheet" href="escolhaojogo.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <main class="game-choice-page">
+        <section class="game-choice-card" aria-labelledby="choice-title">
+            <header class="choice-header">
+                <img src="imgs/logo/logo svg psyzon e prefeitura.svg" alt="Copa Psyzon e Prefeitura" class="choice-logo">
+                <span class="choice-kicker">COPA PSYZON</span>
+                <h1 id="choice-title">Escolha o jogo</h1>
+                <p>Selecione a modalidade que deseja acompanhar ou organizar.</p>
+            </header>
+
+            <div class="game-list">
+                <button class="game-option" data-game="fifa">
+                    <span class="game-icon fifa"><i class="ph-fill ph-soccer-ball"></i></span>
+                    <span class="game-copy">
+                        <strong>FIFA</strong>
+                        <small>Fase de grupos, mata-mata e ranking</small>
+                    </span>
+                    <i class="ph ph-arrow-right"></i>
+                </button>
+
+                <button class="game-option" data-game="sinuca">
+                    <span class="game-icon sinuca"><i class="ph-fill ph-billiards"></i></span>
+                    <span class="game-copy">
+                        <strong>Sinuca</strong>
+                        <small>Mata-mata direto e ranking próprio</small>
+                    </span>
+                    <i class="ph ph-arrow-right"></i>
+                </button>
+
+                <button class="game-option disabled" data-game="cs" disabled>
+                    <span class="game-icon cs"><i class="ph-fill ph-crosshair"></i></span>
+                    <span class="game-copy">
+                        <strong>CS</strong>
+                        <small>Competitivo em breve</small>
+                    </span>
+                    <span class="soon-pill">Em breve</span>
+                </button>
+
+                <button class="game-option disabled" data-game="futsal" disabled>
+                    <span class="game-icon futsal"><i class="ph-fill ph-trophy"></i></span>
+                    <span class="game-copy">
+                        <strong>Futsal</strong>
+                        <small>Chaveamento em breve</small>
+                    </span>
+                    <span class="soon-pill">Em breve</span>
+                </button>
+            </div>
+
+            <footer class="choice-footer">
+                <a href="index.html" class="back-link"><i class="ph ph-arrow-left"></i> Voltar</a>
+            </footer>
+        </section>
+    </main>
+
+    <script src="escolhaojogo.js"></script>
+</body>
+
+</html>

@@ -54,7 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
             signInWithEmailAndPassword(auth, email, password)
                 .then((userCredential) => {
                     // Login sucesso
-                    window.location.href = 'FIFA/Fifa.html?role=organizador';
+                    localStorage.setItem('copaRole', 'organizador');
+                    window.location.href = 'escolhaojogo.html?role=organizador';
                 })
                 .catch((error) => {
                     btnSubmit.textContent = originalText;
@@ -78,14 +79,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnVisitante = document.getElementById('btn-visitante');
     if (btnVisitante) {
         btnVisitante.addEventListener('click', () => {
-            window.location.href = 'FIFA/Fifa.html?role=visitante';
+            localStorage.setItem('copaRole', 'visitante');
+            window.location.href = 'escolhaojogo.html?role=visitante';
         });
     }
 
     const btnApostador = document.getElementById('btn-apostador');
     if (btnApostador) {
         btnApostador.addEventListener('click', () => {
-            window.location.href = 'FIFA/Fifa.html?role=apostador';
+            localStorage.setItem('copaRole', 'apostador');
+            window.location.href = 'escolhaojogo.html?role=apostador';
         });
     }
 });

@@ -60,10 +60,30 @@ document.addEventListener('DOMContentLoaded', () => {
             ...raw,
             status,
             used: status === 'used',
+            modality: raw.modality || inferModalityFromCode(raw.code),
             participantId: raw.participantId || raw.usedBy || null,
             usedBy: raw.usedBy || raw.participantId || null,
             usedAt: raw.usedAt || null
         };
+    }
+
+    function inferModalityFromCode(code = '') {
+        const prefix = String(code).trim().toUpperCase().charAt(0);
+        if (prefix === 'F') return 'fifa';
+        if (prefix === 'S') return 'sinuca';
+        if (prefix === 'C') return 'cs';
+        return null;
+    }
+
+    function getTournamentPath(modality) {
+        return modality === 'sinuca' ? 'tournaments/sinuca/current' : 'tournaments/current';
+    }
+
+    function getParticipantRoute(modality, participantId, participantName = '') {
+        const id = encodeURIComponent(participantId || '');
+        const name = encodeURIComponent(participantName || '');
+        if (modality === 'sinuca') return `SINUCA/sinuca.html?role=participante&id=${id}&name=${name}`;
+        return `FIFA/Fifa.html?role=participante&id=${id}&name=${name}`;
     }
 
     // TELA 0: CÓDIGO
@@ -262,13 +282,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // VALIDAÇÃO DO CÓDIGO
     // ==========================================
     let validCodeData = null;
+    let validCodeModality = null;
 
     formCodigo.addEventListener('submit', async (e) => {
         e.preventDefault();
         const code = inputCodigo.value.trim().toUpperCase();
         if (!code) return;
-        if (!CODE_REGEX_BY_MODALITY.fifa.test(code)) {
-            alert('Código inválido para FIFA. Use o formato F1234.');
+        const modality = inferModalityFromCode(code);
+        if (!modality || !CODE_REGEX_BY_MODALITY[modality]?.test(code) || !['fifa', 'sinuca'].includes(modality)) {
+            alert('Código inválido. Use F1234 para FIFA ou S1234 para Sinuca.');
             return;
         }
 
@@ -291,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         alert('Este código já foi utilizado.');
                     } else {
                         validCodeData = code;
+                        validCodeModality = codeObj.modality || modality;
                         screenCodigo.style.display = 'none';
                         screenChoice.style.display = 'block';
                     }
@@ -375,7 +398,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const existingData = normalizeParticipant(docSnap.val());
                     const registrationOk = await markCodeAsUsed(validCodeData, existingData);
                     if (!registrationOk) return;
-                    window.location.href = `FIFA/Fifa.html?role=participante&id=${encodeURIComponent(getParticipantStableId(existingData) || participantId || cpfRaw)}`;
+                    const stableId = getParticipantStableId(existingData) || participantId || cpfRaw;
+                    window.location.href = getParticipantRoute(validCodeModality || inferModalityFromCode(validCodeData), stableId, existingData.name);
                 } else {
                     if (confirm('Não encontramos seu cadastro. Verifique o CPF ou faça um novo cadastro.\nDeseja fazer um novo cadastro agora?')) {
                         screenLogin.style.display = 'none';
@@ -493,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!registrationOk) return;
 
                 alert('Cadastro realizado com sucesso!');
-                window.location.href = `FIFA/Fifa.html?role=participante&id=${encodeURIComponent(participantId)}`;
+                window.location.href = getParticipantRoute(validCodeModality || inferModalityFromCode(validCodeData), participantId, normalized.name);
                 
             } catch (error) {
                 console.error('Erro no cadastro:', error);
@@ -554,6 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function markCodeAsUsed(codeStr, participantData) {
         if (!codeStr) return false;
+        const modality = validCodeModality || inferModalityFromCode(codeStr) || 'fifa';
         const stableParticipantId = getParticipantStableId(participantData || {});
         if (!stableParticipantId) {
             alert('Não foi possível validar seu cadastro. Faça login novamente antes de usar o código.');
@@ -563,7 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let codeConsumed = false;
         try {
             if (!participantData) return false;
-            const tRef = ref(db, 'tournaments/current');
+            const tRef = ref(db, getTournamentPath(modality));
             const tSnap = await get(tRef);
             if (!tSnap.exists()) {
                 alert('Nenhum torneio ativo foi encontrado para inscrição.');
@@ -585,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return false;
             }
 
-            regPlayers.push({
+            const participantEntry = {
                 id: stableParticipantId,
                 uid: participantData.uid || null,
                 cpf: participantData.cpf || null,
@@ -595,7 +620,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 flagId: participantData.flagId || participantData.flag || "br",
                 countryCode: participantData.countryCode || "br",
                 photo: participantData.photoUrl || participantData.photo || null
-            });
+            };
+
+            regPlayers.push(participantEntry);
+
+            if (modality === 'sinuca') {
+                const participants = Array.isArray(tData.participants) ? [...tData.participants] : [];
+                if (!participants.some((p) => getParticipantStableId(p) === stableParticipantId)) {
+                    participants.push(participantEntry);
+                }
+
+                const updateData = {
+                    participants,
+                    registeredPlayers: regPlayers,
+                    updatedAt: new Date().toISOString()
+                };
+
+                await update(tRef, updateData);
+                if (tData.tournamentCode) {
+                    await update(ref(db, 'tournaments/' + tData.tournamentCode), updateData);
+                }
+
+                console.log(`Sinuca: ${participantData.name || participantData.nome} cadastrado.`);
+                return true;
+            }
 
             // 3. ENCAIXAR NO CHAVEAMENTO — Fase de Grupos
             let placed = false;
