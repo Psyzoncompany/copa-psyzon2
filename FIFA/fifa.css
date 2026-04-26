@@ -1522,12 +1522,14 @@ body {
 }
 
 .knockout-scroll-container {
+    width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
-    display: flex;
-    gap: 14px;
+    display: block;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
     padding-bottom: 10px;
 }
 
@@ -2633,6 +2635,12 @@ body {
     font-weight: 700;
 }
 .bracket-container { align-items:stretch; gap:8px; padding:1.25rem .25rem; }
+.knockout-scroll-container .bracket-container {
+    width: max-content;
+    min-width: 100%;
+    display: flex;
+    touch-action: pan-x;
+}
 .bracket-round {
     min-width:310px; padding:8px 8px 10px; border-radius:16px; background:rgba(255,255,255,.52);
     border:1px solid rgba(191,219,254,.6); justify-content:flex-start; gap:10px;
@@ -2659,6 +2667,17 @@ body {
 .champion-card { background:linear-gradient(160deg, rgba(254,249,195,.95), rgba(255,255,255,.98)); border:1px solid rgba(250,204,21,.4); border-radius:16px; padding:18px 14px; text-align:center; }
 .champion-icon { font-size:28px; }
 @media (max-width: 768px) {
+    #tab-mata-mata {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
+    }
+    #tab-mata-mata .mata-mata-tab {
+        overflow: visible;
+    }
+    #tab-mata-mata .knockout-scroll-container {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
     .bracket-round { min-width:300px; }
     .bracket-match.modern { min-width:280px; }
     .bracket-slot .player-name-clickable { max-width:158px; }
