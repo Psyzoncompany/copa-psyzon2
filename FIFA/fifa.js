@@ -1867,7 +1867,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <td class="player-col">
                                 <div class="player-info-cell">
                                     <div class="player-avatar">
-                                        ${photo ? `<img src="${photo}" alt="">` : `<img src="https://flagcdn.com/w80/${countryCode || 'br'}.png" alt="" class="flag-avatar">`}
+                                        ${photo ? `<img src="${photo}" alt="">` : `<img src="../imgs/svg-bandeiras/${(countryCode || 'br').toLowerCase()}.svg" alt="" class="flag-avatar">`}
                                     </div>
                                     <span style="${nameStyle}" class="player-name-clickable" onclick="openPlayerProfile('${player.name}')">${formatName(player.name)}</span>
                                     ${(isGroupFinished && statusLabel) ? `<span class="player-status-badge ${statusClass}">${statusLabel}</span>` : ''}
@@ -1961,11 +1961,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     warningHTML += `<div class="knockout-warning-banner knockout-alert"><i class="ph ph-warning-circle"></i><span>Repescagem pendente: edite os resultados para liberar a próxima fase.</span></div>`;
                 }
 
-                let bracketHTML = `<div class="mata-mata-tab knockout-panel">
-                    <div class="knockout-header">
+                let bracketHTML = `<div class="mata-mata-tab knockout-panel bracket-stage fifa-bracket-stage">
+                    <div class="bracket-overlay"></div>
+                    <div class="knockout-header bracket-toolbar">
                         <div class="knockout-header-copy">
                             <span class="knockout-eyebrow">Fase eliminatória</span>
-                            <h2>Mata-mata oficial</h2>
+                            <h2>Chaveamento oficial</h2>
                         </div>
                         <div class="knockout-summary-pills knockout-status-badges">
                             <span class="knockout-pill glass-pill"><i class="ph ph-check-circle"></i> Finalizadas: ${finalizedCount}</span>
@@ -1976,14 +1977,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     ${warningHTML}
                     <div class="knockout-scroll-indicator"><i class="ph ph-arrows-left-right"></i>${window.matchMedia('(max-width: 768px)').matches ? 'Fases eliminatórias' : 'Linha de fases do mata-mata'}</div>
-                    <div class="knockout-scroll-frame"><div class="knockout-scroll-container" tabindex="0" aria-label="Chaveamento mata-mata"><div class="bracket-container knockout-track${isPreview ? ' preview-mode' : ''}">
+                    <div class="knockout-scroll-frame bracket-scroll"><div class="knockout-scroll-container" tabindex="0" aria-label="Chaveamento mata-mata"><div class="bracket-container bracket-tree knockout-track${isPreview ? ' preview-mode' : ''}">
                     ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
 
                 function playerBadge(name) {
                     const cleaned = formatName(displayParticipantName(name || 'A definir'));
                     const initials = cleaned.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0].toUpperCase()).join('') || '?';
+                    const participant = (tournamentState.registeredPlayers || []).find(p => formatName(p.name || p.nome) === cleaned || p.name === name || p.nome === name);
+                    const avatar = participant?.photo
+                        ? `<img src="${participant.photo}" alt="">`
+                        : `<img src="../imgs/svg-bandeiras/${(participant?.countryCode || 'br').toLowerCase()}.svg" alt="">`;
+                    const subtitle = participant?.nick || participant?.teamName || participant?.flagId || (isRealPlayer(name) ? 'Atleta' : 'Aguardando');
                     const profileAttr = isRealPlayer(name) ? ` onclick="openPlayerProfile(decodeURIComponent('${encodeURIComponent(name)}'))"` : '';
-                    return `<span class="knockout-avatar">${initials}</span><span class="player-name-clickable"${profileAttr}>${cleaned}</span>`;
+                    return `<span class="knockout-avatar team-avatar">${avatar}<em>${initials}</em></span><span class="team-info"><span class="player-name-clickable team-name-bracket"${profileAttr}>${cleaned}</span><small class="team-subtitle">${formatName(subtitle)}</small></span>`;
                 }
 
                 function matchStatus(match, winner, isTwoLegged) {
@@ -2003,6 +2009,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (normalized.includes('finalizado') || normalized.includes('bye')) return 'is-finalized';
                     if (normalized.includes('andamento') || normalized.includes('desempate') || normalized.includes('pendente')) return 'is-pending';
                     return 'is-waiting';
+                }
+
+                function connectorColumn() {
+                    return `<div class="bracket-connector-column" aria-hidden="true"><span class="bracket-connector top"></span><span class="bracket-connector join"></span><span class="bracket-connector bottom"></span></div>`;
                 }
 
                 function renderBracketMatch(match, type, rIdx, mIdx, label) {
@@ -2025,18 +2035,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ? `<button class="btn-test-inline" data-test-action="knockout-match-sim" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}">Simular confronto</button>`
                         : '';
                     return `
-                        <div class="bracket-match knockout-match-card modern ${statusClass} ${hasResult ? 'has-result' : ''} ${winner ? 'finished' : ''}" data-open-type="${type}" data-open-r="${rIdx}" data-open-m="${mIdx}">
-                            <div class="bracket-match-head">
-                                <span class="match-title">${label}</span>
-                                ${showBtn ? `<button class="btn-edit-knockout glass-button" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar resultado"><i class="ph ph-pencil-simple"></i><span>Editar</span></button>` : ''}
+                        <div class="bracket-match match-card knockout-match-card modern ${statusClass} ${hasResult ? 'has-result' : ''} ${winner ? 'finished match-card-finished' : 'match-card-pending'}" data-open-type="${type}" data-open-r="${rIdx}" data-open-m="${mIdx}">
+                            <div class="bracket-match-head match-header">
+                                <span class="match-title match-id">${label}</span>
+                                <span class="bracket-status match-status ${statusClass}">${statusText}</span>
                             </div>
-                            <div class="${p1Class}">
+                            <div class="${p1Class} match-team ${winner === match.p1 ? 'match-team-winner' : (winner === match.p2 ? 'match-team-loser' : '')}">
                                 <span class="player-line">${playerBadge(match.p1)}</span>
-                                <span class="slot-score knockout-score-pill">${score1}</span>
+                                <span class="slot-score knockout-score-pill score-display score-pill">${score1}</span>
                             </div>
-                            <div class="${p2Class}">
+                            <div class="${p2Class} match-team ${winner === match.p2 ? 'match-team-winner' : (winner === match.p1 ? 'match-team-loser' : '')}">
                                 <span class="player-line">${playerBadge(match.p2)}</span>
-                                <span class="slot-score knockout-score-pill">${score2}</span>
+                                <span class="slot-score knockout-score-pill score-display score-pill">${score2}</span>
                             </div>
                             ${isTwoLegged ? `<div class="knockout-legs-inline knockout-leg-summary">
                                 <span class="knockout-leg-row"><strong>IDA</strong><em>${formatName(displayParticipantName(match.p1))} ${idaScore} ${formatName(displayParticipantName(match.p2))}</em></span>
@@ -2045,25 +2055,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>` : ''}
                             ${match.pen1 && match.pen2 ? `<div class="penalty-badge"><i class="ph-fill ph-soccer-ball"></i> Pênaltis: ${match.pen1} x ${match.pen2}</div>` : ''}
                             <div class="knockout-card-footer">
-                                <span class="bracket-status match-status ${statusClass}">${statusText}</span>
                                 ${winner ? `<span class="winner-tag"><i class="ph-fill ph-seal-check"></i> Classificado: ${formatName(winner)}</span>` : ''}
+                                ${showBtn ? `<button class="btn-edit-knockout glass-button" data-type="${type}" data-r="${rIdx}" data-m="${mIdx}" title="Editar resultado"><i class="ph ph-pencil-simple"></i><span>Editar</span></button>` : ''}
                             </div>
                             ${testSimBtn}
                         </div>`;
                 }
 
                 if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
-                    bracketHTML += `<section class="bracket-round knockout-phase-column"><div class="bracket-round-title knockout-phase-header"><i class="ph ph-flag-checkered"></i><span>Repescagem</span></div>`;
+                    bracketHTML += `<section class="bracket-round knockout-phase-column"><div class="bracket-round-title knockout-phase-header"><i class="ph ph-flag-checkered"></i><span>Repescagem</span></div><div class="bracket-round-matches">`;
                     tournamentState.knockout.repechage.forEach((match, mIdx) => {
                         bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx, `Repescagem ${mIdx + 1}`);
                     });
-                    bracketHTML += `</section><div class="bracket-round-gap"><i class="ph ph-arrow-right"></i></div>`;
+                    bracketHTML += `</div></section>${connectorColumn()}`;
                 }
 
                 if (tournamentState.knockout.rounds) {
                     tournamentState.knockout.rounds.forEach((round, rIdx) => {
                         const totalMatches = (round.matches || []).length;
-                        bracketHTML += `<section class="bracket-round knockout-phase-column"><div class="bracket-round-title knockout-phase-header"><i class="ph ph-trophy"></i><span>${round.name}</span><small>${totalMatches} jogos</small></div>`;
+                        const isFinal = rIdx === tournamentState.knockout.rounds.length - 1;
+                        bracketHTML += `<section class="bracket-round knockout-phase-column"><div class="bracket-round-title knockout-phase-header"><i class="ph ${isFinal ? 'ph-trophy' : 'ph-soccer-ball'}"></i><span>${round.name}</span><small>${totalMatches} jogos</small></div><div class="bracket-round-matches">`;
                         if (testModeActive && role === 'organizador' && !isPreview) {
                             bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
                                 <button class="btn-test-inline" data-test-action="knockout-phase-sim" data-r="${rIdx}">Simular esta fase</button>
@@ -2074,7 +2085,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         round.matches.forEach((match, mIdx) => {
                             bracketHTML += renderBracketMatch(match, 'round', rIdx, mIdx, `${round.name} ${mIdx + 1}`);
                         });
-                        bracketHTML += `</section>${rIdx < tournamentState.knockout.rounds.length - 1 ? '<div class="bracket-round-gap"><i class="ph ph-arrow-right"></i></div>' : ''}`;
+                        bracketHTML += `</div></section>${rIdx < tournamentState.knockout.rounds.length - 1 ? connectorColumn() : ''}`;
                     });
                 }
 
@@ -3163,7 +3174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const stats = {
                 nome: pData ? pData.nome : playerName,
                 username: pData ? `@${pData.nick || pData.nome.split(' ')[0].toLowerCase()}` : '@atleta',
-                foto: pData && pData.photo ? pData.photo : `https://api.dicebear.com/7.x/avataaars/svg?seed=${playerName}`,
+                foto: pData && pData.photo ? pData.photo : `../imgs/svg-bandeiras/${((pData && pData.countryCode) || 'br').toLowerCase()}.svg`,
                 trofeus: 0, finals: 0, semis: 0,
                 jogos: 0, vitorias: 0, empates: 0, derrotas: 0, gols: 0, golsSofridos: 0
             };

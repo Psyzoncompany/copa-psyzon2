@@ -100,7 +100,7 @@
                         </div>
 
                         <!-- SELETOR DE ESCUDO POR PAÍS -->
-                        <div class="input-group">
+                        <div class="input-group" style="display:none;">
                             <i class="ph ph-globe"></i>
                             <select id="reg-pais" style="width: 100%; border: none; background: transparent; outline: none; font-size: 1rem; color: #042D15;">
                                 <option value="">Selecione o País da Liga</option>
@@ -114,15 +114,15 @@
                             </select>
                         </div>
 
-                        <!-- Preview + Seletor de time -->
-                        <div id="shield-section" style="display: none;">
+                        <!-- Preview + Seletor de bandeira -->
+                        <div id="shield-section" style="display: block;">
                             <div id="shield-preview" style="text-align:center; margin-bottom:10px;">
-                                <img id="shield-preview-img" src="" alt="Escudo" style="width:80px; height:80px; object-fit:contain; border-radius:12px; border:2px solid rgba(22,163,74,0.2); padding:8px; background:rgba(255,255,255,0.7); display:none;">
+                                <img id="shield-preview-img" src="imgs/svg-bandeiras/br.svg" alt="Bandeira" style="width:80px; height:58px; object-fit:cover; border-radius:12px; border:2px solid rgba(22,163,74,0.2); padding:6px; background:rgba(255,255,255,0.7);">
                             </div>
                             <div class="input-group">
-                                <i class="ph ph-shield"></i>
+                                <i class="ph ph-flag"></i>
                                 <select id="reg-bandeira" required style="width: 100%; border: none; background: transparent; outline: none; font-size: 1rem; color: #042D15;">
-                                    <option value="">Selecione o Time</option>
+                                    <option value="br">Brasil</option>
                                 </select>
                             </div>
                         </div>

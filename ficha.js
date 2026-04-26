@@ -50,7 +50,9 @@ function normalizeParticipant(raw = {}) {
 const flagNames = {
     br: 'Brasil', ar: 'Argentina', fr: 'França', de: 'Alemanha',
     es: 'Espanha', gb: 'Inglaterra', it: 'Itália', pt: 'Portugal',
-    nl: 'Holanda', uy: 'Uruguai'
+    nl: 'Holanda', uy: 'Uruguai', cl: 'Chile', co: 'Colombia',
+    pe: 'Peru', us: 'Estados Unidos', mx: 'Mexico', jp: 'Japao',
+    kr: 'Coreia do Sul'
 };
 
 // ========== MASK CPF for display ==========
@@ -77,12 +79,12 @@ function renderFichas(list) {
         const card = document.createElement('div');
         card.className = 'ficha-card';
 
+        const flagCode = (p.countryCode || 'br').toLowerCase();
+        const flagSrc = `imgs/svg-bandeiras/${flagCode}.svg`;
+        const flagName = flagNames[flagCode] || flagCode.toUpperCase();
         const avatarContent = p.photo
             ? `<img src="${p.photo}" alt="${escapeHtml(p.nome)}">`
-            : `<i class="ph-fill ph-user"></i>`;
-
-        const flagCode = (p.countryCode || 'br').toLowerCase();
-        const flagName = flagNames[flagCode] || flagCode.toUpperCase();
+            : `<img src="${flagSrc}" alt="${escapeHtml(flagName)}">`;
 
         const createdDate = p.createdAt
             ? new Date(p.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -96,7 +98,7 @@ function renderFichas(list) {
                     <div class="ficha-nick">${escapeHtml(p.nick || 'Sem nick')}</div>
                 </div>
                 <div class="ficha-flag-badge">
-                    <img src="https://flagcdn.com/24x18/${flagCode}.png" alt="${flagName}">
+                    <img src="${flagSrc}" alt="${flagName}">
                     ${escapeHtml(flagName)}
                 </div>
                 <button class="btn-delete-ficha" data-cpf="${p.cpf}" title="Apagar Cadastro">

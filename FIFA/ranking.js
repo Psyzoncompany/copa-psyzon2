@@ -321,7 +321,7 @@ export function initRankingSystem(db, role) {
                     <td style="font-weight:bold; color: #042D15;">${medal}</td>
                     <td style="text-align:left; display:flex; align-items:center; gap:12px;">
                         <div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; background: #eee; flex-shrink: 0; border: 2px solid rgba(22,163,74,0.1); display: flex; align-items: center; justify-content: center;">
-                            ${(p.photo || p.fotoURL) ? `<img src="${p.photo || p.fotoURL}" style="width:100%; height:100%; object-fit:cover;">` : `<img src="https://flagcdn.com/w80/${(p.countryCode || 'br').toLowerCase()}.png" style="transform:scale(1.6); width:100%; height:100%; object-fit:cover;">`}
+                            ${(p.photo || p.fotoURL) ? `<img src="${p.photo || p.fotoURL}" style="width:100%; height:100%; object-fit:cover;">` : `<img src="../imgs/svg-bandeiras/${(p.countryCode || 'br').toLowerCase()}.svg" style="width:100%; height:100%; object-fit:cover;">`}
                         </div>
                         <div style="display:flex; flex-direction:column;">
                             <span style="font-weight:600; color:#042D15;">${escapeHtml(formatName(p.name))}</span>

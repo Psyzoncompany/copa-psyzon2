@@ -4,6 +4,199 @@
     padding: 0;
 }
 
+/* Premium knockout bracket */
+:root {
+    --psy-bg-dark: #060e1e;
+    --psy-surface: rgba(11, 19, 35, 0.78);
+    --psy-card: rgba(15, 23, 42, 0.82);
+    --psy-border: rgba(255, 255, 255, 0.08);
+    --psy-border-strong: rgba(173, 199, 255, 0.18);
+    --psy-text: #ffffff;
+    --psy-muted: rgba(219, 226, 249, 0.58);
+    --psy-blue-soft: #adc7ff;
+    --psy-green-soft: #66df75;
+    --psy-yellow-soft: #ffcc00;
+    --psy-shadow-dark: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+#tab-mata-mata .knockout-panel {
+    position: relative;
+    min-height: calc(100dvh - 160px);
+    overflow: hidden;
+    border-radius: 28px;
+    border: 1px solid var(--psy-border);
+    background:
+        linear-gradient(rgba(6, 14, 30, 0.86), rgba(6, 14, 30, 0.92)),
+        url('imgs/sinuca-fundo-pc.png') center/cover;
+    box-shadow: var(--psy-shadow-dark);
+    color: var(--psy-text);
+}
+
+#tab-mata-mata .knockout-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 18% 12%, rgba(173, 199, 255, 0.18), transparent 34%),
+        radial-gradient(circle at 84% 18%, rgba(102, 223, 117, 0.13), transparent 30%);
+}
+
+#tab-mata-mata .knockout-header,
+#tab-mata-mata .alerts-stack,
+#tab-mata-mata .scroll-label,
+#tab-mata-mata .knockout-scroll-frame {
+    position: relative;
+    z-index: 1;
+}
+
+#tab-mata-mata .knockout-header { color: #fff; }
+#tab-mata-mata .eyebrow { color: var(--psy-blue-soft); }
+#tab-mata-mata .knockout-header h1 { color: #fff; }
+#tab-mata-mata .glass-pill { border-color: var(--psy-border-strong); background: rgba(15,23,42,.66); color: #eef4ff; }
+#tab-mata-mata .scroll-label { color: var(--psy-muted); }
+
+#tab-mata-mata .knockout-scroll-frame {
+    border: 1px solid var(--psy-border);
+    border-radius: 22px;
+    background: rgba(6, 14, 30, 0.36);
+}
+
+#tab-mata-mata .knockout-scroll-container {
+    min-height: 560px;
+    padding: 24px;
+    overflow-x: auto;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    touch-action: pan-x pan-y;
+}
+
+#tab-mata-mata .bracket-tree {
+    width: max-content;
+    min-width: 100%;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+}
+
+#tab-mata-mata .bracket-round {
+    flex: 0 0 292px;
+    min-width: 292px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+#tab-mata-mata .bracket-round-title {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 0;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+}
+
+#tab-mata-mata .bracket-round-title i { color: var(--psy-blue-soft); }
+#tab-mata-mata .bracket-round-title small { color: var(--psy-muted); }
+
+#tab-mata-mata .bracket-round-matches {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 26px;
+}
+
+#tab-mata-mata .match-card {
+    overflow: hidden;
+    border: 1px solid var(--psy-border-strong);
+    border-radius: 18px;
+    background: linear-gradient(145deg, rgba(24, 32, 48, 0.94), rgba(11, 19, 35, 0.88));
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+#tab-mata-mata .match-header {
+    min-height: 42px;
+    background: rgba(0, 0, 0, 0.24);
+    border-bottom: 1px solid var(--psy-border);
+}
+
+#tab-mata-mata .match-id {
+    color: #fff;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+#tab-mata-mata .match-team {
+    display: grid;
+    align-items: center;
+    gap: 12px;
+    min-height: 62px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    background: transparent;
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+#tab-mata-mata .match-team-winner { background: linear-gradient(90deg, rgba(102, 223, 117, 0.16), rgba(102, 223, 117, 0.03)); }
+#tab-mata-mata .match-team-loser { opacity: 0.54; }
+#tab-mata-mata .player-line { display: flex; align-items: center; min-width: 0; }
+#tab-mata-mata .team-avatar { width: 36px; height: 36px; flex-basis: 36px; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #fff; }
+#tab-mata-mata .team-info { min-width: 0; display: grid; gap: 3px; }
+#tab-mata-mata .team-name-bracket { color: #fff; font-size: 13px; font-weight: 900; }
+#tab-mata-mata .team-subtitle { overflow: hidden; color: var(--psy-muted); font-size: 10px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+
+#tab-mata-mata .score-display {
+    min-width: 42px;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(173, 199, 255, 0.2);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 950;
+}
+
+#tab-mata-mata .match-team-winner .score-display { color: var(--psy-green-soft); border-color: rgba(102,223,117,.35); background: rgba(102,223,117,.12); }
+#tab-mata-mata .match-status.done { color: var(--psy-green-soft); border-color: rgba(102,223,117,.28); background: rgba(102,223,117,.12); }
+#tab-mata-mata .match-status.pending { color: var(--psy-yellow-soft); border-color: rgba(255,204,0,.25); background: rgba(255,204,0,.10); }
+#tab-mata-mata .match-status.waiting { color: var(--psy-muted); border-color: rgba(255,255,255,.1); background: rgba(255,255,255,.08); }
+#tab-mata-mata .match-footer { background: rgba(0,0,0,.18); border-color: rgba(255,255,255,.08); color: var(--psy-muted); }
+#tab-mata-mata .win-button { min-height: 34px; border-color: rgba(173,199,255,.22); background: rgba(173,199,255,.10); color: #fff; }
+
+#tab-mata-mata .bracket-connector-column { flex: 0 0 70px; position: relative; min-width: 70px; }
+#tab-mata-mata .bracket-connector-column::before { content: ""; position: absolute; top: 50%; left: 10px; right: 10px; height: 2px; background: rgba(219,226,249,.32); }
+#tab-mata-mata .bracket-connector { position: absolute; left: 12px; right: 12px; border-color: rgba(219,226,249,.28); }
+#tab-mata-mata .bracket-connector.top,
+#tab-mata-mata .bracket-connector.bottom { width: 28px; height: 28%; border-right: 2px solid rgba(219,226,249,.28); }
+#tab-mata-mata .bracket-connector.top { top: 24%; border-top: 2px solid rgba(219,226,249,.28); }
+#tab-mata-mata .bracket-connector.bottom { bottom: 24%; border-bottom: 2px solid rgba(219,226,249,.28); }
+#tab-mata-mata .champion-card { background: linear-gradient(145deg, rgba(250,204,21,.22), rgba(15,23,42,.84)); color: #fff; border-color: rgba(250,204,21,.32); }
+
+@media (max-width: 767px) {
+    html, body { width: 100%; overflow-x: hidden; }
+    #tab-mata-mata .knockout-panel { min-height: 0; border-radius: 18px; }
+    #tab-mata-mata .knockout-scroll-frame { border: 0; background: transparent; }
+    #tab-mata-mata .knockout-scroll-container { min-height: 0; overflow: visible; padding: 0; touch-action: pan-y; }
+    #tab-mata-mata .bracket-tree { width: 100%; display: grid; gap: 18px; }
+    #tab-mata-mata .bracket-round { width: 100%; min-width: 0; display: grid; }
+    #tab-mata-mata .bracket-round-matches { display: grid; gap: 12px; }
+    #tab-mata-mata .bracket-connector-column { display: none; }
+    #tab-mata-mata .match-card { width: 100%; }
+    #tab-mata-mata .win-button { min-height: 44px; }
+}
+
 :root {
     --glass-bg: rgba(255, 255, 255, 0.72);
     --glass-border: rgba(255, 255, 255, 0.58);
@@ -27,7 +220,7 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     color: var(--text-main);
     background-color: #edf5f0;
-    background-image: url('../imgs/imagem de fundo-pc.webp');
+    background-image: url('imgs/sinuca-fundo-pc.png');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -104,6 +297,7 @@ input {
 }
 
 .icon-button {
+    border: 0;
     width: 38px;
     height: 38px;
     display: inline-flex;
@@ -114,6 +308,11 @@ input {
     background: rgba(255,255,255,0.56);
     color: #064e3b;
     text-decoration: none;
+    cursor: pointer;
+}
+
+.mobile-config-button {
+    display: none;
 }
 
 .tabs-nav {
@@ -352,6 +551,7 @@ input {
 .code-chip {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 8px;
     padding: 8px 10px;
     border-radius: 12px;
@@ -359,6 +559,63 @@ input {
     color: #334155;
     font-size: 12px;
     font-weight: 850;
+}
+
+.code-chip.is-unavailable {
+    border: 1px solid rgba(239,68,68,0.26);
+    background: rgba(254,226,226,0.72);
+}
+
+.code-main {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.code-main strong {
+    color: #042d15;
+    font-size: 13px;
+}
+
+.code-main span {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.code-chip.is-unavailable .code-main span {
+    font-size: 0;
+}
+
+.code-chip.is-unavailable .code-main span::after {
+    content: "Indisponivel";
+    color: #b91c1c;
+    font-size: 11px;
+}
+
+.code-actions {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.code-action {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(37,99,235,0.20);
+    border-radius: 10px;
+    background: rgba(239,246,255,0.92);
+    color: #1d4ed8;
+    cursor: pointer;
+}
+
+.code-action.danger {
+    border-color: rgba(239,68,68,0.25);
+    background: rgba(255,255,255,0.62);
+    color: #b91c1c;
 }
 
 .section-header {
@@ -681,6 +938,13 @@ td {
 
 .history-card {
     padding: 16px;
+    cursor: pointer;
+    transition: border-color 0.16s ease, transform 0.16s ease;
+}
+
+.history-card.active {
+    border-color: rgba(22,163,74,0.55);
+    transform: translateY(-1px);
 }
 
 .history-card h3 {
@@ -693,6 +957,145 @@ td {
     color: var(--text-muted);
     font-size: 13px;
     font-weight: 750;
+}
+
+.history-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.history-button {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid rgba(37,99,235,0.20);
+    border-radius: 999px;
+    background: rgba(239,246,255,0.86);
+    color: #1d4ed8;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.history-button.danger {
+    border-color: rgba(239,68,68,0.25);
+    background: rgba(254,226,226,0.86);
+    color: #b91c1c;
+}
+
+.history-detail {
+    margin-top: 14px;
+}
+
+.history-detail-card {
+    border: 1px solid var(--glass-border);
+    border-radius: 22px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,255,255,0.58));
+    box-shadow: var(--glass-shadow);
+    padding: 16px;
+}
+
+.history-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.history-detail-header h2 {
+    font-size: 22px;
+    font-weight: 950;
+}
+
+.history-detail-header p {
+    margin-top: 5px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.history-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+    gap: 14px;
+}
+
+.history-detail-grid h3 {
+    margin-bottom: 10px;
+    color: #064e3b;
+    font-size: 14px;
+    font-weight: 950;
+    text-transform: uppercase;
+}
+
+.history-bracket {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.history-round {
+    flex: 0 0 260px;
+    display: grid;
+    align-content: start;
+    gap: 8px;
+}
+
+.history-round h4 {
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 950;
+    text-transform: uppercase;
+}
+
+.history-match,
+.history-ranking-row {
+    display: grid;
+    gap: 5px;
+    border: 1px solid rgba(226,232,240,0.82);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.62);
+    padding: 10px;
+}
+
+.history-match strong,
+.history-ranking-row span {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 950;
+    text-transform: uppercase;
+}
+
+.history-match span,
+.history-ranking-row strong {
+    color: #042d15;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.history-match small,
+.history-ranking-row small {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.winner-name {
+    color: #047857 !important;
+}
+
+.history-ranking-list {
+    display: grid;
+    gap: 8px;
+    max-height: 520px;
+    overflow-y: auto;
 }
 
 .empty-state {
@@ -711,7 +1114,7 @@ td {
         height: auto;
         min-height: 100dvh;
         overflow-y: auto;
-        background-image: url('../imgs/imagem de fundo-mobile.webp');
+        background-image: url('imgs/sinuca-fundo-mobile.png');
         background-attachment: scroll;
     }
 
@@ -745,8 +1148,32 @@ td {
         overflow: visible;
     }
 
+    .mobile-config-button {
+        display: inline-flex;
+    }
+
     .sidebar {
-        display: none;
+        position: fixed;
+        top: 0;
+        left: -100%;
+        z-index: 1000;
+        width: min(86vw, 340px);
+        height: 100dvh;
+        max-height: 100dvh;
+        display: flex !important;
+        padding: 18px;
+        padding-bottom: calc(90px + env(safe-area-inset-bottom));
+        background: rgba(255,255,255,0.94);
+        border-right: 1px solid rgba(255,255,255,0.72);
+        box-shadow: 20px 0 50px rgba(15,23,42,0.16);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        overflow-y: auto;
+        transition: left 0.28s ease;
+    }
+
+    .sidebar.active {
+        left: 0;
     }
 
     .content-area,
@@ -807,5 +1234,21 @@ td {
         overflow: visible;
         white-space: normal;
         word-break: break-word;
+    }
+
+    .history-detail-header,
+    .history-detail-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .history-bracket {
+        display: grid;
+        overflow: visible;
+    }
+
+    .history-round {
+        width: 100%;
+        min-width: 0;
     }
 }

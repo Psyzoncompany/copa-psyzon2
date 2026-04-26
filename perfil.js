@@ -5,7 +5,7 @@
 const dadosAtleta = {
     nome: "Júlio César Ferreira",
     username: "@Mr_julius96",
-    foto: "https://api.dicebear.com/7.x/avataaars/svg?seed=Julius", // Avatar dinâmico
+    foto: "imgs/svg-bandeiras/br.svg",
     trofeus: 1,
     finais: 1,
     semifinais: 1,

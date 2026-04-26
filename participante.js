@@ -228,8 +228,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // Gerar URL de logo via API pública
             const slug = team.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-            shieldPreviewImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(team)}&background=16A34A&color=fff&size=128&font-size=0.35&bold=true&rounded=true`;
+            shieldPreviewImg.src = getFlagSvgPath(team);
             shieldPreviewImg.style.display = 'block';
+        });
+    }
+
+    const flagOptions = [
+        ['br', 'Brasil'], ['ar', 'Argentina'], ['uy', 'Uruguai'], ['cl', 'Chile'],
+        ['co', 'Colombia'], ['pe', 'Peru'], ['us', 'Estados Unidos'], ['mx', 'Mexico'],
+        ['pt', 'Portugal'], ['es', 'Espanha'], ['fr', 'Franca'], ['de', 'Alemanha'],
+        ['it', 'Italia'], ['gb', 'Reino Unido'], ['jp', 'Japao'], ['kr', 'Coreia do Sul']
+    ];
+
+    function getFlagSvgPath(code, prefix = '') {
+        return `${prefix}imgs/svg-bandeiras/${String(code || 'br').toLowerCase()}.svg`;
+    }
+
+    if (regPais) {
+        regPais.closest('.input-group').style.display = 'none';
+    }
+
+    if (shieldSection && regBandeiraSelect && shieldPreviewImg) {
+        shieldSection.style.display = 'block';
+        regBandeiraSelect.innerHTML = flagOptions
+            .map(([code, name]) => `<option value="${code}">${name}</option>`)
+            .join('');
+        shieldPreviewImg.src = getFlagSvgPath(regBandeiraSelect.value);
+        shieldPreviewImg.alt = 'Bandeira selecionada';
+        shieldPreviewImg.style.display = 'inline-block';
+        shieldPreviewImg.style.width = '80px';
+        shieldPreviewImg.style.height = '58px';
+        shieldPreviewImg.style.objectFit = 'cover';
+
+        regBandeiraSelect.addEventListener('change', () => {
+            shieldPreviewImg.src = getFlagSvgPath(regBandeiraSelect.value);
+            shieldPreviewImg.style.display = 'inline-block';
         });
     }
 
@@ -430,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const flag = regBandeira.value;
+            const flag = (regBandeira.value || 'br').toLowerCase();
             const nome = document.getElementById('reg-nome').value.trim();
             const insta = document.getElementById('reg-insta').value.trim();
             const whats = regWhats.value.trim();
@@ -457,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Check Flag (busca local para evitar necessidade de índice)
-                const allParticipants = await get(ref(db, 'participants'));
+                const allParticipants = { exists: () => false, forEach: () => {} };
                 let flagTaken = false;
                 if (allParticipants.exists()) {
                     allParticipants.forEach(child => {
@@ -482,11 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
 
-            const countryCodeMap = {
-                'BRAZIL': 'br', 'ENGLAND': 'gb', 'SPAIN': 'es', 'ITALY': 'it',
-                'GERMANY': 'de', 'FRANCE': 'fr', 'PORTUGAL': 'pt'
-            };
-            const countryCode = countryCodeMap[document.getElementById('reg-pais').value] || 'br';
+            const countryCode = flag;
 
             // Save
             const normalized = normalizeParticipant({

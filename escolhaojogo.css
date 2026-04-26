@@ -121,10 +121,12 @@ body {
     font-size: 26px;
 }
 
-.game-icon.fifa { background: linear-gradient(135deg, #16a34a, #047857); }
-.game-icon.sinuca { background: linear-gradient(135deg, #2563eb, #16a34a); }
-.game-icon.cs { background: linear-gradient(135deg, #64748b, #1e293b); }
-.game-icon.futsal { background: linear-gradient(135deg, #facc15, #d97706); }
+.game-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: inherit;
+}
 
 .game-copy {
     min-width: 0;

@@ -2671,6 +2671,200 @@ body {
     --text-muted: #64748b;
 }
 
+/* Premium knockout bracket */
+:root {
+    --psy-bg-dark: #060e1e;
+    --psy-surface: rgba(11, 19, 35, 0.78);
+    --psy-card: rgba(15, 23, 42, 0.82);
+    --psy-card-strong: rgba(24, 32, 48, 0.92);
+    --psy-border: rgba(255, 255, 255, 0.08);
+    --psy-border-strong: rgba(173, 199, 255, 0.18);
+    --psy-text: #ffffff;
+    --psy-muted: rgba(219, 226, 249, 0.58);
+    --psy-blue-soft: #adc7ff;
+    --psy-green-soft: #66df75;
+    --psy-yellow-soft: #ffcc00;
+    --psy-shadow-dark: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+#tab-mata-mata .bracket-stage {
+    position: relative;
+    min-height: calc(100dvh - 190px);
+    overflow: hidden;
+    border-radius: 28px;
+    border: 1px solid var(--psy-border);
+    background: linear-gradient(rgba(6, 14, 30, 0.88), rgba(6, 14, 30, 0.9)), url('IMG/imagem de fundo pc FIFA.png') center/cover;
+    box-shadow: var(--psy-shadow-dark);
+    color: var(--psy-text);
+}
+
+#tab-mata-mata .bracket-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 18% 12%, rgba(173, 199, 255, 0.18), transparent 34%), radial-gradient(circle at 85% 18%, rgba(102, 223, 117, 0.13), transparent 30%);
+}
+
+#tab-mata-mata .bracket-toolbar,
+#tab-mata-mata .knockout-scroll-indicator,
+#tab-mata-mata .knockout-scroll-frame { position: relative; z-index: 1; }
+
+#tab-mata-mata .bracket-toolbar { padding: 22px 24px 10px; color: var(--psy-text); }
+#tab-mata-mata .knockout-eyebrow { color: var(--psy-blue-soft); }
+#tab-mata-mata .bracket-toolbar h2 { color: #fff; letter-spacing: 0; }
+#tab-mata-mata .knockout-pill { border-color: var(--psy-border-strong); background: rgba(15, 23, 42, 0.66); color: #eef4ff; }
+#tab-mata-mata .knockout-scroll-indicator { margin: 0 24px 12px; color: var(--psy-muted); }
+
+#tab-mata-mata .bracket-scroll {
+    height: auto;
+    min-height: 0;
+    margin: 0 18px 18px;
+    border: 1px solid var(--psy-border);
+    border-radius: 22px;
+    background: rgba(6, 14, 30, 0.36);
+}
+
+#tab-mata-mata .knockout-scroll-container {
+    min-height: 560px;
+    padding: 24px;
+    overflow-x: auto;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    touch-action: pan-x pan-y;
+}
+
+#tab-mata-mata .bracket-tree {
+    width: max-content;
+    min-width: 100%;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+}
+
+#tab-mata-mata .bracket-round {
+    flex: 0 0 292px;
+    min-width: 292px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+#tab-mata-mata .bracket-round-title {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 0;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+}
+
+#tab-mata-mata .bracket-round-title i { color: var(--psy-blue-soft); }
+#tab-mata-mata .bracket-round-title small { color: var(--psy-muted); }
+
+#tab-mata-mata .bracket-round-matches {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 26px;
+}
+
+#tab-mata-mata .match-card {
+    overflow: hidden;
+    border: 1px solid var(--psy-border-strong);
+    border-radius: 18px;
+    background: linear-gradient(145deg, rgba(24, 32, 48, 0.94), rgba(11, 19, 35, 0.88));
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+#tab-mata-mata .match-header {
+    min-height: 42px;
+    background: rgba(0, 0, 0, 0.24);
+    border-bottom: 1px solid var(--psy-border);
+}
+
+#tab-mata-mata .match-id {
+    color: #fff;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+#tab-mata-mata .match-team {
+    display: grid;
+    align-items: center;
+    gap: 12px;
+    min-height: 62px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    background: transparent;
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+#tab-mata-mata .match-team-winner,
+#tab-mata-mata .knockout-player-row.winner { background: linear-gradient(90deg, rgba(102, 223, 117, 0.16), rgba(102, 223, 117, 0.03)); }
+#tab-mata-mata .match-team-loser,
+#tab-mata-mata .knockout-player-row.loser { opacity: 0.54; }
+
+#tab-mata-mata .player-line { display: flex; align-items: center; min-width: 0; }
+#tab-mata-mata .team-avatar { width: 36px; height: 36px; flex-basis: 36px; overflow: hidden; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); }
+#tab-mata-mata .team-avatar img { width: 100%; height: 100%; object-fit: cover; }
+#tab-mata-mata .team-avatar em { display: none; }
+#tab-mata-mata .team-info { min-width: 0; display: grid; gap: 3px; }
+#tab-mata-mata .team-name-bracket { color: #fff; font-size: 13px; font-weight: 900; }
+#tab-mata-mata .team-subtitle { overflow: hidden; color: var(--psy-muted); font-size: 10px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+
+#tab-mata-mata .score-display {
+    min-width: 42px;
+    min-height: 34px;
+    border-color: rgba(173, 199, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 15px;
+}
+
+#tab-mata-mata .match-team-winner .score-display { color: var(--psy-green-soft); border-color: rgba(102,223,117,.35); background: rgba(102,223,117,.12); }
+#tab-mata-mata .match-status { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.08); color: var(--psy-muted); }
+#tab-mata-mata .match-status.is-finalized { color: var(--psy-green-soft); border-color: rgba(102,223,117,.28); background: rgba(102,223,117,.12); }
+#tab-mata-mata .match-status.is-pending { color: var(--psy-yellow-soft); border-color: rgba(255,204,0,.25); background: rgba(255,204,0,.10); }
+#tab-mata-mata .knockout-card-footer,
+#tab-mata-mata .knockout-leg-summary,
+#tab-mata-mata .penalty-badge { background: rgba(0,0,0,.18); border-color: rgba(255,255,255,.08); }
+#tab-mata-mata .winner-tag { color: var(--psy-green-soft); }
+#tab-mata-mata .btn-edit-knockout { width: auto; min-height: 34px; border-color: rgba(173,199,255,.22); background: rgba(173,199,255,.10); color: #fff; }
+
+#tab-mata-mata .bracket-connector-column { flex: 0 0 70px; position: relative; min-width: 70px; }
+#tab-mata-mata .bracket-connector-column::before { content: ""; position: absolute; top: 50%; left: 10px; right: 10px; height: 2px; background: rgba(219,226,249,.32); }
+#tab-mata-mata .bracket-connector { position: absolute; left: 12px; right: 12px; border-color: rgba(219,226,249,.28); }
+#tab-mata-mata .bracket-connector.top,
+#tab-mata-mata .bracket-connector.bottom { width: 28px; height: 28%; border-right: 2px solid rgba(219,226,249,.28); }
+#tab-mata-mata .bracket-connector.top { top: 24%; border-top: 2px solid rgba(219,226,249,.28); }
+#tab-mata-mata .bracket-connector.bottom { bottom: 24%; border-bottom: 2px solid rgba(219,226,249,.28); }
+#tab-mata-mata .champion-card { background: linear-gradient(145deg, rgba(250,204,21,.22), rgba(15,23,42,.84)); color: #fff; border-color: rgba(250,204,21,.32); }
+
+@media (max-width: 767px) {
+    html, body { width: 100%; overflow-x: hidden; }
+    #tab-mata-mata .bracket-stage { min-height: 0; border-radius: 18px; }
+    #tab-mata-mata .bracket-toolbar { display: grid; padding: 16px; }
+    #tab-mata-mata .knockout-summary-pills { justify-content: flex-start; }
+    #tab-mata-mata .knockout-scroll-indicator { margin-inline: 16px; }
+    #tab-mata-mata .bracket-scroll { margin: 0 10px 12px; border: 0; background: transparent; }
+    #tab-mata-mata .knockout-scroll-container { min-height: 0; overflow: visible; padding: 0; touch-action: pan-y; }
+    #tab-mata-mata .bracket-tree { width: 100%; display: grid; gap: 18px; }
+    #tab-mata-mata .bracket-round { width: 100%; min-width: 0; display: grid; }
+    #tab-mata-mata .bracket-round-matches { display: grid; gap: 12px; }
+    #tab-mata-mata .bracket-connector-column { display: none; }
+    #tab-mata-mata .match-card { width: 100%; }
+    #tab-mata-mata .btn-edit-knockout { min-height: 44px; }
+}
+
 #tab-mata-mata,
 #tab-mata-mata * {
     box-sizing: border-box;
@@ -3706,5 +3900,32 @@ body {
         overflow-x: auto;
         overflow-y: auto;
         scrollbar-gutter: stable;
+    }
+}
+
+/* Final bracket scroll/mobile overrides */
+#tab-mata-mata .bracket-stage .knockout-scroll-container {
+    height: auto;
+    max-height: none;
+    min-height: 560px;
+    padding: 24px;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+@media (max-width: 767px) {
+    #tab-mata-mata .bracket-stage .knockout-scroll-container {
+        height: auto;
+        max-height: none;
+        min-height: 0;
+        overflow: visible;
+        padding: 0;
+        touch-action: pan-y;
+    }
+
+    #tab-mata-mata .bracket-stage .bracket-scroll {
+        height: auto;
+        max-height: none;
+        overflow: visible;
     }
 }

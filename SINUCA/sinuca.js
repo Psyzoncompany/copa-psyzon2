@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const HISTORY_KEY = 'copaPsyzon_sinuca_history';
     const RANKING_KEY = 'copaPsyzon_sinuca_ranking';
     const FIREBASE_TOURNAMENT_PATH = 'tournaments/sinuca/current';
+    const RESET_CODE_PASSWORD = '153090';
     const VALID_SIZES = [2, 4, 8, 16, 32, 64];
 
     const params = new URLSearchParams(window.location.search);
@@ -36,10 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
         bracket: null,
         champion: null,
         status: 'aguardando',
+        finishedHistoryId: null,
         updatedAt: null
     };
 
     let state = loadState();
+    let selectedHistoryId = null;
 
     const $ = (selector) => document.querySelector(selector);
     const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -90,8 +93,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 state = { ...defaultState, ...remote };
                 persist();
             }
+            await syncLocalCodesFromPool();
         } catch (error) {
             console.warn('Nao foi possivel carregar a Sinuca do Firebase:', error);
+        }
+    }
+
+    async function syncLocalCodesFromPool() {
+        if (!state.codes?.length) return;
+        try {
+            const snap = await get(ref(db, 'codes/pool'));
+            if (!snap.exists()) return;
+            const poolCodes = snap.val().codes || [];
+            const byCode = new Map(poolCodes.map(item => [item.code, item]));
+            let changed = false;
+            state.codes = state.codes.map(item => {
+                const remote = byCode.get(item.code);
+                if (!remote) return item;
+                changed = true;
+                return { ...item, ...remote, modality: 'sinuca' };
+            });
+            if (changed) persist();
+        } catch (error) {
+            console.warn('Nao foi possivel sincronizar os codigos da Sinuca:', error);
         }
     }
 
@@ -117,6 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setRanking(ranking) {
         localStorage.setItem(RANKING_KEY, JSON.stringify(ranking));
+    }
+
+    function cloneData(value) {
+        return JSON.parse(JSON.stringify(value ?? null));
     }
 
     function escapeHtml(value) {
@@ -255,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.bracket = { rounds };
         state.champion = null;
+        state.finishedHistoryId = null;
         state.status = 'em_andamento';
         normalizeAutoAdvances();
         persist();
@@ -347,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         state.champion = null;
+        state.finishedHistoryId = null;
         state.status = 'em_andamento';
         normalizeAutoAdvances();
         persist();
@@ -354,9 +384,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAll();
     }
 
-    function updateRankingFromCurrentTournament() {
-        if (!state.bracket?.rounds?.length) return;
-        const ranking = getRanking();
+    function calculateCurrentTournamentRanking(baseRanking = {}) {
+        if (!state.bracket?.rounds?.length) return baseRanking;
+        const ranking = cloneData(baseRanking) || {};
         const ensure = (name) => {
             if (!isRealPlayer(name)) return null;
             if (!ranking[name]) {
@@ -393,7 +423,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        setRanking(ranking);
+        return ranking;
+    }
+
+    function updateRankingFromCurrentTournament() {
+        setRanking(calculateCurrentTournamentRanking(getRanking()));
     }
 
     function finishTournament() {
@@ -402,20 +436,37 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (state.finishedHistoryId && !confirm('Este torneio ja foi salvo no historico. Deseja salvar uma nova copia?')) {
+            return;
+        }
+
         updateRankingFromCurrentTournament();
+        const tournamentRanking = Object.values(calculateCurrentTournamentRanking({})).sort((a, b) =>
+            (b.titulos || 0) - (a.titulos || 0) ||
+            (b.pts || 0) - (a.pts || 0) ||
+            (b.vitorias || 0) - (a.vitorias || 0) ||
+            a.name.localeCompare(b.name, 'pt-BR')
+        );
         const history = getHistory();
-        history.unshift({
-            id: Date.now(),
+        const item = {
+            id: `sinuca-${Date.now()}`,
             name: state.name,
             champion: state.champion,
             participants: state.participants.length,
+            participantsList: cloneData(state.participants),
+            bracket: cloneData(state.bracket),
+            rankingFinal: tournamentRanking,
+            status: 'encerrado',
             finishedAt: new Date().toISOString()
-        });
+        };
+        history.unshift(item);
         setHistory(history.slice(0, 50));
         state.status = 'encerrado';
+        state.finishedHistoryId = item.id;
         persist();
         syncTournamentToFirebase();
         renderAll();
+        switchTab('historico');
         alert('Torneio de Sinuca salvo no histórico.');
     }
 
@@ -479,6 +530,87 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Códigos da Sinuca atualizados para cadastro dos participantes.');
     }
 
+    async function copyCode(code) {
+        try {
+            await navigator.clipboard.writeText(code);
+            alert(`Codigo ${code} copiado.`);
+        } catch (_) {
+            prompt('Copie o codigo:', code);
+        }
+    }
+
+    async function resetCode(code) {
+        if (!isOrganizer) return;
+        const password = prompt('Digite a senha para resetar este codigo:');
+        if (password !== RESET_CODE_PASSWORD) {
+            alert('Senha incorreta.');
+            return;
+        }
+
+        const poolSnap = await get(ref(db, 'codes/pool'));
+        const poolCodes = poolSnap.exists() ? (poolSnap.val().codes || []) : [];
+        const target = poolCodes.find(item => item.code === code);
+        if (!target) {
+            alert('Codigo nao encontrado.');
+            return;
+        }
+
+        const tournamentSnap = await get(ref(db, FIREBASE_TOURNAMENT_PATH));
+        if (tournamentSnap.exists()) {
+            state = { ...defaultState, ...tournamentSnap.val(), codes: state.codes };
+        }
+
+        const ownerId = target.participantId || target.usedBy || null;
+        const ownerName = target.usedByName || target.participantName || null;
+        const updatedPoolCodes = poolCodes.map(item => item.code === code
+            ? {
+                ...item,
+                status: 'available',
+                used: false,
+                participantId: null,
+                usedBy: null,
+                usedByName: null,
+                participantName: null,
+                resetAt: new Date().toISOString()
+            }
+            : item
+        );
+
+        const removeOwner = (player) => {
+            const playerId = player.id || player.uid || player.participantId || player.cpf || null;
+            return ownerId ? playerId !== ownerId : (ownerName ? player.name !== ownerName : true);
+        };
+
+        if (ownerId || ownerName) {
+            state.participants = (state.participants || []).filter(removeOwner);
+            state.registeredPlayers = (state.registeredPlayers || []).filter(removeOwner);
+            if (state.bracket?.rounds?.length) {
+                state.bracket = null;
+                state.champion = null;
+                state.status = 'ativo';
+            }
+        }
+
+        state.codes = (state.codes || []).map(item => item.code === code
+            ? {
+                ...item,
+                status: 'available',
+                used: false,
+                participantId: null,
+                usedBy: null,
+                usedByName: null,
+                participantName: null
+            }
+            : item
+        );
+
+        persist();
+        await set(ref(db, 'codes/pool'), { codes: updatedPoolCodes });
+        await syncTournamentToFirebase();
+        renderAll();
+        alert('Codigo resetado e jogador removido do torneio.');
+    }
+
     function addParticipant(name) {
         const clean = name.trim().replace(/\s+/g, ' ');
         if (!clean) return;
@@ -495,6 +627,61 @@ document.addEventListener('DOMContentLoaded', () => {
         persist();
         syncTournamentToFirebase();
         renderAll();
+    }
+
+    function generateTestPlayers() {
+        if (state.participants.length && !confirm('Substituir os participantes atuais por jogadores de teste?')) return;
+        const names = [
+            'Lucas Falcao', 'Rafael Costa', 'Bruno Lima', 'Marcos Vieira',
+            'Thiago Rocha', 'Pedro Nunes', 'Andre Martins', 'Felipe Souza',
+            'Diego Alves', 'Victor Hugo', 'Caio Ribeiro', 'Renan Lopes',
+            'Gustavo Melo', 'Joao Pedro', 'Daniel Torres', 'Matheus Reis'
+        ];
+        const amount = Math.min(Number(state.participantLimit) || 16, names.length);
+        state.participants = names.slice(0, amount).map((name, index) => ({
+            id: `test-${Date.now()}-${index}`,
+            name
+        }));
+        state.registeredPlayers = state.participants;
+        state.bracket = null;
+        state.champion = null;
+        state.finishedHistoryId = null;
+        state.status = 'teste';
+        persist();
+        syncTournamentToFirebase();
+        renderAll();
+        alert(`${amount} jogadores de teste gerados.`);
+    }
+
+    function generateTestResults() {
+        if (!state.participants.length) generateTestPlayers();
+        if (!state.bracket?.rounds?.length) buildBracket();
+        if (!state.bracket?.rounds?.length) return;
+
+        normalizeAutoAdvances();
+        state.bracket.rounds.forEach((round, rIdx) => {
+            round.matches.forEach((match) => {
+                if (getWinner(match) || !isRealPlayer(match.p1) || !isRealPlayer(match.p2)) return;
+                const winner = Math.random() > 0.5 ? match.p1 : match.p2;
+                match.winner = winner;
+                match.completed = true;
+                match.status = 'completed';
+                if (rIdx < state.bracket.rounds.length - 1) {
+                    propagateWinner(match.winnerToken, winner, rIdx);
+                    normalizeAutoAdvances();
+                } else {
+                    state.champion = winner;
+                    state.status = 'finalizado';
+                }
+            });
+        });
+
+        normalizeAutoAdvances();
+        persist();
+        syncTournamentToFirebase();
+        renderAll();
+        switchTab('mata-mata');
+        alert('Resultados de teste gerados. Agora voce pode clicar em Encerrar e salvar.');
     }
 
     function removeParticipant(id) {
@@ -518,8 +705,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="participant-avatar">${initials(p.name)}</span>
                 <span class="participant-name">${idx + 1}. ${escapeHtml(p.name)}</span>
                 ${isOrganizer ? `<button class="remove-participant" data-remove-id="${escapeHtml(p.id)}" title="Remover"><i class="ph ph-trash"></i></button>` : ''}
+                </div>
+                <div class="code-actions">
+                    <button type="button" class="code-action" data-copy-code="${escapeHtml(item.code)}" title="Copiar codigo"><i class="ph ph-copy"></i></button>
+                    ${unavailable && isOrganizer ? `<button type="button" class="code-action danger" data-reset-code="${escapeHtml(item.code)}" title="Resetar codigo"><i class="ph ph-arrow-counter-clockwise"></i></button>` : ''}
+                </div>
             </div>
-        `).join('');
+        </div>`;
+        }).join('');
     }
 
     function renderCodes() {
@@ -528,9 +721,13 @@ document.addEventListener('DOMContentLoaded', () => {
             list.innerHTML = `<div class="empty-state">Nenhum código gerado.</div>`;
             return;
         }
-        list.innerHTML = state.codes.map(item => `
-            <div class="code-chip">
-                <strong>${escapeHtml(item.code)}</strong>
+        list.innerHTML = state.codes.map(item => {
+            const unavailable = item.used || item.status === 'used';
+            item.used = unavailable;
+            return `
+            <div class="code-chip ${unavailable ? 'is-unavailable' : ''}">
+                <div class="code-main">
+                    <strong>${escapeHtml(item.code)}</strong>
                 <span>${item.used ? 'Usado' : 'Disponível'}</span>
             </div>
         `).join('');
@@ -546,14 +743,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderPlayerRow(match, player, side, rIdx, mIdx) {
         const winner = getWinner(match);
-        const rowClass = winner === player ? 'winner' : (winner && isRealPlayer(player) ? 'loser' : '');
+        const isWinnerRow = winner === player;
+        const rowClass = isWinnerRow ? 'winner match-team-winner' : (winner && isRealPlayer(player) ? 'loser match-team-loser' : '');
         const canWin = isOrganizer && !winner && isRealPlayer(player) && isRealPlayer(match.p1) && isRealPlayer(match.p2);
         return `
-            <div class="player-row ${rowClass}">
-                <span class="player-info">
-                    <span class="player-avatar">${initials(player)}</span>
-                    <span class="player-name">${escapeHtml(player || 'A definir')}</span>
+            <div class="player-row match-team ${rowClass}">
+                <span class="player-info player-line">
+                    <span class="player-avatar team-avatar">${initials(player)}</span>
+                    <span class="team-info">
+                        <span class="player-name team-name-bracket">${escapeHtml(player || 'A definir')}</span>
+                        <small class="team-subtitle">${isBye(player) ? 'Avanço automático' : (isRealPlayer(player) ? 'Atleta' : 'Aguardando')}</small>
+                    </span>
                 </span>
+                <span class="score-display score-pill">${winner ? (isWinnerRow ? 'V' : '-') : '—'}</span>
                 ${canWin ? `<button class="win-button" data-r="${rIdx}" data-m="${mIdx}" data-winner="${escapeHtml(player)}">Vitória</button>` : ''}
             </div>
         `;
@@ -577,20 +779,22 @@ document.addEventListener('DOMContentLoaded', () => {
             ? `<div class="alert"><i class="ph ph-crown-simple"></i> Campeão definido: ${escapeHtml(state.champion)}.</div>`
             : '';
 
-        container.innerHTML = `
+        const connectorColumn = () => `<div class="bracket-connector-column" aria-hidden="true"><span class="bracket-connector top"></span><span class="bracket-connector join"></span><span class="bracket-connector bottom"></span></div>`;
+        container.innerHTML = `<div class="bracket-tree">
             ${state.bracket.rounds.map((round, rIdx) => `
-                <section class="phase-column">
-                    <div class="phase-title">
-                        <span><i class="ph ph-trophy"></i> ${escapeHtml(round.name)}</span>
+                <section class="phase-column bracket-round">
+                    <div class="phase-title bracket-round-title">
+                        <span><i class="ph ${rIdx === state.bracket.rounds.length - 1 ? 'ph-trophy' : 'ph-billiards'}"></i> ${escapeHtml(round.name)}</span>
                         <small>${round.matches.length} jogos</small>
                     </div>
+                    <div class="bracket-round-matches">
                     ${round.matches.map((match, mIdx) => {
                         const status = matchStatus(match);
                         const winner = getWinner(match);
                         return `
-                            <article class="match-card">
-                                <div class="match-card-header">
-                                    <strong>${escapeHtml(round.name)} ${mIdx + 1}</strong>
+                            <article class="match-card ${winner ? 'match-card-finished' : 'match-card-pending'}">
+                                <div class="match-card-header match-header">
+                                    <strong class="match-id">${escapeHtml(round.name)} ${mIdx + 1}</strong>
                                     <span class="match-status ${status.cls}">${status.label}</span>
                                 </div>
                                 ${renderPlayerRow(match, match.p1, 'p1', rIdx, mIdx)}
@@ -601,10 +805,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             </article>
                         `;
                     }).join('')}
+                    </div>
                 </section>
+                ${rIdx < state.bracket.rounds.length - 1 ? connectorColumn() : ''}
             `).join('')}
             ${state.champion ? `
-                <section class="phase-column">
+                <section class="phase-column bracket-round champion-column">
                     <div class="phase-title"><span><i class="ph-fill ph-crown-simple"></i> Campeão</span></div>
                     <div class="champion-card">
                         <i class="ph-fill ph-trophy"></i>
@@ -613,7 +819,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </section>
             ` : ''}
-        `;
+        </div>`;
     }
 
     function updateBadges(matches) {
@@ -654,23 +860,166 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderHistory() {
         const list = $('#history-list');
+        const detail = $('#history-detail');
         const history = getHistory();
         if (!history.length) {
             list.innerHTML = `<div class="empty-state">Nenhum torneio de Sinuca encerrado ainda.</div>`;
+            detail.innerHTML = '';
+            selectedHistoryId = null;
             return;
         }
         list.innerHTML = history.map(item => `
-            <article class="history-card">
+            <article class="history-card ${String(item.id) === String(selectedHistoryId) ? 'active' : ''}" data-history-open="${escapeHtml(item.id)}">
                 <h3>${escapeHtml(item.name)}</h3>
                 <p>Campeão: <strong>${escapeHtml(item.champion)}</strong></p>
                 <p>${item.participants} participantes • ${new Date(item.finishedAt).toLocaleString('pt-BR')}</p>
+                <div class="history-actions">
+                    <button class="history-button" data-history-open="${escapeHtml(item.id)}"><i class="ph ph-eye"></i> Abrir</button>
+                    ${isOrganizer ? `<button class="history-button danger" data-history-delete="${escapeHtml(item.id)}"><i class="ph ph-trash"></i> Deletar</button>` : ''}
+                </div>
             </article>
         `).join('');
+        const selected = history.find(item => String(item.id) === String(selectedHistoryId));
+        detail.innerHTML = selected ? renderHistoryDetail(selected) : '';
+    }
+
+    function renderHistoryDetail(item) {
+        return `
+            <section class="history-detail-card">
+                <div class="history-detail-header">
+                    <div>
+                        <span class="eyebrow">Torneio encerrado</span>
+                        <h2>${escapeHtml(item.name)}</h2>
+                        <p>CampeÃ£o: <strong>${escapeHtml(item.champion)}</strong> - ${new Date(item.finishedAt).toLocaleString('pt-BR')}</p>
+                    </div>
+                    <span class="glass-pill">${item.participants || item.participantsList?.length || 0} jogadores</span>
+                </div>
+                <div class="history-detail-grid">
+                    ${item.groups?.length ? `
+                    <div>
+                        <h3>Grupos</h3>
+                        ${renderHistoryGroups(item.groups)}
+                    </div>
+                    ` : ''}
+                    <div>
+                        <h3>Mata-mata</h3>
+                        ${renderHistoryBracket(item.bracket)}
+                    </div>
+                    <div>
+                        <h3>Ranking do torneio</h3>
+                        ${renderHistoryRanking(item.rankingFinal)}
+                    </div>
+                </div>
+            </section>
+        `;
+    }
+
+    function renderHistoryGroups(groups) {
+        return `
+            <div class="history-ranking-list">
+                ${groups.map(group => `
+                    <div class="history-ranking-row">
+                        <span>${escapeHtml(group.name || 'Grupo')}</span>
+                        <strong>${(group.players || group.teams || []).map(player => escapeHtml(player.name || player)).join(', ') || 'Sem jogadores'}</strong>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function renderHistoryBracket(bracket) {
+        if (!bracket?.rounds?.length) return `<div class="empty-state">Mata-mata nao salvo neste historico.</div>`;
+        return `
+            <div class="history-bracket">
+                ${bracket.rounds.map(round => `
+                    <section class="history-round">
+                        <h4>${escapeHtml(round.name)}</h4>
+                        ${round.matches.map((match, index) => {
+                            const winner = getWinner(match);
+                            return `
+                                <div class="history-match">
+                                    <strong>Jogo ${index + 1}</strong>
+                                    <span class="${winner === match.p1 ? 'winner-name' : ''}">${escapeHtml(match.p1 || 'A definir')}</span>
+                                    <span class="${winner === match.p2 ? 'winner-name' : ''}">${escapeHtml(match.p2 || 'A definir')}</span>
+                                    <small>${winner ? `Vencedor: ${escapeHtml(winner)}` : 'Sem vencedor'}</small>
+                                </div>
+                            `;
+                        }).join('')}
+                    </section>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function renderHistoryRanking(ranking) {
+        if (!ranking?.length) return `<div class="empty-state">Ranking nao salvo neste historico.</div>`;
+        return `
+            <div class="history-ranking-list">
+                ${ranking.map((row, index) => `
+                    <div class="history-ranking-row">
+                        <span>#${index + 1}</span>
+                        <strong>${escapeHtml(row.name)}</strong>
+                        <small>${row.pts || 0} pts - ${row.vitorias || 0}V - ${row.derrotas || 0}D</small>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function deleteHistoryItem(id) {
+        if (!isOrganizer) return;
+        const history = getHistory();
+        const item = history.find(entry => String(entry.id) === String(id));
+        if (!item) return;
+        if (!confirm(`Deletar "${item.name}" do historico?`)) return;
+        setHistory(history.filter(entry => String(entry.id) !== String(id)));
+        if (String(selectedHistoryId) === String(id)) selectedHistoryId = null;
+        renderHistory();
+    }
+
+    function renderParticipants() {
+        $('#participant-count').textContent = `${state.participants.length} inscritos`;
+        const list = $('#participants-list');
+        if (!state.participants.length) {
+            list.innerHTML = `<div class="empty-state">Nenhum participante cadastrado ainda.</div>`;
+            return;
+        }
+        list.innerHTML = state.participants.map((p, idx) => `
+            <div class="participant-item">
+                <span class="participant-avatar">${initials(p.name)}</span>
+                <span class="participant-name">${idx + 1}. ${escapeHtml(p.name)}</span>
+                ${isOrganizer ? `<button class="remove-participant" data-remove-id="${escapeHtml(p.id)}" title="Remover"><i class="ph ph-trash"></i></button>` : ''}
+            </div>
+        `).join('');
+    }
+
+    function renderCodes() {
+        const list = $('#codes-list');
+        if (!state.codes?.length) {
+            list.innerHTML = `<div class="empty-state">Nenhum codigo gerado.</div>`;
+            return;
+        }
+        list.innerHTML = state.codes.map(item => {
+            const unavailable = item.used || item.status === 'used';
+            return `
+                <div class="code-chip ${unavailable ? 'is-unavailable' : ''}">
+                    <div class="code-main">
+                        <strong>${escapeHtml(item.code)}</strong>
+                        <span>${unavailable ? 'Indisponivel' : 'Disponivel'}</span>
+                    </div>
+                    <div class="code-actions">
+                        <button type="button" class="code-action" data-copy-code="${escapeHtml(item.code)}" title="Copiar codigo"><i class="ph ph-copy"></i></button>
+                        ${unavailable && isOrganizer ? `<button type="button" class="code-action danger" data-reset-code="${escapeHtml(item.code)}" title="Resetar codigo"><i class="ph ph-arrow-counter-clockwise"></i></button>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     function renderRole() {
         $('#role-badge').textContent = role.toUpperCase();
         $('#organizer-panel').style.display = isOrganizer ? 'flex' : 'none';
+        $('#btn-toggle-organizer').style.display = isOrganizer ? '' : 'none';
         $('#participant-form').style.display = isOrganizer ? 'grid' : 'none';
         $('#tourney-name').value = state.name;
         $('#participant-limit').value = state.participantLimit;
@@ -694,6 +1043,11 @@ document.addEventListener('DOMContentLoaded', () => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
 
+    $('#btn-toggle-organizer').addEventListener('click', (event) => {
+        event.stopPropagation();
+        $('#organizer-panel').classList.toggle('active');
+    });
+
     $('#participant-form').addEventListener('submit', event => {
         event.preventDefault();
         addParticipant($('#participant-name').value);
@@ -701,11 +1055,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('click', event => {
+        if (window.innerWidth <= 900 && $('#organizer-panel').classList.contains('active')) {
+            const panel = $('#organizer-panel');
+            const toggle = $('#btn-toggle-organizer');
+            if (!panel.contains(event.target) && !toggle.contains(event.target)) {
+                panel.classList.remove('active');
+            }
+        }
+
         const removeButton = event.target.closest('[data-remove-id]');
         if (removeButton) removeParticipant(removeButton.dataset.removeId);
 
+        const copyCodeButton = event.target.closest('[data-copy-code]');
+        if (copyCodeButton) {
+            copyCode(copyCodeButton.dataset.copyCode);
+            return;
+        }
+
+        const resetCodeButton = event.target.closest('[data-reset-code]');
+        if (resetCodeButton) {
+            resetCode(resetCodeButton.dataset.resetCode);
+            return;
+        }
+
         const winButton = event.target.closest('[data-winner]');
         if (winButton) defineWinner(Number(winButton.dataset.r), Number(winButton.dataset.m), winButton.dataset.winner);
+
+        const deleteHistoryButton = event.target.closest('[data-history-delete]');
+        if (deleteHistoryButton) {
+            event.stopPropagation();
+            deleteHistoryItem(deleteHistoryButton.dataset.historyDelete);
+            return;
+        }
+
+        const openHistoryButton = event.target.closest('[data-history-open]');
+        if (openHistoryButton) {
+            selectedHistoryId = openHistoryButton.dataset.historyOpen;
+            renderHistory();
+        }
     });
 
     $('#btn-save-config').addEventListener('click', () => {
@@ -719,6 +1106,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     $('#btn-generate-codes').addEventListener('click', generateCodes);
     $('#btn-generate-bracket').addEventListener('click', buildBracket);
+    $('#btn-test-players').addEventListener('click', generateTestPlayers);
+    $('#btn-test-results').addEventListener('click', generateTestResults);
     $('#btn-reset-results').addEventListener('click', () => {
         if (confirm('Resetar resultados do mata-mata da Sinuca?')) resetResults();
     });
@@ -730,6 +1119,11 @@ document.addEventListener('DOMContentLoaded', () => {
         syncTournamentToFirebase();
         renderAll();
     });
+
+    setInterval(async () => {
+        await syncLocalCodesFromPool();
+        renderCodes();
+    }, 10000);
 
     loadTournamentFromFirebase().finally(renderAll);
 });

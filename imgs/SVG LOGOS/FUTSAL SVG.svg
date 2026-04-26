@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Futsal">
+  <defs>
+    <linearGradient id="court" x1="16" y1="112" x2="112" y2="16" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16a34a"/>
+      <stop offset="1" stop-color="#facc15"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#court)"/>
+  <circle cx="76" cy="24" r="12" fill="#ffffff"/>
+  <path d="M62 42c8-7 19-6 26 1l12 12c4 4 4 10 1 13-4 4-9 4-13 1l-7-7-10 18 12 12c3 3 4 8 1 12l-8 13c-3 5-9 6-13 3-4-3-5-8-2-13l5-8-13-13-12 10c-4 3-10 3-13-1-3-4-3-9 1-13l17-14 10-18-9 3-8 10c-3 4-9 4-13 1-4-3-4-9-1-13l11-14c2-2 4-4 7-5l20-7z" fill="#ffffff"/>
+  <circle cx="32" cy="100" r="14" fill="#0f172a"/>
+  <path d="M25 100h14M32 93v14M23 93l18 14M41 93l-18 14" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+</svg>
