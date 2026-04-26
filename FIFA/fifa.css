@@ -1557,6 +1557,15 @@ body {
 .match-leg-badge.ida { background: rgba(59,130,246,.14); color:#2563eb; }
 .match-leg-badge.volta { background: rgba(147,51,234,.14); color:#7e22ce; }
 .knockout-legs-inline { margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(4,45,21,.15); display:grid; gap: 4px; font-size: 12px; color:#345; }
+.knockout-legs-inline span {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(239, 246, 255, 0.78);
+    border: 1px solid rgba(191, 219, 254, 0.7);
+}
 
 .modal-body {
     padding: 2rem;
@@ -2457,6 +2466,43 @@ body {
 .ranking-cards-mobile {
     display: none;
 }
+.ranking-list-mobile {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+}
+.ranking-list-item {
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.88);
+    background: rgba(255, 255, 255, 0.7);
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+}
+.ranking-list-head { display: flex; align-items: center; gap: 10px; }
+.ranking-list-pos {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(22, 163, 74, 0.14);
+    color: #15803D;
+    font-weight: 900;
+}
+.ranking-list-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.ranking-list-meta span {
+    border-radius: 8px;
+    background: rgba(241, 245, 249, 0.9);
+    border: 1px solid rgba(203, 213, 225, 0.8);
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #1e293b;
+}
 
 .next-phase-match-editor {
     margin-top: 12px;
@@ -2652,7 +2698,7 @@ body {
 .bracket-round-title i { color:#16A34A; margin-right:6px; }
 .bracket-round-title small { margin-left:8px; color:#64748b; font-weight:700; letter-spacing:0; }
 .bracket-round-gap { display:flex; align-items:center; justify-content:center; color:#60a5fa; min-width:22px; }
-.bracket-match.modern { width:100%; margin:0; border-radius:14px; border:1px solid rgba(203,213,225,.8); background:rgba(255,255,255,.95); overflow:visible; }
+.bracket-match.modern { width:100%; margin:0; border-radius:14px; border:1px solid rgba(203,213,225,.8); background:rgba(255,255,255,.95); overflow:visible; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06); cursor: pointer; }
 .bracket-match.modern::before, .bracket-match.modern::after, .bracket-round:not(:last-child) .bracket-match::after, .bracket-round:not(:first-child) .bracket-match::before { content:none; }
 .bracket-match-head { display:flex; align-items:center; justify-content:space-between; padding:9px 11px; border-bottom:1px solid rgba(226,232,240,.85); }
 .match-title { font-size:12px; font-weight:800; color:#0f172a; }
@@ -2672,18 +2718,33 @@ body {
 .champion-icon { font-size:28px; color:#1d4ed8; display:inline-flex; align-items:center; justify-content:center; }
 @media (max-width: 768px) {
     #tab-mata-mata {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch;
-        touch-action: pan-x pan-y;
+        overflow-x: hidden !important;
     }
     #tab-mata-mata .mata-mata-tab {
         overflow: visible;
+        padding: 12px;
+    }
+    #tab-mata-mata .knockout-scroll-indicator {
+        margin-bottom: 10px;
     }
     #tab-mata-mata .knockout-scroll-container {
-        padding-bottom: calc(16px + env(safe-area-inset-bottom));
-        scroll-snap-type: x mandatory;
+        overflow: visible;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+        scroll-snap-type: none;
     }
-    .bracket-round { min-width:320px; }
-    .bracket-match.modern { min-width:280px; }
-    .bracket-slot .player-name-clickable { max-width:158px; }
+    #tab-mata-mata .knockout-scroll-container .bracket-container {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+    #tab-mata-mata .bracket-round {
+        min-width: 0;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    #tab-mata-mata .bracket-round-gap {
+        display: none;
+    }
+    .bracket-match.modern { min-width: 0; }
+    .bracket-slot .player-name-clickable { max-width: 180px; }
 }
