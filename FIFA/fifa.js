@@ -1821,7 +1821,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 if (tournamentState.knockout.repechage && tournamentState.knockout.repechage.length > 0) {
-                    bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">🏁 Repescagem</div>`;
+                    bracketHTML += `<div class="bracket-round"><div class="bracket-round-title"><i class="ph ph-flag-checkered"></i> Repescagem</div>`;
                     tournamentState.knockout.repechage.forEach((match, mIdx) => {
                         bracketHTML += renderBracketMatch(match, 'repechage', 0, mIdx, `Repescagem ${mIdx + 1}`);
                     });
@@ -1831,7 +1831,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (tournamentState.knockout.rounds) {
                     tournamentState.knockout.rounds.forEach((round, rIdx) => {
                         const totalMatches = (round.matches || []).length;
-                        bracketHTML += `<div class="bracket-round"><div class="bracket-round-title">🏆 ${round.name} <small>${totalMatches} jogos</small></div>`;
+                        bracketHTML += `<div class="bracket-round"><div class="bracket-round-title"><i class="ph ph-trophy"></i> ${round.name} <small>${totalMatches} jogos</small></div>`;
                         if (testModeActive && role === 'organizador' && !isPreview) {
                             bracketHTML += `<div class="context-test-buttons" style="margin-bottom:8px;">
                                 <button class="btn-test-inline" data-test-action="knockout-phase-sim" data-r="${rIdx}">Simular esta fase</button>
@@ -1850,7 +1850,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     bracketHTML += `<div class="bracket-round champion-column">
                         <div class="bracket-round-title">CAMPEÃO</div>
                         <div class="champion-card">
-                            <span class="champion-icon">🏆</span>
+                            <span class="champion-icon"><i class="ph-fill ph-trophy"></i></span>
                             <h4>${formatName(champion)}</h4>
                             <p>Título confirmado</p>
                         </div>
@@ -1859,6 +1859,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 bracketHTML += `</div></div></div>`;
                 mataMataContainer.innerHTML = bracketHTML;
+                setupKnockoutScrollInteractions(mataMataContainer);
 
                 // Add Listeners
                 mataMataContainer.querySelectorAll('.btn-edit-knockout').forEach(btn => {
@@ -1875,6 +1876,50 @@ document.addEventListener('DOMContentLoaded', async () => {
             checkAndOpenNextPhaseModal();
         }
         renderRanking();
+    }
+
+    function setupKnockoutScrollInteractions(rootEl) {
+        const scroller = rootEl?.querySelector('.knockout-scroll-container');
+        if (!scroller || scroller.dataset.dragReady === '1') return;
+        scroller.dataset.dragReady = '1';
+
+        let dragging = false;
+        let startX = 0;
+        let startLeft = 0;
+        const isInteractiveTarget = (target) => !!target?.closest('button, a, input, select, textarea, .btn-edit-knockout');
+
+        scroller.addEventListener('pointerdown', (event) => {
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            if (isInteractiveTarget(event.target)) return;
+            dragging = true;
+            startX = event.clientX;
+            startLeft = scroller.scrollLeft;
+            scroller.classList.add('dragging');
+            try { scroller.setPointerCapture(event.pointerId); } catch (_) { /* noop */ }
+        });
+
+        scroller.addEventListener('pointermove', (event) => {
+            if (!dragging) return;
+            const deltaX = event.clientX - startX;
+            scroller.scrollLeft = startLeft - deltaX;
+            event.preventDefault();
+        }, { passive: false });
+
+        const stopDrag = (event) => {
+            if (!dragging) return;
+            dragging = false;
+            scroller.classList.remove('dragging');
+            try { scroller.releasePointerCapture(event.pointerId); } catch (_) { /* noop */ }
+        };
+        scroller.addEventListener('pointerup', stopDrag);
+        scroller.addEventListener('pointercancel', stopDrag);
+        scroller.addEventListener('pointerleave', stopDrag);
+
+        scroller.addEventListener('wheel', (event) => {
+            if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+            scroller.scrollLeft += event.deltaY;
+            event.preventDefault();
+        }, { passive: false });
     }
 
     // ========== TABS NAVIGATION ==========
