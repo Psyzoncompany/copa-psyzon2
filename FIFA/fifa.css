@@ -2672,18 +2672,33 @@ body {
 .champion-icon { font-size:28px; color:#1d4ed8; display:inline-flex; align-items:center; justify-content:center; }
 @media (max-width: 768px) {
     #tab-mata-mata {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch;
-        touch-action: pan-x pan-y;
+        overflow-x: hidden !important;
     }
     #tab-mata-mata .mata-mata-tab {
         overflow: visible;
+        padding: 12px;
+    }
+    #tab-mata-mata .knockout-scroll-indicator {
+        margin-bottom: 10px;
     }
     #tab-mata-mata .knockout-scroll-container {
-        padding-bottom: calc(16px + env(safe-area-inset-bottom));
-        scroll-snap-type: x mandatory;
+        overflow: visible;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+        scroll-snap-type: none;
     }
-    .bracket-round { min-width:320px; }
-    .bracket-match.modern { min-width:280px; }
-    .bracket-slot .player-name-clickable { max-width:158px; }
+    #tab-mata-mata .knockout-scroll-container .bracket-container {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+    #tab-mata-mata .bracket-round {
+        min-width: 0;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    #tab-mata-mata .bracket-round-gap {
+        display: none;
+    }
+    .bracket-match.modern { min-width: 0; }
+    .bracket-slot .player-name-clickable { max-width: 180px; }
 }

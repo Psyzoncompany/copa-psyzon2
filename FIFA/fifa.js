@@ -1231,6 +1231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function openGroupMatches(index) {
         selectedGroupIndex = index;
         const group = tournamentState.groups[index];
+        const readOnlyViewer = role !== 'organizador';
         document.getElementById('modal-group-title').textContent = `Jogos: ${group.name}`;
         
         // Initialize matches if not exist
@@ -1241,6 +1242,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             document.getElementById('chk-ida-volta').checked = !!tournamentState.homeAway;
         }
+
+        const homeAwayCheckbox = document.getElementById('chk-ida-volta');
+        if (homeAwayCheckbox) homeAwayCheckbox.disabled = readOnlyViewer;
+
+        const groupModalSubtitle = document.querySelector('#modal-jogos-grupo .modal-header .header-info p');
+        if (groupModalSubtitle) {
+            groupModalSubtitle.textContent = readOnlyViewer
+                ? 'Visualização somente leitura'
+                : 'Gerencie os placares e confrontos';
+        }
+
+        const btnSaveGroupMatches = document.getElementById('btn-salvar-jogos-grupo');
+        if (btnSaveGroupMatches) btnSaveGroupMatches.style.display = readOnlyViewer ? 'none' : 'inline-flex';
 
         const controlsHost = document.getElementById('group-matches-stats');
         if (controlsHost && testModeActive && role === 'organizador') {
@@ -1267,6 +1281,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const group = tournamentState.groups[selectedGroupIndex];
         const container = document.getElementById('group-matches-list');
         const countEl = document.getElementById('total-matches-count');
+        const readOnlyViewer = role !== 'organizador';
         
         if (!group.matches || group.matches.length === 0) {
             container.innerHTML = '<div class="empty-state">Nenhum jogo disponível</div>';
@@ -1284,9 +1299,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="match-team home">
                     <span>${formatName(m.home)} <small>(Casa)</small></span>
                 </div>
-                <input type="number" min="0" class="match-score-input" value="${m.gHome}" data-idx="${i}" data-side="home" placeholder="0">
+                <input type="number" min="0" class="match-score-input" value="${m.gHome}" data-idx="${i}" data-side="home" placeholder="0" ${readOnlyViewer ? 'disabled' : ''}>
                 <span class="match-vs">VS</span>
-                <input type="number" min="0" class="match-score-input" value="${m.gAway}" data-idx="${i}" data-side="away" placeholder="0">
+                <input type="number" min="0" class="match-score-input" value="${m.gAway}" data-idx="${i}" data-side="away" placeholder="0" ${readOnlyViewer ? 'disabled' : ''}>
                 <div class="match-team away">
                     <span>${formatName(m.away)} <small>(Fora)</small></span>
                 </div>
@@ -1891,7 +1906,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <span class="knockout-pill"><i class="ph ph-flag"></i> Fase atual: ${currentPhase}</span>
                         ${champion ? `<span class="knockout-pill champion"><i class="ph-fill ph-trophy"></i> Campeão: ${formatName(champion)}</span>` : ''}
                     </div>
-                    <div class="knockout-scroll-indicator">Arraste para o lado para ver as próximas fases</div>
+                    <div class="knockout-scroll-indicator">${window.matchMedia('(max-width: 768px)').matches ? 'Lista por fases para facilitar a leitura no mobile' : 'Arraste para o lado para ver as próximas fases'}</div>
                     <div class="knockout-scroll-container"><div class="bracket-container${isPreview ? ' preview-mode' : ''}">
                     ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
                 if ((tournamentState.groups || []).length && groupsPending) {
@@ -3868,6 +3883,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnSalvarJogos = document.getElementById('btn-salvar-jogos-grupo');
     if (btnSalvarJogos) {
         btnSalvarJogos.addEventListener('click', async () => {
+            if (role !== 'organizador') return;
             if (selectedGroupIndex === null) return;
             
             const btn = btnSalvarJogos;
