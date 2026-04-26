@@ -340,10 +340,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ...((tournamentState.knockout.rounds || []).flatMap(r => (r.matches || []).map(m => ({ ...m, roundName: r.name }))))
             ];
             allRounds.forEach(m => {
-                if (m.s1 === '' || m.s2 === '') return;
-                const s1 = parseInt(m.s1);
-                const s2 = parseInt(m.s2);
-                if (!Number.isNaN(s1) && !Number.isNaN(s2)) apply(m.p1, m.p2, s1, s2, true);
+                if (tournamentState.homeAway && m.idaS1 != null && m.idaS2 != null && m.voltaS1 != null && m.voltaS2 != null && m.idaS1 !== '' && m.idaS2 !== '' && m.voltaS1 !== '' && m.voltaS2 !== '') {
+                    const ida1 = parseInt(m.idaS1);
+                    const ida2 = parseInt(m.idaS2);
+                    const volta1 = parseInt(m.voltaS1);
+                    const volta2 = parseInt(m.voltaS2);
+                    if (!Number.isNaN(ida1) && !Number.isNaN(ida2)) apply(m.p1, m.p2, ida1, ida2, true);
+                    if (!Number.isNaN(volta1) && !Number.isNaN(volta2)) apply(m.p2, m.p1, volta1, volta2, true);
+                } else if (m.s1 !== '' && m.s2 !== '') {
+                    const s1 = parseInt(m.s1);
+                    const s2 = parseInt(m.s2);
+                    if (!Number.isNaN(s1) && !Number.isNaN(s2)) apply(m.p1, m.p2, s1, s2, true);
+                } else {
+                    return;
+                }
                 const winner = getKnockoutMatchWinner(m);
                 const pWinner = ensure(winner);
                 if (pWinner) pWinner.avancos += 1;
@@ -501,7 +511,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Check if repechage tie → show penalty
                 const agg1 = ida1 + volta1;
                 const agg2 = ida2 + volta2;
-                if (type === 'repechage' && agg1 === agg2 && (document.getElementById('edit-ida-s1').value !== '' || document.getElementById('edit-volta-s1').value !== '')) {
+                if (agg1 === agg2 && (document.getElementById('edit-ida-s1').value !== '' || document.getElementById('edit-volta-s1').value !== '')) {
                     penaltyEl.style.display = 'block';
                     document.getElementById('pen-p1-name').textContent = formatName(displayParticipantName(match.p1));
                     document.getElementById('pen-p2-name').textContent = formatName(displayParticipantName(match.p2));
@@ -530,7 +540,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             function checkSinglePenalty() {
                 const v1 = parseInt(editS1.value);
                 const v2 = parseInt(editS2.value);
-                if (type === 'repechage' && !isNaN(v1) && !isNaN(v2) && v1 === v2 && editS1.value !== '') {
+                if (!isNaN(v1) && !isNaN(v2) && v1 === v2 && editS1.value !== '') {
                     penaltyEl.style.display = 'block';
                     document.getElementById('pen-p1-name').textContent = formatName(displayParticipantName(match.p1));
                     document.getElementById('pen-p2-name').textContent = formatName(displayParticipantName(match.p2));
@@ -794,12 +804,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 winner = match.p2;
             } else {
                 // EMPATE
-                if (type === 'repechage') {
+                if (type === 'repechage' || isHomeAway) {
                     // Repescagem: empate vai pra pênaltis
                     const pen1 = document.getElementById('edit-pen1').value;
                     const pen2 = document.getElementById('edit-pen2').value;
                     if (pen1 === '' || pen2 === '') {
-                        alert('Empate na repescagem! Preencha os pênaltis.');
+                        alert('Empate no agregado! Preencha os pênaltis/desempate.');
                         return;
                     }
                     const p1Pen = parseInt(pen1);
@@ -852,35 +862,104 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // ROUND ROBIN MATCH GENERATION
-    function generateRoundRobin(playersNames, idaVolta = false) {
-        const matches = [];
-        const n = playersNames.length;
-        if (n < 2) return [];
+    function hasAnyRecordedScores() {
+        const groupsHasScores = (tournamentState.groups || []).some(g => (g.matches || []).some(m => m.gHome !== '' || m.gAway !== ''));
+        const knockoutHasScores = (tournamentState.knockout?.repechage || []).some(m => m.s1 !== '' || m.s2 !== '' || m.idaS1 != null || m.voltaS1 != null)
+            || (tournamentState.knockout?.rounds || []).some(r => (r.matches || []).some(m => m.s1 !== '' || m.s2 !== '' || m.idaS1 != null || m.voltaS1 != null));
+        return groupsHasScores || knockoutHasScores;
+    }
 
-        for (let i = 0; i < n; i++) {
-            for (let j = i + 1; j < n; j++) {
-                matches.push({
-                    id: `m_${Date.now()}_${i}_${j}`,
-                    home: playersNames[i],
-                    away: playersNames[j],
-                    gHome: "",
-                    gAway: ""
-                });
+    function generateRoundRobinSchedule(playersNames) {
+        const list = [...playersNames];
+        if (list.length < 2) return [];
+        const hasBye = list.length % 2 === 1;
+        if (hasBye) list.push('BYE');
+        const rounds = list.length - 1;
+        const half = list.length / 2;
+        const rotation = [...list];
+        const schedule = [];
+
+        for (let round = 0; round < rounds; round++) {
+            const roundMatches = [];
+            for (let i = 0; i < half; i++) {
+                const a = rotation[i];
+                const b = rotation[rotation.length - 1 - i];
+                if (!isBye(a) && !isBye(b)) {
+                    const swap = round % 2 === 1;
+                    roundMatches.push({
+                        id: `m_${Date.now()}_${round}_${i}`,
+                        home: swap ? b : a,
+                        away: swap ? a : b,
+                        gHome: '',
+                        gAway: '',
+                        round: round + 1,
+                        leg: 'ida',
+                        isHomeAway: false
+                    });
+                }
+            }
+            schedule.push(...roundMatches);
+            rotation.splice(1, 0, rotation.pop());
+        }
+        return schedule;
+    }
+
+    function generateDoubleRoundRobinSchedule(playersNames) {
+        const firstLeg = generateRoundRobinSchedule(playersNames);
+        const roundOffset = Math.max(...firstLeg.map(m => m.round || 1), 0);
+        const secondLeg = firstLeg.map((m, idx) => ({
+            ...m,
+            id: `${m.id}_v`,
+            home: m.away,
+            away: m.home,
+            gHome: '',
+            gAway: '',
+            round: (m.round || 1) + roundOffset,
+            leg: 'volta',
+            isHomeAway: true
+        }));
+        return [...firstLeg.map(m => ({ ...m, isHomeAway: true })), ...secondLeg];
+    }
+
+    function generateGroupMatchesHomeAway(playersNames, homeAwayEnabled) {
+        return homeAwayEnabled ? generateDoubleRoundRobinSchedule(playersNames) : generateRoundRobinSchedule(playersNames);
+    }
+
+    function generateKnockoutMatchesHomeAway() {
+        if (!tournamentState.knockout) return;
+        (tournamentState.knockout.repechage || []).forEach(match => {
+            clearMatchResultFields(match);
+        });
+        (tournamentState.knockout.rounds || []).forEach(round => {
+            (round.matches || []).forEach(match => {
+                clearMatchResultFields(match);
+                resolveByeMatchOutcome(match);
+            });
+        });
+    }
+
+    async function toggleHomeAwayMode(enabled) {
+        if (role !== 'organizador') return;
+        const hasScores = hasAnyRecordedScores();
+        if (hasScores) {
+            const msg = enabled
+                ? 'Ativar Casa e Fora vai recriar os jogos da fase atual. Resultados existentes podem ser apagados. Deseja continuar?'
+                : 'Desativar Casa e Fora vai remover os jogos de volta. Deseja continuar?';
+            if (!confirm(msg)) {
+                const input = document.getElementById('tourney-home-away');
+                if (input) input.checked = !enabled;
+                return;
             }
         }
-
-        if (idaVolta) {
-            const returnMatches = matches.map(m => ({
-                id: m.id + '_r',
-                home: m.away,
-                away: m.home,
-                gHome: "",
-                gAway: ""
-            }));
-            return [...matches, ...returnMatches];
-        }
-        return matches;
+        tournamentState.homeAway = enabled;
+        (tournamentState.groups || []).forEach(group => {
+            const names = (group.players || []).map(p => p.name);
+            group.matches = generateGroupMatchesHomeAway(names, enabled);
+        });
+        generateKnockoutMatchesHomeAway();
+        recalculateCurrentCupRanking();
+        await persistCurrentTournament({ homeAway: enabled, groups: tournamentState.groups, knockout: tournamentState.knockout, generalStats: tournamentState.generalStats });
+        renderTournamentFromState();
     }
 
     function openGroupMatches(index) {
@@ -891,13 +970,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Initialize matches if not exist
         if (!group.matches || group.matches.length === 0) {
             const names = group.players.map(p => p.name);
-            group.matches = generateRoundRobin(names, false);
-            document.getElementById('chk-ida-volta').checked = false;
+            group.matches = generateGroupMatchesHomeAway(names, !!tournamentState.homeAway);
+            document.getElementById('chk-ida-volta').checked = !!tournamentState.homeAway;
         } else {
-            // Detect if idaVolta is active based on match count
-            const n = group.players.length;
-            const expectedSingle = (n * (n - 1)) / 2;
-            document.getElementById('chk-ida-volta').checked = group.matches.length > expectedSingle;
+            document.getElementById('chk-ida-volta').checked = !!tournamentState.homeAway;
         }
 
         const controlsHost = document.getElementById('group-matches-stats');
@@ -935,14 +1011,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         countEl.textContent = group.matches.length;
         container.innerHTML = group.matches.map((m, i) => `
             <div class="match-card">
+                <div class="match-meta">
+                    <span class="match-round">Rodada ${m.round || 1}</span>
+                    <span class="match-leg-badge ${m.leg === 'volta' ? 'volta' : 'ida'}">${m.leg === 'volta' ? 'VOLTA' : 'IDA'}</span>
+                </div>
                 <div class="match-team home">
-                    <span>${formatName(m.home)}</span>
+                    <span>${formatName(m.home)} <small>(Casa)</small></span>
                 </div>
                 <input type="number" min="0" class="match-score-input" value="${m.gHome}" data-idx="${i}" data-side="home" placeholder="0">
                 <span class="match-vs">VS</span>
                 <input type="number" min="0" class="match-score-input" value="${m.gAway}" data-idx="${i}" data-side="away" placeholder="0">
                 <div class="match-team away">
-                    <span>${formatName(m.away)}</span>
+                    <span>${formatName(m.away)} <small>(Fora)</small></span>
                 </div>
                 ${(testModeActive && role === 'organizador') ? `<div class="test-game-action"><button class="btn-test-inline" data-test-action="group-match-sim" data-group-index="${selectedGroupIndex}" data-match-index="${i}">⚡ Simular jogo</button></div>` : ''}
             </div>
@@ -1130,9 +1210,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const homeAwayInput = document.getElementById('tourney-home-away');
     if (homeAwayInput) {
-        homeAwayInput.addEventListener('change', () => {
+        homeAwayInput.addEventListener('change', async () => {
             if (homeAwayInput.checked && formatSelect) {
                 formatSelect.value = 'grupos-mata-mata';
+            }
+            if ((tournamentState.groups || []).length || tournamentState.knockout) {
+                await toggleHomeAwayMode(homeAwayInput.checked);
             }
             updatePreview();
         });
@@ -1281,7 +1364,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const playerName = groupPlayers[p] ? groupPlayers[p].name : `A definir (Slot ${p + 1})`;
                     players.push({ name: playerName, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0 });
                 }
-                tournamentState.groups.push({ name: `Grupo ${letter}`, players });
+                const matches = generateGroupMatchesHomeAway(players.map(p => p.name), !!tournamentState.homeAway);
+                tournamentState.groups.push({ name: `Grupo ${letter}`, players, matches });
             }
         }
 
@@ -1563,6 +1647,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (match.pen1 && match.pen2) {
                         penaltyBadge = `<div class="penalty-badge"><i class="ph-fill ph-soccer-ball"></i> Pên: ${match.pen1} x ${match.pen2}</div>`;
                     }
+                    const isTwoLegged = !!tournamentState.homeAway && !match.walkover && !isBye(match.p1) && !isBye(match.p2);
+                    const idaScore = (match.idaS1 != null && match.idaS1 !== '' && match.idaS2 != null && match.idaS2 !== '') ? `${match.idaS1} x ${match.idaS2}` : '—';
+                    const voltaScore = (match.voltaS1 != null && match.voltaS1 !== '' && match.voltaS2 != null && match.voltaS2 !== '') ? `${match.voltaS1} x ${match.voltaS2}` : '—';
                     const statusText = match.walkover ? 'walkover' : (winner ? 'concluído' : (match.status === 'in-progress' ? 'em andamento' : 'pendente'));
 
                     const testSimBtn = (testModeActive && role === 'organizador' && !isPreview)
@@ -1579,6 +1666,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <span class="player-name-clickable" onclick="openPlayerProfile('${match.p2}')">${formatName(displayParticipantName(match.p2))}</span>
                                 <span class="slot-score">${score2}</span>
                             </div>
+                            ${isTwoLegged ? `
+                                <div class="knockout-legs-inline">
+                                    <span><strong>IDA</strong> ${formatName(displayParticipantName(match.p1))} ${idaScore} ${formatName(displayParticipantName(match.p2))}</span>
+                                    <span><strong>VOLTA</strong> ${formatName(displayParticipantName(match.p2))} ${voltaScore} ${formatName(displayParticipantName(match.p1))}</span>
+                                    <span><strong>AGREGADO</strong> ${formatName(displayParticipantName(match.p1))} ${score1} x ${score2} ${formatName(displayParticipantName(match.p2))}</span>
+                                </div>
+                            ` : ''}
                             ${penaltyBadge}
                             ${match.walkover && winner ? `<div class="penalty-badge">Classificado automaticamente: ${formatName(winner)}</div>` : ''}
                             ${testSimBtn}
@@ -3442,18 +3536,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ========== GROUP MATCHES MODAL LISTENERS ==========
     const chkIdaVolta = document.getElementById('chk-ida-volta');
     if (chkIdaVolta) {
-        chkIdaVolta.addEventListener('change', (e) => {
+        chkIdaVolta.addEventListener('change', async (e) => {
             if (selectedGroupIndex === null) return;
-            const group = tournamentState.groups[selectedGroupIndex];
-            const hasScores = (group.matches || []).some(m => m.gHome !== "" || m.gAway !== "");
-            
-            if (hasScores && !confirm('Isso vai resetar os placares atuais. Continuar?')) {
-                e.target.checked = !e.target.checked;
-                return;
-            }
-
-            const names = group.players.map(p => p.name);
-            group.matches = generateRoundRobin(names, e.target.checked);
+            await toggleHomeAwayMode(e.target.checked);
             renderGroupMatchesList();
         });
     }
