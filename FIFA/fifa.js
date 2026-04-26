@@ -342,38 +342,123 @@ document.addEventListener('DOMContentLoaded', async () => {
         return rounds;
     }
 
-    async function rebuildKnockoutFromGroups() {
-        const qualifiedEntries = getGroupQualifiedEntries();
-        const totalQualified = qualifiedEntries.length;
-        if (totalQualified < 2) return false;
-        const qualifiedNames = qualifiedEntries.map(entry => entry.name);
+    function buildKnockoutBlueprintFromQualifiedNames(qualifiedNames) {
+        const totalQualified = qualifiedNames.length;
         const isPerfectBracket = VALID_KNOCKOUT_SIZES.includes(totalQualified);
         const targetSize = isPerfectBracket ? totalQualified : getNearestValidKnockoutSize(totalQualified);
-
-        let repechage = [];
+        let repechagePairs = [];
         let firstRoundSlots = [];
 
         if (isPerfectBracket) {
             firstRoundSlots = [...qualifiedNames];
         } else {
-            const repechagePlayersCount = (totalQualified - targetSize) * 2;
             const directSlots = targetSize - (totalQualified - targetSize);
             const directQualified = qualifiedNames.slice(0, Math.max(0, directSlots));
             const repechageQualified = qualifiedNames.slice(Math.max(0, directSlots));
             firstRoundSlots = [...directQualified];
             for (let i = 0; i < repechageQualified.length; i += 2) {
                 const token = `Vencedor Rep. ${Math.floor(i / 2) + 1}`;
-                const p1 = repechageQualified[i] || 'BYE';
-                const p2 = repechageQualified[i + 1] || 'BYE';
-                const match = createMatchData(p1, p2, token);
-                resolveByeMatchOutcome(match);
-                repechage.push(match);
+                repechagePairs.push({
+                    p1: repechageQualified[i] || 'BYE',
+                    p2: repechageQualified[i + 1] || 'BYE',
+                    token
+                });
                 firstRoundSlots.push(token);
             }
-            if (repechageQualified.length !== repechagePlayersCount) {
-                console.warn('[Knockout] Ajuste automático de repescagem aplicado.');
-            }
         }
+        return { repechagePairs, firstRoundSlots };
+    }
+
+    function getCurrentKnockoutQualifiersFromState() {
+        const knockout = tournamentState.knockout;
+        if (!knockout?.rounds?.length) return [];
+        const qualifiers = [];
+        const pushUnique = (name) => {
+            if (!isRealPlayer(name)) return;
+            if (!qualifiers.includes(name)) qualifiers.push(name);
+        };
+        const repSet = new Set();
+        (knockout.repechage || []).forEach(match => {
+            pushUnique(match.p1);
+            pushUnique(match.p2);
+            if (isRealPlayer(match.p1)) repSet.add(match.p1);
+            if (isRealPlayer(match.p2)) repSet.add(match.p2);
+        });
+        const firstRound = knockout.rounds[0];
+        (firstRound?.matches || []).forEach(match => {
+            [match.p1, match.p2].forEach(slot => {
+                if (typeof slot === 'string' && slot.startsWith('Vencedor Rep.')) return;
+                if (repSet.has(slot)) return;
+                pushUnique(slot);
+            });
+        });
+        (knockout.repechage || []).forEach(match => {
+            pushUnique(match.p1);
+            pushUnique(match.p2);
+        });
+        return qualifiers;
+    }
+
+    function haveQualifiersChanged(oldQualifiers, newQualifiers) {
+        if ((oldQualifiers || []).length !== (newQualifiers || []).length) return true;
+        for (let i = 0; i < oldQualifiers.length; i++) {
+            if ((oldQualifiers[i] || '').trim() !== (newQualifiers[i] || '').trim()) return true;
+        }
+        return false;
+    }
+
+    function hasManualKnockoutChanges(expectedQualifiedNames) {
+        const knockout = tournamentState.knockout;
+        if (!knockout?.rounds?.length) return false;
+        const blueprint = buildKnockoutBlueprintFromQualifiedNames(expectedQualifiedNames);
+        const currentRep = knockout.repechage || [];
+        if (currentRep.length !== blueprint.repechagePairs.length) return true;
+        for (let i = 0; i < currentRep.length; i++) {
+            if (currentRep[i].p1 !== blueprint.repechagePairs[i].p1 || currentRep[i].p2 !== blueprint.repechagePairs[i].p2) return true;
+        }
+        const firstRoundMatches = knockout.rounds[0]?.matches || [];
+        const expectedSlots = blueprint.firstRoundSlots;
+        if (firstRoundMatches.length * 2 !== expectedSlots.length) return true;
+        const currentSlots = firstRoundMatches.flatMap(match => [match.p1, match.p2]);
+        for (let i = 0; i < expectedSlots.length; i++) {
+            if ((currentSlots[i] || '') !== (expectedSlots[i] || '')) return true;
+        }
+        return false;
+    }
+
+    function hasKnockoutResults() {
+        if (!tournamentState.knockout) return false;
+        const allMatches = [
+            ...(tournamentState.knockout.repechage || []),
+            ...((tournamentState.knockout.rounds || []).flatMap(round => round.matches || []))
+        ];
+        return allMatches.some(match => {
+            const hasScore = (match.s1 !== '' && match.s1 != null) || (match.s2 !== '' && match.s2 != null) ||
+                (match.idaS1 !== '' && match.idaS1 != null) || (match.idaS2 !== '' && match.idaS2 != null) ||
+                (match.voltaS1 !== '' && match.voltaS1 != null) || (match.voltaS2 !== '' && match.voltaS2 != null);
+            const hasPenalty = (match.pen1 !== '' && match.pen1 != null) || (match.pen2 !== '' && match.pen2 != null);
+            const hasWinner = isRealPlayer(match.winner) || !!getKnockoutMatchWinner(match);
+            const hasFlowFlags = !!match.completed || !!match.walkover || match.status === 'completed' || match.status === 'walkover';
+            return hasScore || hasPenalty || hasWinner || hasFlowFlags;
+        });
+    }
+
+    function hasEliminationStarted(expectedQualifiedNames = []) {
+        return hasKnockoutResults() || hasManualKnockoutChanges(expectedQualifiedNames);
+    }
+
+    async function rebuildKnockoutFromGroups() {
+        const qualifiedEntries = getGroupQualifiedEntries();
+        const totalQualified = qualifiedEntries.length;
+        if (totalQualified < 2) return false;
+        const qualifiedNames = qualifiedEntries.map(entry => entry.name);
+        const blueprint = buildKnockoutBlueprintFromQualifiedNames(qualifiedNames);
+        const repechage = blueprint.repechagePairs.map(pair => {
+            const match = createMatchData(pair.p1, pair.p2, pair.token);
+            resolveByeMatchOutcome(match);
+            return match;
+        });
+        const firstRoundSlots = blueprint.firstRoundSlots;
 
         const rounds = createKnockoutRounds(firstRoundSlots);
         tournamentState.knockout = { repechage, rounds };
@@ -3747,7 +3832,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                     (group.matches || []).every(m => m.gHome !== '' && m.gAway !== '')
                 );
                 if (groupsFinished) {
-                    await rebuildKnockoutFromGroups();
+                    const newQualifiers = getGroupQualifiedEntries().map(entry => entry.name);
+                    const hasKnockout = !!tournamentState.knockout?.rounds?.length;
+                    if (!hasKnockout) {
+                        await rebuildKnockoutFromGroups();
+                    } else {
+                        const oldQualifiers = getCurrentKnockoutQualifiersFromState();
+                        const qualifiersChanged = haveQualifiersChanged(oldQualifiers, newQualifiers);
+                        if (qualifiersChanged) {
+                            const eliminationStarted = hasEliminationStarted(oldQualifiers);
+                            if (!eliminationStarted) {
+                                await rebuildKnockoutFromGroups();
+                            } else {
+                                const shouldRebuild = confirm('Alterar essa partida muda os classificados e pode recriar o mata-mata, apagando resultados já lançados. Deseja continuar?');
+                                if (shouldRebuild) {
+                                    await rebuildKnockoutFromGroups();
+                                }
+                            }
+                        }
+                    }
                 }
                 recalculateGeneralStats();
                 
