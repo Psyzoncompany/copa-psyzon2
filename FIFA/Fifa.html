@@ -422,8 +422,8 @@
     </div>
 
     <!-- MODAL JOGOS DO MATA-MATA -->
-    <div id="modal-jogos-mata-mata" class="modal">
-        <div class="modal-content glass-modal">
+    <div id="modal-jogos-mata-mata" class="modal knockout-edit-modal">
+        <div class="modal-content glass-modal knockout-modal-card">
             <div class="modal-header">
                 <div class="header-info">
                     <h2 id="modal-mata-mata-title">Resultado Mata-Mata</h2>
@@ -446,11 +446,11 @@
                 </div>
 
                 <!-- Placar Ida e Volta (Casa e Fora) -->
-                <div id="knockout-legs-score" style="display: none;">
+                <div id="knockout-legs-score" class="knockout-legs-editor" style="display: none;">
                     <div class="legs-header">
                         <span></span>
-                        <span id="edit-legs-p1" style="font-weight: 800; color: #042D15;">Jogador 1</span>
-                        <span id="edit-legs-p2" style="font-weight: 800; color: #042D15;">Jogador 2</span>
+                        <span id="edit-legs-p1">Jogador 1</span>
+                        <span id="edit-legs-p2">Jogador 2</span>
                     </div>
                     <div class="legs-row">
                         <span class="legs-label"><i class="ph-fill ph-house"></i> Jogo de Ida</span>
@@ -471,16 +471,16 @@
                 </div>
 
                 <!-- Pênaltis (Repescagem) -->
-                <div id="knockout-penalty-section" style="display: none; margin-top: 15px;">
-                    <div style="text-align: center; padding: 10px; background: rgba(250,204,21,0.1); border-radius: 12px; border: 1px solid rgba(250,204,21,0.3);">
-                        <i class="ph-fill ph-warning" style="color: #FACC15; font-size: 1.2rem;"></i>
-                        <p style="font-weight: 700; color: #042D15; margin: 5px 0 10px;">Empate! Disputa de Pênaltis</p>
-                        <div class="knockout-match-edit" style="margin-top: 10px;">
+                <div id="knockout-penalty-section" class="knockout-penalty-editor" style="display: none;">
+                    <div class="penalty-editor-card">
+                        <i class="ph-fill ph-warning"></i>
+                        <p>Empate! Disputa de Pênaltis</p>
+                        <div class="knockout-match-edit penalty-score-edit">
                             <div class="edit-player">
                                 <span id="pen-p1-name">J1</span>
                                 <input type="number" id="edit-pen1" min="0" placeholder="0">
                             </div>
-                            <div class="edit-vs" style="font-size: 0.7rem;">PEN</div>
+                            <div class="edit-vs">PEN</div>
                             <div class="edit-player">
                                 <input type="number" id="edit-pen2" min="0" placeholder="0">
                                 <span id="pen-p2-name">J2</span>
@@ -489,13 +489,13 @@
                     </div>
                 </div>
 
-                <div id="knockout-info-text" style="margin-top: 20px; text-align: center; color: #51715C; font-size: 0.9rem;">
+                <div id="knockout-info-text" class="knockout-info-text">
                     <i class="ph ph-info"></i> O vencedor avançará automaticamente para a próxima fase.
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline-full btn-close-modal">Cancelar</button>
-                <button class="btn btn-primary" id="btn-save-knockout">
+                <button class="btn btn-outline-full btn-close-modal glass-button">Cancelar</button>
+                <button class="btn btn-primary glass-button primary" id="btn-save-knockout">
                     <i class="ph-fill ph-floppy-disk"></i> Salvar Resultado
                 </button>
             </div>
