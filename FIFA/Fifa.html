@@ -494,10 +494,23 @@
                                 <div id="livePinnedMessage" class="live-pinned-message" hidden></div>
                                 <div id="liveCommentsDisabled" class="live-comments-disabled" hidden>Comentarios desativados pelo organizador.</div>
 
+                                <div class="live-chat-auth" id="liveChatAuth">
+                                    <button class="btn btn-outline-full live-google-btn" id="btn-live-google-login" type="button">
+                                        <i class="ph-fill ph-google-logo"></i> Entrar com Google
+                                    </button>
+                                    <div class="live-chat-user" id="liveChatUser" hidden>
+                                        <img id="liveChatUserAvatar" alt="Avatar do usuario">
+                                        <div>
+                                            <strong id="liveChatUserName">Visitante</strong>
+                                            <button class="live-chat-logout" id="btn-live-google-logout" type="button">Sair</button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <form id="liveCommentForm" class="live-comment-form">
-                                    <input id="liveCommentName" placeholder="Seu nome" maxlength="40" autocomplete="name">
-                                    <textarea id="liveCommentText" placeholder="Escreva um comentario..." maxlength="200" rows="3"></textarea>
-                                    <button class="btn btn-primary" type="submit">
+                                    <input id="liveCommentName" placeholder="Seu nome" maxlength="40" autocomplete="name" hidden>
+                                    <textarea id="liveCommentText" placeholder="Entre para comentar..." maxlength="200" rows="3" disabled></textarea>
+                                    <button class="btn btn-primary" id="liveCommentSubmit" type="submit" disabled>
                                         <i class="ph-fill ph-paper-plane-tilt"></i> Enviar
                                     </button>
                                 </form>
