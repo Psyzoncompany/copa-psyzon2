@@ -4,6 +4,14 @@
     padding: 0;
 }
 
+@font-face {
+    font-family: 'TanNimbus';
+    src: url('fonts/TAN-NIMBUS.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
 body {
     min-height: 100dvh;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -58,9 +66,10 @@ body {
 
 .choice-header h1 {
     margin-top: 4px;
+    font-family: 'TanNimbus', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     color: #042d15;
     font-size: clamp(32px, 7vw, 48px);
-    font-weight: 950;
+    font-weight: 400;
     line-height: 1;
     text-transform: uppercase;
 }
@@ -215,33 +224,139 @@ body {
 
     .game-choice-page {
         align-items: start;
-        padding: 16px;
+        padding: 10px;
     }
 
     .game-choice-card {
-        padding: 20px;
-        border-radius: 28px;
+        width: 100%;
+        max-height: calc(100dvh - 20px);
+        padding: 14px;
+        border-radius: 22px;
+    }
+
+    .choice-logo {
+        width: min(132px, 58vw);
+        margin-bottom: 6px;
+    }
+
+    .choice-kicker {
+        font-size: 10px;
+        letter-spacing: 2px;
+    }
+
+    .choice-header h1 {
+        margin-top: 3px;
+        font-size: clamp(27px, 8.4vw, 36px);
+        line-height: 0.98;
+    }
+
+    .choice-header p {
+        margin: 7px auto 12px;
+        font-size: 12px;
+        line-height: 1.25;
+    }
+
+    .game-list {
+        gap: 8px;
     }
 
     .game-option {
         grid-template-columns: 48px minmax(0, 1fr);
-        min-height: 76px;
-    }
-
-    .game-icon {
-        width: 48px;
-        height: 48px;
+        min-height: 62px;
+        gap: 10px;
+        padding: 8px 10px;
         border-radius: 16px;
     }
 
+    .game-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+    }
+
     .game-icon::before {
-        width: 36px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
+    }
+
+    .game-copy {
+        gap: 1px;
+    }
+
+    .game-copy strong {
+        font-size: 15px;
+    }
+
+    .game-copy small {
+        font-size: 11px;
+        line-height: 1.15;
     }
 
     .game-option > .ph-arrow-right,
     .soon-pill {
         grid-column: 2;
         justify-self: start;
+    }
+
+    .game-option > .ph-arrow-right {
+        font-size: 18px;
+    }
+
+    .soon-pill {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    .choice-footer {
+        margin-top: 10px;
+    }
+
+    .back-link {
+        min-height: 38px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 640px) and (max-height: 620px) {
+    .game-choice-card {
+        padding: 10px;
+        border-radius: 18px;
+    }
+
+    .choice-logo {
+        width: min(96px, 48vw);
+        margin-bottom: 4px;
+    }
+
+    .choice-header p {
+        margin: 5px auto 8px;
+        font-size: 11px;
+    }
+
+    .game-list {
+        gap: 6px;
+    }
+
+    .game-option {
+        min-height: 54px;
+        padding: 6px 8px;
+    }
+
+    .game-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .game-icon::before {
+        width: 28px;
+        height: 28px;
+    }
+
+    .choice-footer {
+        margin-top: 8px;
+    }
+
+    .back-link {
+        min-height: 34px;
     }
 }
