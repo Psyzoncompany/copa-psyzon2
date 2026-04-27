@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const RANKING_KEY = 'copaPsyzon_sinuca_ranking';
     const FIREBASE_TOURNAMENT_PATH = 'tournaments/sinuca/current';
     const RESET_CODE_PASSWORD = '153090';
+    const RP_PRIVATE_PASSWORD = 'Ro153090';
     const VALID_SIZES = [2, 4, 8, 16, 32, 64];
 
     function createDefaultLiveState() {
@@ -1280,6 +1281,67 @@ document.addEventListener('DOMContentLoaded', () => {
         await action();
     }
 
+    function ensureRodrigoPaulaModal() {
+        let modal = document.getElementById('rpPrivateModal');
+        if (modal) return modal;
+
+        modal = document.createElement('section');
+        modal.id = 'rpPrivateModal';
+        modal.className = 'rp-private-modal';
+        modal.hidden = true;
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'rpPrivateTitle');
+        modal.innerHTML = `
+            <div class="rp-private-card">
+                <span class="eyebrow">Area privada</span>
+                <h2 id="rpPrivateTitle">Rodrigo & Paula</h2>
+                <p>Digite a senha para entrar no cinema privado.</p>
+                <form id="rpPrivateForm" class="rp-private-form">
+                    <label class="field">
+                        <span>Senha</span>
+                        <input id="rpPrivatePassword" type="password" autocomplete="current-password" inputmode="text">
+                    </label>
+                    <div id="rpPrivateError" class="rp-private-error" role="alert"></div>
+                    <div class="rp-private-actions">
+                        <button class="btn primary" type="submit"><i class="ph ph-lock-key"></i> Entrar</button>
+                        <button class="btn secondary" type="button" id="rpPrivateCancel">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const closeModal = () => {
+            modal.hidden = true;
+            $('#rpPrivatePassword').value = '';
+            $('#rpPrivateError').textContent = '';
+        };
+
+        $('#rpPrivateCancel')?.addEventListener('click', closeModal);
+        modal.addEventListener('click', event => {
+            if (event.target === modal) closeModal();
+        });
+        $('#rpPrivateForm')?.addEventListener('submit', event => {
+            event.preventDefault();
+            const password = $('#rpPrivatePassword')?.value || '';
+            if (password !== RP_PRIVATE_PASSWORD) {
+                $('#rpPrivateError').textContent = 'Senha incorreta.';
+                $('#rpPrivatePassword')?.focus();
+                return;
+            }
+            window.location.href = new URL('../Rodrigo-Paula/index.html?host=rodrigo', window.location.href).toString();
+        });
+
+        return modal;
+    }
+
+    function openRodrigoPaulaGate() {
+        const modal = ensureRodrigoPaulaModal();
+        modal.hidden = false;
+        setTimeout(() => $('#rpPrivatePassword')?.focus(), 60);
+    }
+
     function renderLiveTabStatus() {
         const live = ensureLiveState();
         const tab = document.querySelector('.tab[data-tab="ao-vivo"]');
@@ -1872,6 +1934,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!panel.contains(event.target) && !toggle.contains(event.target)) {
                 panel.classList.remove('active');
             }
+        }
+
+        const privateEntry = event.target.closest('#rpSecretEntry');
+        if (privateEntry) {
+            event.preventDefault();
+            event.stopPropagation();
+            openRodrigoPaulaGate();
+            return;
         }
 
         const removeButton = event.target.closest('[data-remove-id]');

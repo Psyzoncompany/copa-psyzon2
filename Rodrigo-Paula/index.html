@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rodrigo & Paula - Cinema Privado</title>
+    <link rel="stylesheet" href="rodrigo-paula.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="rp-page">
+        <header class="rp-topbar">
+            <a class="rp-brand" href="../escolhaojogo.html">
+                <img src="../imgs/logo/logo svg psyzon e prefeitura.svg" alt="Copa Psyzon">
+                <span>
+                    <strong>Rodrigo & Paula</strong>
+                    <small>Cinema privado</small>
+                </span>
+            </a>
+
+            <div class="rp-top-status" aria-label="Status da sala">
+                <span id="connectionBadge" class="rp-status-pill">
+                    <i class="ph-fill ph-circle-notch"></i>
+                    <span>Conectando...</span>
+                </span>
+                <span id="roomBadge" class="rp-status-pill soft">
+                    <i class="ph-fill ph-door-open"></i>
+                    <span>Sem sala</span>
+                </span>
+            </div>
+        </header>
+
+        <main class="rp-shell">
+            <section class="rp-session-header">
+                <div class="rp-title-block">
+                    <span class="rp-eyebrow">COPA PSYZON PRIVATE</span>
+                    <h1>Rodrigo & Paula</h1>
+                    <p>Cinema sincronizado em tempo real, com player do site, chat ao vivo e sala privada.</p>
+                </div>
+
+                <div class="rp-session-badges">
+                    <span id="syncStatus" class="rp-badge">
+                        <i class="ph-fill ph-arrows-clockwise"></i>
+                        <span>Conectando...</span>
+                    </span>
+                    <span id="participantsBadge" class="rp-badge subtle">
+                        <i class="ph-fill ph-users-three"></i>
+                        <span>0 online</span>
+                    </span>
+                </div>
+            </section>
+
+            <section class="rp-watch-layout" id="watchLayout">
+                <div class="rp-main-column">
+                    <article class="rp-glass-card rp-player-card">
+                        <div class="rp-player-heading">
+                            <div>
+                                <span class="rp-eyebrow">Sessão privada</span>
+                                <h2 id="movieTitleDisplay">Cinema Rodrigo & Paula</h2>
+                            </div>
+                            <span id="playerStateBadge" class="rp-live-badge">Sincronizado</span>
+                        </div>
+
+                        <div class="rp-video-frame" id="videoFrame">
+                            <video id="moviePlayer" controls playsinline preload="metadata" controlslist="nodownload noplaybackrate">
+                                Seu navegador não suporta vídeo HTML5.
+                            </video>
+
+                            <div id="videoNotice" class="rp-video-notice">
+                                <i class="ph-fill ph-play-circle"></i>
+                                <span>Clique em play para iniciar sincronizado.</span>
+                            </div>
+
+                            <div id="videoErrorCard" class="rp-video-error" hidden>
+                                <i class="ph-fill ph-warning-circle"></i>
+                                <strong>Não foi possível carregar o vídeo.</strong>
+                                <span>Verifique se o link MP4 está acessível e permitido para reprodução.</span>
+                                <button id="retryVideoButton" type="button" class="rp-btn rp-btn-light">
+                                    <i class="ph-fill ph-arrow-clockwise"></i>
+                                    Tentar recarregar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="rp-player-footer">
+                            <div id="participantsList" class="rp-participants-list" aria-label="Participantes online">
+                                <span class="rp-participant-chip muted">Aguardando sala</span>
+                            </div>
+
+                            <button id="toggleChatButton" type="button" class="rp-btn rp-btn-ghost">
+                                <i class="ph-fill ph-chat-circle-dots"></i>
+                                Ocultar chat
+                            </button>
+                        </div>
+
+                        <button id="messageTicker" class="rp-message-ticker" type="button" hidden>
+                            <i class="ph-fill ph-chat-teardrop-text"></i>
+                            <span id="tickerTrack" class="rp-ticker-track">Nenhuma mensagem ainda.</span>
+                        </button>
+                    </article>
+
+                    <article id="organizerPanel" class="rp-glass-card rp-organizer-panel" hidden>
+                        <div class="rp-card-title">
+                            <div>
+                                <span class="rp-eyebrow">Organizador</span>
+                                <h2>Controle da sessão</h2>
+                            </div>
+                            <span class="rp-mini-lock">
+                                <i class="ph-fill ph-lock-key"></i>
+                                Rodrigo
+                            </span>
+                        </div>
+
+                        <form id="movieSettingsForm" class="rp-settings-form">
+                            <label class="rp-field rp-field-wide">
+                                <span>Título do filme</span>
+                                <input id="movieTitleInput" type="text" maxlength="80" autocomplete="off" placeholder="Ex: Sessão de hoje">
+                            </label>
+
+                            <label class="rp-field rp-field-wide">
+                                <span>Link MP4 do filme</span>
+                                <input id="videoUrlInput" type="url" autocomplete="off" placeholder="https://exemplo.com/filme.mp4">
+                            </label>
+
+                            <button class="rp-btn rp-btn-primary" type="submit">
+                                <i class="ph-fill ph-film-strip"></i>
+                                Atualizar filme
+                            </button>
+                            <button id="sharePaulaButton" class="rp-btn rp-btn-rose" type="button">
+                                <i class="ph-fill ph-heart"></i>
+                                Compartilhar com Paula
+                            </button>
+                            <button id="copyRoomButton" class="rp-btn rp-btn-secondary" type="button">
+                                <i class="ph-fill ph-copy"></i>
+                                Copiar link da sala
+                            </button>
+                        </form>
+                        <p id="settingsFeedback" class="rp-feedback" role="status"></p>
+                    </article>
+                </div>
+
+                <aside id="chatPanel" class="rp-chat-card rp-glass-card" aria-label="Chat ao vivo">
+                    <div class="rp-chat-header">
+                        <div>
+                            <span class="rp-eyebrow">Chat ao vivo</span>
+                            <h2>Conversa da sessão</h2>
+                        </div>
+                        <div class="rp-chat-actions">
+                            <button id="chatFullscreenButton" type="button" class="rp-icon-button" title="Tela cheia do chat" aria-label="Tela cheia do chat">
+                                <i class="ph-fill ph-corners-out"></i>
+                            </button>
+                            <button id="hideChatButton" type="button" class="rp-icon-button" title="Ocultar chat" aria-label="Ocultar chat">
+                                <i class="ph-fill ph-eye-slash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="messagesList" class="rp-messages-list" aria-live="polite">
+                        <div class="rp-empty-chat">As mensagens aparecem aqui em tempo real.</div>
+                    </div>
+
+                    <form id="chatForm" class="rp-chat-form">
+                        <label class="rp-field">
+                            <span>Mensagem</span>
+                            <textarea id="messageInput" maxlength="240" rows="3" placeholder="Digite sua mensagem..."></textarea>
+                        </label>
+                        <button class="rp-btn rp-btn-primary" type="submit">
+                            <i class="ph-fill ph-paper-plane-tilt"></i>
+                            Enviar
+                        </button>
+                    </form>
+                </aside>
+            </section>
+        </main>
+    </div>
+
+    <section id="nameModal" class="rp-modal" hidden aria-modal="true" role="dialog" aria-labelledby="nameModalTitle">
+        <div class="rp-modal-card">
+            <span class="rp-eyebrow">Entrada privada</span>
+            <h2 id="nameModalTitle">Como você quer aparecer?</h2>
+            <p>Digite seu nome para entrar na sala, assistir e conversar.</p>
+            <form id="nameForm" class="rp-name-form">
+                <label class="rp-field">
+                    <span>Seu nome</span>
+                    <input id="nameInput" type="text" maxlength="32" autocomplete="name" placeholder="Rodrigo ou Paula">
+                </label>
+                <button class="rp-btn rp-btn-primary" type="submit">
+                    <i class="ph-fill ph-check-circle"></i>
+                    Entrar
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <div id="toastStack" class="rp-toast-stack" aria-live="polite"></div>
+
+    <script type="module" src="rodrigo-paula.js"></script>
+</body>
+
+</html>
