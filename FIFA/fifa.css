@@ -5525,6 +5525,50 @@ body {
     gap: 10px;
 }
 
+.live-chat-auth {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.live-google-btn {
+    width: 100%;
+}
+
+.live-chat-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.74);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.live-chat-user img {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    object-fit: cover;
+    border: 2px solid rgba(22, 163, 74, 0.2);
+}
+
+.live-chat-user strong {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.live-chat-logout {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 0;
+    cursor: pointer;
+}
+
 .live-comment-form input,
 .live-comment-form textarea,
 .live-admin-form input,

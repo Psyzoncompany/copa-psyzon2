@@ -6,7 +6,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { initRankingSystem } from './ranking.js';
 
 const firebaseConfig = {
@@ -198,6 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let selectedGroupIndex = null;
     let selectedKnockoutMatch = null; // { type, rIdx, mIdx }
+    let liveChatUser = null;
 
     async function sha256Hex(value) {
         const encoded = new TextEncoder().encode(value);
@@ -1003,6 +1004,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         feedback.classList.toggle('is-warning', !!isWarning);
     }
 
+    function setLiveChatFeedback(message) {
+        const disabled = document.getElementById('liveCommentsDisabled');
+        if (!disabled) return;
+        if (message) {
+            disabled.hidden = false;
+            disabled.textContent = message;
+        } else if (ensureLiveState().commentsEnabled) {
+            disabled.hidden = true;
+            disabled.textContent = 'Comentarios desativados pelo organizador.';
+        }
+    }
+
     function getLiveParticipantNames() {
         const names = new Set();
         const pushName = (value) => {
@@ -1189,6 +1202,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const pinned = document.getElementById('livePinnedMessage');
         const disabled = document.getElementById('liveCommentsDisabled');
         const form = document.getElementById('liveCommentForm');
+        const textInput = document.getElementById('liveCommentText');
+        const submitBtn = document.getElementById('liveCommentSubmit');
+        const authBox = document.getElementById('liveChatAuth');
+        const userBox = document.getElementById('liveChatUser');
+        const loginBtn = document.getElementById('btn-live-google-login');
+        const userName = document.getElementById('liveChatUserName');
+        const userAvatar = document.getElementById('liveChatUserAvatar');
         const list = document.getElementById('liveCommentsList');
         const comments = [...live.comments]
             .filter(comment => comment && comment.text)
@@ -1203,8 +1223,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             pinned.textContent = message ? `Mensagem fixada: ${message}` : '';
         }
 
-        if (disabled) disabled.hidden = live.commentsEnabled;
+        if (authBox) authBox.hidden = !live.commentsEnabled;
+        const canComment = !!live.commentsEnabled && !!liveChatUser;
         if (form) form.hidden = !live.commentsEnabled;
+        if (textInput) {
+            textInput.disabled = !canComment;
+            textInput.placeholder = !live.commentsEnabled
+                ? 'Comentarios desativados pelo organizador.'
+                : (liveChatUser ? 'Escreva um comentario...' : 'Entre para comentar...');
+        }
+        if (submitBtn) submitBtn.disabled = !canComment;
+        if (disabled) disabled.hidden = canComment || !live.commentsEnabled ? true : false;
+        if (disabled && !live.commentsEnabled) disabled.textContent = 'Comentarios desativados pelo organizador.';
+        if (disabled && live.commentsEnabled && !liveChatUser) disabled.textContent = 'Para comentar, clique em "Entrar com Google".';
+
+        if (userBox) userBox.hidden = !liveChatUser;
+        if (loginBtn) loginBtn.hidden = !!liveChatUser;
+        if (userName) userName.textContent = sanitizeLiveText(liveChatUser?.displayName || liveChatUser?.email || 'Usuario', 40);
+        if (userAvatar) {
+            const name = sanitizeLiveText(liveChatUser?.displayName || 'Usuario', 40);
+            const fallback = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='100%' height='100%' fill='#dbeafe'/><text x='50%' y='56%' text-anchor='middle' font-family='Arial' font-size='28' fill='#1d4ed8'>${name.slice(0, 1).toUpperCase()}</text></svg>`)}`;
+            userAvatar.src = liveChatUser?.photoURL || fallback;
+        }
         if (!list) return;
 
         list.replaceChildren();
@@ -1314,15 +1354,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function addLiveComment(nameValue, textValue) {
         const live = ensureLiveState();
         if (!live.commentsEnabled) return;
+        if (!liveChatUser) return;
 
         const text = sanitizeLiveText(textValue, 200);
         if (!text) return;
 
-        const name = sanitizeLiveText(nameValue, 40) || 'Visitante';
+        const name = sanitizeLiveText(
+            liveChatUser?.displayName || nameValue || liveChatUser?.email || 'Visitante',
+            40
+        );
         const comment = {
             id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             name,
             text,
+            userId: String(liveChatUser?.uid || ''),
+            userPhoto: sanitizeLiveText(liveChatUser?.photoURL || '', 300),
             createdAt: Date.now(),
             approved: true
         };
@@ -1365,6 +1411,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.getElementById('liveCommentForm')?.addEventListener('submit', async (event) => {
             event.preventDefault();
+            if (!liveChatUser) {
+                setLiveChatFeedback('Para comentar, clique em "Entrar com Google".');
+                return;
+            }
             const nameInput = document.getElementById('liveCommentName');
             const textInput = document.getElementById('liveCommentText');
             const text = sanitizeLiveText(textInput?.value, 200);
@@ -1374,6 +1424,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             await addLiveComment(nameInput?.value, text);
             if (textInput) textInput.value = '';
+        });
+
+        document.getElementById('btn-live-google-login')?.addEventListener('click', async () => {
+            if (!auth) {
+                setLiveChatFeedback('Login indisponivel no momento. Firebase nao conectado.');
+                return;
+            }
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+                setLiveChatFeedback('');
+            } catch (error) {
+                console.error('Erro no login Google da live:', error);
+                setLiveChatFeedback('Nao foi possivel entrar com Google. Tente novamente.');
+            }
+        });
+
+        document.getElementById('btn-live-google-logout')?.addEventListener('click', async () => {
+            if (!auth) return;
+            try {
+                await signOut(auth);
+                setLiveChatFeedback('Voce saiu. Para comentar, entre com Google novamente.');
+            } catch (error) {
+                console.error('Erro ao sair da conta Google da live:', error);
+            }
         });
 
         document.getElementById('btn-live-clear-comments')?.addEventListener('click', () => {
@@ -1390,6 +1465,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             const id = deleteBtn.dataset.liveCommentDelete;
             withSensitiveGuard('btn-live-delete-comment', () => deleteLiveComment(id));
         });
+    }
+
+    if (auth) {
+        onAuthStateChanged(auth, (user) => {
+            liveChatUser = user || null;
+            renderLiveComments();
+        });
+    } else {
+        liveChatUser = null;
     }
 
     async function recalculateGeneralRanking() {
