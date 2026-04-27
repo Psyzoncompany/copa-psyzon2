@@ -1303,6 +1303,32 @@ document.addEventListener('DOMContentLoaded', () => {
         if (muteIcon) muteIcon.className = livePlayerMuted ? 'ph-fill ph-speaker-slash' : 'ph-fill ph-speaker-high';
     }
 
+    function updateLiveFullscreenButton() {
+        const button = $('#liveFullscreenToggle');
+        const icon = $('#liveFullscreenToggle i');
+        const isFullscreen = document.fullscreenElement === $('#liveVideoWrapper');
+        if (icon) icon.className = isFullscreen ? 'ph-fill ph-corners-in' : 'ph-fill ph-corners-out';
+        if (button) button.title = isFullscreen ? 'Sair da tela cheia' : 'Tela cheia';
+    }
+
+    function getLiveShareUrl() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('role', 'visitante');
+        url.searchParams.set('tab', 'ao-vivo');
+        url.hash = 'ao-vivo';
+        return url.toString();
+    }
+
+    async function shareLiveLink() {
+        const url = getLiveShareUrl();
+        if (navigator.share) {
+            await navigator.share({ title: 'COPA PSYZON AO VIVO', text: 'Acompanhe a live da COPA PSYZON.', url });
+            return;
+        }
+        await navigator.clipboard.writeText(url);
+        alert('Link da live copiado!');
+    }
+
     function updateLiveEmbed() {
         const live = ensureLiveState();
         const iframe = $('#liveYoutubeIframe');
@@ -1732,6 +1758,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'ao-vivo') renderLiveSection();
     }
 
+    function getInitialTab() {
+        const requested = params.get('tab') || window.location.hash.replace('#', '');
+        return requested === 'ao-vivo' ? 'ao-vivo' : (!isOrganizer ? 'mata-mata' : '');
+    }
+
     $$('.tab').forEach(tab => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
@@ -1775,8 +1806,21 @@ document.addEventListener('DOMContentLoaded', () => {
         await addLiveComment($('#liveCommentName')?.value, text);
         if (textInput) textInput.value = '';
     });
+    $('#liveCommentText')?.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' || event.shiftKey) return;
+        event.preventDefault();
+        $('#liveCommentForm')?.requestSubmit();
+    });
 
-    $('#liveGoogleLogin')?.addEventListener('click', () => signInWithPopup(auth, googleProvider).catch(() => alert('Nao foi possivel entrar com Google.')));
+    $('#liveGoogleLogin')?.addEventListener('click', async () => {
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            liveUser = result.user;
+            renderLiveAuth();
+        } catch {
+            alert('Nao foi possivel entrar com Google.');
+        }
+    });
     $('#liveGoogleLogout')?.addEventListener('click', () => signOut(auth));
     $('#livePlayToggle')?.addEventListener('click', () => {
         livePlayerPlaying = !livePlayerPlaying;
@@ -1790,10 +1834,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     $('#liveFullscreenToggle')?.addEventListener('click', () => {
         const wrapper = $('#liveVideoWrapper');
-        if (wrapper?.requestFullscreen) wrapper.requestFullscreen();
+        if (document.fullscreenElement === wrapper) {
+            document.exitFullscreen?.();
+        } else if (wrapper?.requestFullscreen) {
+            wrapper.requestFullscreen();
+        }
         document.activeElement?.blur?.();
         showLiveControlsTemporarily();
+        updateLiveFullscreenButton();
     });
+    $('#liveShareButton')?.addEventListener('click', () => shareLiveLink().catch(() => alert('Nao foi possivel compartilhar a live.')));
+    document.addEventListener('fullscreenchange', updateLiveFullscreenButton);
     $('#liveVideoWrapper')?.addEventListener('pointermove', showLiveControlsTemporarily);
     document.addEventListener('mousemove', () => {
         const wrapper = $('#liveVideoWrapper');
@@ -1889,7 +1940,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadTournamentFromFirebase().finally(() => {
         renderAll();
-        if (!isOrganizer) switchTab('mata-mata');
+        const initialTab = getInitialTab();
+        if (initialTab) switchTab(initialTab);
         subscribeTournamentFromFirebase();
     });
 

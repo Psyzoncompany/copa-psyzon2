@@ -164,16 +164,7 @@
             </section>
 
             <section id="tab-ao-vivo" class="tab-content">
-                <section class="live-section" aria-labelledby="live-section-title">
-                    <div class="live-section-heading">
-                        <div>
-                            <span class="eyebrow">Transmissao oficial</span>
-                            <h1 id="live-section-title">AO VIVO</h1>
-                            <p>Acompanhe a partida em tempo real pela transmissao oficial da COPA PSYZON.</p>
-                        </div>
-                        <span id="liveSectionStatus" class="live-section-status">Offline</span>
-                    </div>
-
+                <section class="live-section" aria-label="AO VIVO">
                     <div id="liveWarning" class="live-warning" hidden></div>
 
                     <div class="live-grid">
@@ -210,11 +201,50 @@
                                         <button id="liveMuteToggle" type="button" class="live-control-button" title="Som">
                                             <i class="ph-fill ph-speaker-high"></i>
                                         </button>
+                                        <button id="liveShareButton" type="button" class="live-control-button" title="Compartilhar live">
+                                            <i class="ph-fill ph-share-network"></i>
+                                        </button>
                                         <button id="liveFullscreenToggle" type="button" class="live-control-button" title="Tela cheia">
                                             <i class="ph-fill ph-corners-out"></i>
                                         </button>
                                     </div>
                                 </div>
+
+                                <article class="live-current-match-card">
+                                    <div class="live-card-header">
+                                        <span class="live-mini-dot" aria-hidden="true"></span>
+                                        <h2>Partida na tela</h2>
+                                        <span id="liveMatchBadge" class="live-small-badge">OFFLINE</span>
+                                    </div>
+
+                                    <div class="live-match-title" id="liveCurrentMatchTitle">Aguardando partida</div>
+
+                                    <div class="live-scoreboard">
+                                        <div class="live-player-name" id="livePlayer1Name">Jogador 1</div>
+                                        <div class="live-score">
+                                            <span id="liveScore1">0</span>
+                                            <span>x</span>
+                                            <span id="liveScore2">0</span>
+                                        </div>
+                                        <div class="live-player-name" id="livePlayer2Name">Jogador 2</div>
+                                    </div>
+
+                                    <div class="live-extra-info">
+                                        <span id="livePhaseName">Fase nao definida</span>
+                                        <span id="liveTableName">Mesa nao definida</span>
+                                    </div>
+                                </article>
+
+                                <article class="live-info-card">
+                                    <div class="live-card-header">
+                                        <h2>Informacoes</h2>
+                                    </div>
+                                    <div class="live-info-list">
+                                        <div><span>Status</span><strong id="liveInfoStatus">Offline</strong></div>
+                                        <div><span>Player</span><strong id="liveInfoPlayer">Sem link</strong></div>
+                                        <div><span>Comentarios</span><strong id="liveInfoComments">Ativados</strong></div>
+                                    </div>
+                                </article>
                             </article>
 
                             <article class="live-admin-panel glass-card" id="liveAdminPanel" hidden>
@@ -305,31 +335,6 @@
                         </div>
 
                         <aside class="live-side-column">
-                            <article class="live-current-match-card glass-card">
-                                <div class="live-card-header">
-                                    <span class="live-mini-dot" aria-hidden="true"></span>
-                                    <h2>Partida na tela</h2>
-                                    <span id="liveMatchBadge" class="live-small-badge">OFFLINE</span>
-                                </div>
-
-                                <div class="live-match-title" id="liveCurrentMatchTitle">Aguardando partida</div>
-
-                                <div class="live-scoreboard">
-                                    <div class="live-player-name" id="livePlayer1Name">Jogador 1</div>
-                                    <div class="live-score">
-                                        <span id="liveScore1">0</span>
-                                        <span>x</span>
-                                        <span id="liveScore2">0</span>
-                                    </div>
-                                    <div class="live-player-name" id="livePlayer2Name">Jogador 2</div>
-                                </div>
-
-                                <div class="live-extra-info">
-                                    <span id="livePhaseName">Fase nao definida</span>
-                                    <span id="liveTableName">Mesa nao definida</span>
-                                </div>
-                            </article>
-
                             <article class="live-comments-card glass-card">
                                 <div class="live-card-header">
                                     <h2>Comentarios</h2>
@@ -361,16 +366,6 @@
                                 <div id="liveCommentsList" class="live-comments-list"></div>
                             </article>
 
-                            <article class="live-info-card glass-card">
-                                <div class="live-card-header">
-                                    <h2>Informacoes</h2>
-                                </div>
-                                <div class="live-info-list">
-                                    <div><span>Status</span><strong id="liveInfoStatus">Offline</strong></div>
-                                    <div><span>Player</span><strong id="liveInfoPlayer">Sem link</strong></div>
-                                    <div><span>Comentarios</span><strong id="liveInfoComments">Ativados</strong></div>
-                                </div>
-                            </article>
                         </aside>
                     </div>
                 </section>

@@ -1092,6 +1092,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (muteIcon) muteIcon.className = livePlayerMuted ? 'ph-fill ph-speaker-slash' : 'ph-fill ph-speaker-high';
     }
 
+    function updateLiveFullscreenButton() {
+        const button = document.getElementById('liveFullscreenToggle');
+        const icon = document.querySelector('#liveFullscreenToggle i');
+        const isFullscreen = document.fullscreenElement === document.getElementById('liveVideoWrapper');
+        if (icon) icon.className = isFullscreen ? 'ph-fill ph-corners-in' : 'ph-fill ph-corners-out';
+        if (button) button.title = isFullscreen ? 'Sair da tela cheia' : 'Tela cheia';
+    }
+
+    function getLiveShareUrl() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('role', 'visitante');
+        url.searchParams.set('tab', 'ao-vivo');
+        url.hash = 'ao-vivo';
+        return url.toString();
+    }
+
+    async function shareLiveLink() {
+        const url = getLiveShareUrl();
+        if (navigator.share) {
+            await navigator.share({ title: 'COPA PSYZON AO VIVO', text: 'Acompanhe a live da COPA PSYZON.', url });
+            return;
+        }
+        await navigator.clipboard.writeText(url);
+        alert('Link da live copiado!');
+    }
+
     function updateLiveEmbed() {
         const live = ensureLiveState();
         const iframe = document.getElementById('liveYoutubeIframe');
@@ -1467,10 +1493,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             await addLiveComment(nameInput?.value, text);
             if (textInput) textInput.value = '';
         });
+        document.getElementById('liveCommentText')?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' || event.shiftKey) return;
+            event.preventDefault();
+            document.getElementById('liveCommentForm')?.requestSubmit();
+        });
 
-        document.getElementById('liveGoogleLogin')?.addEventListener('click', () => {
+        document.getElementById('liveGoogleLogin')?.addEventListener('click', async () => {
             if (!auth) return;
-            signInWithPopup(auth, googleProvider).catch(() => alert('Nao foi possivel entrar com Google.'));
+            try {
+                const result = await signInWithPopup(auth, googleProvider);
+                liveUser = result.user;
+                renderLiveAuth();
+            } catch {
+                alert('Nao foi possivel entrar com Google.');
+            }
         });
 
         document.getElementById('liveGoogleLogout')?.addEventListener('click', () => {
@@ -1491,10 +1528,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.getElementById('liveFullscreenToggle')?.addEventListener('click', () => {
             const wrapper = document.getElementById('liveVideoWrapper');
-            if (wrapper?.requestFullscreen) wrapper.requestFullscreen();
+            if (document.fullscreenElement === wrapper) {
+                document.exitFullscreen?.();
+            } else if (wrapper?.requestFullscreen) {
+                wrapper.requestFullscreen();
+            }
             document.activeElement?.blur?.();
             showLiveControlsTemporarily();
+            updateLiveFullscreenButton();
         });
+
+        document.getElementById('liveShareButton')?.addEventListener('click', () => {
+            shareLiveLink().catch(() => alert('Nao foi possivel compartilhar a live.'));
+        });
+        document.addEventListener('fullscreenchange', updateLiveFullscreenButton);
 
         document.getElementById('liveVideoWrapper')?.addEventListener('pointermove', showLiveControlsTemporarily);
         document.addEventListener('mousemove', () => {
@@ -3144,6 +3191,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindLiveEvents();
     loadLiveStateFromLocalStorage();
     renderLiveSection();
+    const requestedInitialTab = urlParams.get('tab') || window.location.hash.replace('#', '');
+    if (requestedInitialTab === 'ao-vivo') {
+        document.querySelector('.tab[data-tab="ao-vivo"]')?.click();
+    }
 
     // ========== GENERATE TOURNAMENT CODE ==========
     async function generateTournamentCode(type = 'fifa') {
