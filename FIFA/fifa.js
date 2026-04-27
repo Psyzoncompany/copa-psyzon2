@@ -6,7 +6,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { initRankingSystem } from './ranking.js';
 
 const firebaseConfig = {
@@ -23,6 +23,8 @@ const firebaseConfig = {
 let db = null;
 let analytics = null;
 let auth = null;
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 try {
     if (firebaseConfig.apiKey !== "SUA_API_KEY") {
         const app = initializeApp(firebaseConfig);
@@ -45,6 +47,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let role = requestedRole;
     const participantId = urlParams.get('id') || null;
     const participantName = urlParams.get('name') ? decodeURIComponent(urlParams.get('name')) : null;
+    let liveUser = null;
+    let livePlayerMuted = false;
+    let livePlayerPlaying = false;
+    let liveControlsHideTimer = null;
 
     document.querySelectorAll('[data-game-switch]').forEach(link => {
         const game = link.dataset.gameSwitch;
@@ -136,6 +142,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             isOrganizerAuthorized = true;
             applyRoleUI('organizador');
             setTimeout(() => renderLiveSection(), 0);
+        });
+    }
+
+    if (auth) {
+        onAuthStateChanged(auth, (user) => {
+            liveUser = user;
+            renderLiveAuth();
         });
     }
 
@@ -913,7 +926,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ...current,
             enabled: current.enabled === true,
             commentsEnabled: current.commentsEnabled !== false,
-            comments: Array.isArray(current.comments) ? current.comments.slice(0, 50) : []
+            comments: Array.isArray(current.comments) ? current.comments.slice(0, 20) : []
         };
         return tournamentState.live;
     }
@@ -991,6 +1004,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/embed/${id}` : '';
     }
 
+    function getYouTubeWatchUrl(url) {
+        const id = extractYouTubeVideoId(url);
+        return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : '';
+    }
+
     function setLiveText(id, value) {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
@@ -1057,6 +1075,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         tab.classList.toggle('live-tab-active', !!live.enabled);
     }
 
+    function postLivePlayerCommand(func, args = []) {
+        const iframe = document.getElementById('liveYoutubeIframe');
+        if (!iframe?.contentWindow || iframe.hidden) return;
+        iframe.contentWindow.postMessage(JSON.stringify({
+            event: 'command',
+            func,
+            args
+        }), '*');
+    }
+
+    function updateLivePlayerButtons() {
+        const playIcon = document.querySelector('#livePlayToggle i');
+        const muteIcon = document.querySelector('#liveMuteToggle i');
+        if (playIcon) playIcon.className = livePlayerPlaying ? 'ph-fill ph-pause' : 'ph-fill ph-play';
+        if (muteIcon) muteIcon.className = livePlayerMuted ? 'ph-fill ph-speaker-slash' : 'ph-fill ph-speaker-high';
+    }
+
     function updateLiveEmbed() {
         const live = ensureLiveState();
         const iframe = document.getElementById('liveYoutubeIframe');
@@ -1068,13 +1103,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (iframe) {
             if (embedUrl) {
-                iframe.src = `${embedUrl}?rel=0&modestbranding=1`;
+                const origin = encodeURIComponent(window.location.origin);
+                const playerUrl = `${embedUrl}?enablejsapi=1&origin=${origin}&rel=0&modestbranding=1&controls=0&playsinline=1`;
+                if (iframe.src !== playerUrl) iframe.src = playerUrl;
                 iframe.hidden = false;
             } else {
-                iframe.src = '';
+                if (iframe.src) iframe.src = '';
                 iframe.hidden = true;
             }
         }
+
+        document.getElementById('liveCustomControls')?.toggleAttribute('hidden', !embedUrl);
 
         if (emptyState) {
             emptyState.hidden = !!embedUrl;
@@ -1084,6 +1123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (videoWrapper) videoWrapper.classList.toggle('has-live-video', !!embedUrl);
+        if (embedUrl) showLiveControlsTemporarily();
 
         if (warning) {
             const showWarning = live.enabled && !embedUrl;
@@ -1102,6 +1142,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         document.querySelectorAll('.live-status-dot').forEach(dot => dot.classList.toggle('is-live', !!live.enabled));
+        updateLivePlayerButtons();
+    }
+
+    function showLiveControlsTemporarily() {
+        const wrapper = document.getElementById('liveVideoWrapper');
+        if (!wrapper?.classList.contains('has-live-video')) return;
+        wrapper.classList.add('controls-visible');
+        clearTimeout(liveControlsHideTimer);
+        liveControlsHideTimer = setTimeout(() => {
+            wrapper.classList.remove('controls-visible');
+        }, 3000);
     }
 
     function renderLiveCurrentMatch() {
@@ -1183,6 +1234,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function renderLiveAuth() {
+        const authBox = document.getElementById('liveAuthBox');
+        const loginBtn = document.getElementById('liveGoogleLogin');
+        const logoutBtn = document.getElementById('liveGoogleLogout');
+        const userName = document.getElementById('liveAuthUserName');
+        const userPhoto = document.getElementById('liveAuthUserPhoto');
+        const textInput = document.getElementById('liveCommentText');
+        const isLogged = !!liveUser;
+
+        if (authBox) authBox.classList.toggle('is-logged', isLogged);
+        if (loginBtn) loginBtn.hidden = isLogged;
+        if (logoutBtn) logoutBtn.hidden = !isLogged;
+        if (userName) userName.textContent = isLogged ? (liveUser.displayName || liveUser.email || 'Conta Google') : 'Fazer login para comentar';
+        if (userPhoto) {
+            userPhoto.src = isLogged && liveUser.photoURL ? liveUser.photoURL : '';
+            userPhoto.hidden = !isLogged || !liveUser.photoURL;
+        }
+        if (textInput) {
+            textInput.disabled = !isLogged;
+            textInput.placeholder = isLogged ? 'Escreva um comentario...' : 'Faca login para comentar';
+        }
+    }
+
     function renderLiveComments() {
         const live = ensureLiveState();
         const count = document.getElementById('liveCommentCount');
@@ -1193,7 +1267,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const comments = [...live.comments]
             .filter(comment => comment && comment.text)
             .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-            .slice(0, 50);
+            .slice(0, 20)
+            .reverse();
 
         if (count) count.textContent = String(comments.length);
 
@@ -1205,6 +1280,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (disabled) disabled.hidden = live.commentsEnabled;
         if (form) form.hidden = !live.commentsEnabled;
+        renderLiveAuth();
         if (!list) return;
 
         list.replaceChildren();
@@ -1226,6 +1302,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const name = document.createElement('strong');
             name.textContent = sanitizeLiveText(comment.name, 40) || 'Visitante';
+            if (comment.photoURL) {
+                const avatar = document.createElement('img');
+                avatar.className = 'live-comment-avatar';
+                avatar.src = sanitizeLiveText(comment.photoURL, 300);
+                avatar.alt = '';
+                meta.appendChild(avatar);
+            }
 
             const time = document.createElement('span');
             const createdAt = Number(comment.createdAt) || Date.now();
@@ -1255,6 +1338,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             list.appendChild(item);
         });
+        list.scrollTop = list.scrollHeight;
     }
 
     function renderLiveSection() {
@@ -1314,20 +1398,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function addLiveComment(nameValue, textValue) {
         const live = ensureLiveState();
         if (!live.commentsEnabled) return;
+        if (!auth) return;
+        if (!liveUser) {
+            await signInWithPopup(auth, googleProvider);
+            if (!auth.currentUser) return;
+        }
 
         const text = sanitizeLiveText(textValue, 200);
         if (!text) return;
 
-        const name = sanitizeLiveText(nameValue, 40) || 'Visitante';
+        const user = auth.currentUser;
+        const name = sanitizeLiveText(user?.displayName || nameValue, 40) || 'Conta Google';
         const comment = {
             id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            uid: user?.uid || '',
             name,
+            photoURL: sanitizeLiveText(user?.photoURL, 300),
             text,
             createdAt: Date.now(),
             approved: true
         };
 
-        live.comments = [comment, ...(live.comments || [])].slice(0, 50);
+        live.comments = [comment, ...(live.comments || [])].slice(0, 20);
         await persistLiveState();
         renderLiveComments();
     }
@@ -1374,6 +1466,46 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             await addLiveComment(nameInput?.value, text);
             if (textInput) textInput.value = '';
+        });
+
+        document.getElementById('liveGoogleLogin')?.addEventListener('click', () => {
+            if (!auth) return;
+            signInWithPopup(auth, googleProvider).catch(() => alert('Nao foi possivel entrar com Google.'));
+        });
+
+        document.getElementById('liveGoogleLogout')?.addEventListener('click', () => {
+            if (auth) signOut(auth);
+        });
+
+        document.getElementById('livePlayToggle')?.addEventListener('click', () => {
+            livePlayerPlaying = !livePlayerPlaying;
+            postLivePlayerCommand(livePlayerPlaying ? 'playVideo' : 'pauseVideo');
+            updateLivePlayerButtons();
+        });
+
+        document.getElementById('liveMuteToggle')?.addEventListener('click', () => {
+            livePlayerMuted = !livePlayerMuted;
+            postLivePlayerCommand(livePlayerMuted ? 'mute' : 'unMute');
+            updateLivePlayerButtons();
+        });
+
+        document.getElementById('liveFullscreenToggle')?.addEventListener('click', () => {
+            const wrapper = document.getElementById('liveVideoWrapper');
+            if (wrapper?.requestFullscreen) wrapper.requestFullscreen();
+            document.activeElement?.blur?.();
+            showLiveControlsTemporarily();
+        });
+
+        document.getElementById('liveVideoWrapper')?.addEventListener('pointermove', showLiveControlsTemporarily);
+        document.addEventListener('mousemove', () => {
+            const wrapper = document.getElementById('liveVideoWrapper');
+            if (document.fullscreenElement === wrapper) showLiveControlsTemporarily();
+        });
+        document.getElementById('liveVideoWrapper')?.addEventListener('pointerleave', () => {
+            clearTimeout(liveControlsHideTimer);
+            liveControlsHideTimer = setTimeout(() => {
+                document.getElementById('liveVideoWrapper')?.classList.remove('controls-visible');
+            }, 3000);
         });
 
         document.getElementById('btn-live-clear-comments')?.addEventListener('click', () => {

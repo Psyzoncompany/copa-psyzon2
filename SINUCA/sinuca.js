@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCL2u-oSlw8EWQ96atPI9Tc-0cIl2k9K6M",
@@ -14,6 +15,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 document.addEventListener('DOMContentLoaded', () => {
     const STORAGE_KEY = 'copaPsyzon_sinuca_tournamentState';
@@ -77,6 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedHistoryId = null;
     let participantSearchTerm = '';
     let participantStatusFilter = 'todos';
+    let liveUser = null;
+    let livePlayerMuted = false;
+    let livePlayerPlaying = false;
+    let liveControlsHideTimer = null;
 
     const $ = (selector) => document.querySelector(selector);
     const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -108,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ...current,
             enabled: current.enabled === true,
             commentsEnabled: current.commentsEnabled !== false,
-            comments: Array.isArray(current.comments) ? current.comments.slice(0, 50) : []
+            comments: Array.isArray(current.comments) ? current.comments.slice(0, 20) : []
         };
         return state.live;
     }
@@ -1245,6 +1253,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/embed/${id}` : '';
     }
 
+    function getYouTubeWatchUrl(url) {
+        const id = extractYouTubeVideoId(url);
+        return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : '';
+    }
+
     function setLiveText(id, value) {
         const element = document.getElementById(id);
         if (element) element.textContent = value;
@@ -1273,6 +1286,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tab) tab.classList.toggle('live-tab-active', !!live.enabled);
     }
 
+    function postLivePlayerCommand(func, args = []) {
+        const iframe = $('#liveYoutubeIframe');
+        if (!iframe?.contentWindow || iframe.hidden) return;
+        iframe.contentWindow.postMessage(JSON.stringify({
+            event: 'command',
+            func,
+            args
+        }), '*');
+    }
+
+    function updateLivePlayerButtons() {
+        const playIcon = $('#livePlayToggle i');
+        const muteIcon = $('#liveMuteToggle i');
+        if (playIcon) playIcon.className = livePlayerPlaying ? 'ph-fill ph-pause' : 'ph-fill ph-play';
+        if (muteIcon) muteIcon.className = livePlayerMuted ? 'ph-fill ph-speaker-slash' : 'ph-fill ph-speaker-high';
+    }
+
     function updateLiveEmbed() {
         const live = ensureLiveState();
         const iframe = $('#liveYoutubeIframe');
@@ -1283,13 +1313,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (iframe) {
             if (embedUrl) {
-                iframe.src = `${embedUrl}?rel=0&modestbranding=1`;
+                const origin = encodeURIComponent(window.location.origin);
+                const playerUrl = `${embedUrl}?enablejsapi=1&origin=${origin}&rel=0&modestbranding=1&controls=0&playsinline=1`;
+                if (iframe.src !== playerUrl) iframe.src = playerUrl;
                 iframe.hidden = false;
             } else {
-                iframe.src = '';
+                if (iframe.src) iframe.src = '';
                 iframe.hidden = true;
             }
         }
+
+        $('#liveCustomControls')?.toggleAttribute('hidden', !embedUrl);
+        $('#liveVideoWrapper')?.classList.toggle('has-live-video', !!embedUrl);
+        if (embedUrl) showLiveControlsTemporarily();
 
         if (emptyState) {
             emptyState.hidden = !!embedUrl;
@@ -1311,6 +1347,40 @@ document.addEventListener('DOMContentLoaded', () => {
             badge.classList.toggle('live-on', !!live.enabled);
         }
         $$('.live-status-dot').forEach(dot => dot.classList.toggle('is-live', !!live.enabled));
+        updateLivePlayerButtons();
+    }
+
+    function showLiveControlsTemporarily() {
+        const wrapper = $('#liveVideoWrapper');
+        if (!wrapper?.classList.contains('has-live-video')) return;
+        wrapper.classList.add('controls-visible');
+        clearTimeout(liveControlsHideTimer);
+        liveControlsHideTimer = setTimeout(() => {
+            wrapper.classList.remove('controls-visible');
+        }, 3000);
+    }
+
+    function renderLiveAuth() {
+        const authBox = $('#liveAuthBox');
+        const loginBtn = $('#liveGoogleLogin');
+        const logoutBtn = $('#liveGoogleLogout');
+        const userName = $('#liveAuthUserName');
+        const userPhoto = $('#liveAuthUserPhoto');
+        const textInput = $('#liveCommentText');
+        const isLogged = !!liveUser;
+
+        if (authBox) authBox.classList.toggle('is-logged', isLogged);
+        if (loginBtn) loginBtn.hidden = isLogged;
+        if (logoutBtn) logoutBtn.hidden = !isLogged;
+        if (userName) userName.textContent = isLogged ? (liveUser.displayName || liveUser.email || 'Conta Google') : 'Fazer login para comentar';
+        if (userPhoto) {
+            userPhoto.src = isLogged && liveUser.photoURL ? liveUser.photoURL : '';
+            userPhoto.hidden = !isLogged || !liveUser.photoURL;
+        }
+        if (textInput) {
+            textInput.disabled = !isLogged;
+            textInput.placeholder = isLogged ? 'Escreva um comentario...' : 'Faca login para comentar';
+        }
     }
 
     function renderLiveCurrentMatch() {
@@ -1403,7 +1473,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const comments = [...live.comments]
             .filter(comment => comment && comment.text)
             .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-            .slice(0, 50);
+            .slice(0, 20)
+            .reverse();
         setLiveText('liveCommentCount', String(comments.length));
 
         const pinned = $('#livePinnedMessage');
@@ -1417,6 +1488,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = $('#liveCommentForm');
         if (disabled) disabled.hidden = live.commentsEnabled;
         if (form) form.hidden = !live.commentsEnabled;
+        renderLiveAuth();
 
         const list = $('#liveCommentsList');
         if (!list) return;
@@ -1438,6 +1510,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const name = document.createElement('strong');
             name.textContent = sanitizeLiveText(comment.name, 40) || 'Visitante';
+            if (comment.photoURL) {
+                const avatar = document.createElement('img');
+                avatar.className = 'live-comment-avatar';
+                avatar.src = sanitizeLiveText(comment.photoURL, 300);
+                avatar.alt = '';
+                meta.appendChild(avatar);
+            }
 
             const time = document.createElement('span');
             time.textContent = new Date(Number(comment.createdAt) || Date.now()).toLocaleString('pt-BR', {
@@ -1464,6 +1543,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             list.appendChild(item);
         });
+        list.scrollTop = list.scrollHeight;
     }
 
     function renderLiveSection() {
@@ -1517,15 +1597,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function addLiveComment(nameValue, textValue) {
         const live = ensureLiveState();
         if (!live.commentsEnabled) return;
+        if (!liveUser) {
+            await signInWithPopup(auth, googleProvider);
+            if (!auth.currentUser) return;
+        }
         const text = sanitizeLiveText(textValue, 200);
         if (!text) return;
         live.comments = [{
             id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name: sanitizeLiveText(nameValue, 40) || 'Visitante',
+            uid: auth.currentUser?.uid || '',
+            name: sanitizeLiveText(auth.currentUser?.displayName || nameValue, 40) || 'Conta Google',
+            photoURL: sanitizeLiveText(auth.currentUser?.photoURL, 300),
             text,
             createdAt: Date.now(),
             approved: true
-        }, ...(live.comments || [])].slice(0, 50);
+        }, ...(live.comments || [])].slice(0, 20);
         persist();
         await syncTournamentToFirebase();
         renderLiveComments();
@@ -1690,6 +1776,36 @@ document.addEventListener('DOMContentLoaded', () => {
         if (textInput) textInput.value = '';
     });
 
+    $('#liveGoogleLogin')?.addEventListener('click', () => signInWithPopup(auth, googleProvider).catch(() => alert('Nao foi possivel entrar com Google.')));
+    $('#liveGoogleLogout')?.addEventListener('click', () => signOut(auth));
+    $('#livePlayToggle')?.addEventListener('click', () => {
+        livePlayerPlaying = !livePlayerPlaying;
+        postLivePlayerCommand(livePlayerPlaying ? 'playVideo' : 'pauseVideo');
+        updateLivePlayerButtons();
+    });
+    $('#liveMuteToggle')?.addEventListener('click', () => {
+        livePlayerMuted = !livePlayerMuted;
+        postLivePlayerCommand(livePlayerMuted ? 'mute' : 'unMute');
+        updateLivePlayerButtons();
+    });
+    $('#liveFullscreenToggle')?.addEventListener('click', () => {
+        const wrapper = $('#liveVideoWrapper');
+        if (wrapper?.requestFullscreen) wrapper.requestFullscreen();
+        document.activeElement?.blur?.();
+        showLiveControlsTemporarily();
+    });
+    $('#liveVideoWrapper')?.addEventListener('pointermove', showLiveControlsTemporarily);
+    document.addEventListener('mousemove', () => {
+        const wrapper = $('#liveVideoWrapper');
+        if (document.fullscreenElement === wrapper) showLiveControlsTemporarily();
+    });
+    $('#liveVideoWrapper')?.addEventListener('pointerleave', () => {
+        clearTimeout(liveControlsHideTimer);
+        liveControlsHideTimer = setTimeout(() => {
+            $('#liveVideoWrapper')?.classList.remove('controls-visible');
+        }, 3000);
+    });
+
     $('#btn-live-clear-comments')?.addEventListener('click', () => withLivePassword(clearLiveComments));
     $('#btn-live-toggle-comments')?.addEventListener('click', () => withLivePassword(toggleLiveComments));
     $('#liveCommentsList')?.addEventListener('click', event => {
@@ -1775,5 +1891,10 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAll();
         if (!isOrganizer) switchTab('mata-mata');
         subscribeTournamentFromFirebase();
+    });
+
+    onAuthStateChanged(auth, (user) => {
+        liveUser = user;
+        renderLiveAuth();
     });
 });

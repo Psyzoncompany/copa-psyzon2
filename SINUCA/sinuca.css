@@ -2191,16 +2191,20 @@ body {
 
 .live-grid {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(320px, 0.9fr);
-    gap: 22px;
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    gap: 14px;
+    align-items: stretch;
 }
 
 .live-main-column,
 .live-side-column {
     display: grid;
-    gap: 16px;
+    gap: 14px;
     min-width: 0;
+}
+
+.live-side-column {
+    align-content: start;
 }
 
 .live-player-card,
@@ -2208,7 +2212,14 @@ body {
 .live-current-match-card,
 .live-comments-card,
 .live-info-card {
-    padding: 18px;
+    padding: 14px;
+}
+
+.live-player-card {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
 }
 
 .live-player-header,
@@ -2218,6 +2229,13 @@ body {
     justify-content: space-between;
     gap: 14px;
     margin-bottom: 14px;
+}
+
+.live-player-header {
+    order: 2;
+    margin: 0;
+    padding: 16px 18px;
+    border-top: 1px solid rgba(4, 45, 21, 0.08);
 }
 
 .live-card-header h2,
@@ -2261,11 +2279,12 @@ body {
 
 .live-video-wrapper {
     position: relative;
+    order: 1;
     width: 100%;
     aspect-ratio: 16 / 9;
     overflow: hidden;
-    border: 1px solid rgba(4, 45, 21, 0.10);
-    border-radius: 22px;
+    border: 0;
+    border-radius: 0;
     background: #07130c;
 }
 
@@ -2274,6 +2293,71 @@ body {
     width: 100%;
     height: 100%;
     border: 0;
+}
+
+.live-custom-controls {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(6, 18, 12, 0.82), rgba(6, 18, 12, 0.62));
+    backdrop-filter: blur(12px);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    z-index: 2;
+}
+
+.live-custom-controls[hidden] {
+    display: none;
+}
+
+.live-video-wrapper.controls-visible .live-custom-controls {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.live-youtube-cover {
+    position: absolute;
+    inset: 0 0 auto;
+    height: clamp(58px, 10vw, 82px);
+    background: linear-gradient(180deg, rgba(7, 19, 12, 0.98) 0%, rgba(7, 19, 12, 0.88) 66%, rgba(7, 19, 12, 0) 100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+    z-index: 1;
+}
+
+.live-video-wrapper.controls-visible .live-youtube-cover {
+    opacity: 1;
+}
+
+.live-control-button {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.live-control-button:hover {
+    background: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
 }
 
 .live-video-wrapper iframe[hidden],
@@ -2429,6 +2513,56 @@ body {
 .live-comment-form {
     display: grid;
     gap: 10px;
+    order: 4;
+    margin-top: 10px;
+}
+
+.live-auth-box {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.48);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.live-auth-box.is-logged {
+    border-color: rgba(22, 163, 74, 0.22);
+    background: rgba(240, 253, 244, 0.64);
+    color: #064e3b;
+}
+
+.live-auth-photo,
+.live-comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    object-fit: cover;
+}
+
+.live-google-button {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid rgba(4, 45, 21, 0.12);
+    border-radius: 12px;
+    background: #fff;
+    color: #042d15;
+    cursor: pointer;
+    font-weight: 950;
+}
+
+.live-google-button.secondary {
+    background: rgba(255, 255, 255, 0.58);
 }
 
 .live-comment-form input,
@@ -2468,11 +2602,22 @@ body {
 }
 
 .live-comments-list {
-    display: grid;
+    order: 3;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
     gap: 10px;
-    max-height: 460px;
+    min-height: 320px;
+    max-height: min(58vh, 640px);
     margin-top: 12px;
     overflow-y: auto;
+}
+
+.live-comments-card {
+    order: -1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .live-comment-item {
@@ -2486,6 +2631,7 @@ body {
 
 .live-comment-meta {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 10px;
     color: var(--text-muted);
@@ -2530,6 +2676,14 @@ body {
 
     .live-section-heading {
         display: grid;
+    }
+
+    .live-auth-box {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .live-google-button {
+        grid-column: 1 / -1;
     }
 
     .live-scoreboard {

@@ -364,6 +364,18 @@
                                         <div id="liveEmptyState" class="live-empty-state">
                                             Nenhuma transmissao configurada no momento.
                                         </div>
+                                        <div class="live-youtube-cover" aria-hidden="true"></div>
+                                        <div id="liveCustomControls" class="live-custom-controls" hidden>
+                                            <button id="livePlayToggle" type="button" class="live-control-button" title="Reproduzir/Pausar">
+                                                <i class="ph-fill ph-play"></i>
+                                            </button>
+                                            <button id="liveMuteToggle" type="button" class="live-control-button" title="Som">
+                                                <i class="ph-fill ph-speaker-high"></i>
+                                            </button>
+                                            <button id="liveFullscreenToggle" type="button" class="live-control-button" title="Tela cheia">
+                                                <i class="ph-fill ph-corners-out"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </article>
@@ -494,8 +506,19 @@
                                 <div id="livePinnedMessage" class="live-pinned-message" hidden></div>
                                 <div id="liveCommentsDisabled" class="live-comments-disabled" hidden>Comentarios desativados pelo organizador.</div>
 
+                                <div id="liveAuthBox" class="live-auth-box">
+                                    <img id="liveAuthUserPhoto" class="live-auth-photo" alt="" hidden>
+                                    <span id="liveAuthUserName">Fazer login para comentar</span>
+                                    <button id="liveGoogleLogin" class="live-google-button" type="button">
+                                        <i class="ph-fill ph-google-logo"></i> Fazer login
+                                    </button>
+                                    <button id="liveGoogleLogout" class="live-google-button secondary" type="button" hidden>
+                                        <i class="ph-fill ph-sign-out"></i> Sair
+                                    </button>
+                                </div>
+
                                 <form id="liveCommentForm" class="live-comment-form">
-                                    <input id="liveCommentName" placeholder="Seu nome" maxlength="40" autocomplete="name">
+                                    <input id="liveCommentName" placeholder="Seu nome" maxlength="40" autocomplete="name" hidden>
                                     <textarea id="liveCommentText" placeholder="Escreva um comentario..." maxlength="200" rows="3"></textarea>
                                     <button class="btn btn-primary" type="submit">
                                         <i class="ph-fill ph-paper-plane-tilt"></i> Enviar
