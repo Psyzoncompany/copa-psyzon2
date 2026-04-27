@@ -4460,6 +4460,15 @@ textarea::placeholder {
   text-align: center;
 }
 
+.game-selection-card .login-subtitle-new {
+  font-family: var(--font-title, 'TAN-NIMBUS', cursive);
+  font-weight: normal;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #fff;
+  opacity: 1;
+}
+
 .game-options {
   display: flex;
   flex-direction: column;
@@ -4537,6 +4546,106 @@ textarea::placeholder {
   border-radius: 20px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+@media (max-width: 480px) {
+  #game-selection-screen.login-screen {
+    height: 100dvh;
+    min-height: 100dvh;
+    justify-content: center;
+    overflow: hidden;
+    padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom));
+  }
+
+  #game-selection-screen > .sponsors-wrapper {
+    display: none;
+  }
+
+  .game-selection-card.login-card-new {
+    width: min(100%, 360px);
+    max-height: calc(100dvh - 20px);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 12px;
+    border-radius: 28px;
+  }
+
+  .game-selection-card .login-title-new {
+    font-size: clamp(23px, 8vw, 30px);
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+
+  .game-selection-card .login-subtitle-new {
+    margin-bottom: 10px;
+    font-size: clamp(24px, 9vw, 34px);
+    line-height: 0.95;
+  }
+
+  .game-selection-card .game-options {
+    gap: 8px;
+  }
+
+  .game-selection-card .btn-game-option {
+    min-height: 58px;
+    gap: 10px;
+    padding: 9px 11px;
+    border-radius: 14px;
+  }
+
+  .game-selection-card .btn-game-option .svg-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+  }
+
+  .game-selection-card .game-option-name {
+    font-size: 15px;
+    letter-spacing: 0;
+  }
+
+  .game-selection-card .game-option-badge {
+    padding: 3px 7px;
+    font-size: 9px;
+  }
+
+  #btn-game-back {
+    min-height: 38px;
+    margin-top: 8px !important;
+    padding: 9px 12px;
+  }
+}
+
+@media (max-width: 380px), (max-height: 620px) {
+  .game-selection-card.login-card-new {
+    padding: 12px 10px;
+    border-radius: 24px;
+  }
+
+  .game-selection-card .login-title-new {
+    font-size: clamp(21px, 7.4vw, 27px);
+  }
+
+  .game-selection-card .login-subtitle-new {
+    margin-bottom: 8px;
+    font-size: clamp(22px, 8vw, 30px);
+  }
+
+  .game-selection-card .btn-game-option {
+    min-height: 52px;
+    padding: 7px 9px;
+  }
+
+  .game-selection-card .btn-game-option .svg-icon {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+
+  #btn-game-back {
+    min-height: 34px;
+    margin-top: 6px !important;
+  }
 }
 
 /* ---------- 31. Player Profile Modal ---------- */
