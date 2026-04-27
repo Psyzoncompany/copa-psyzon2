@@ -135,6 +135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             isOrganizerAuthorized = true;
             applyRoleUI('organizador');
+            setTimeout(() => renderLiveSection(), 0);
         });
     }
 
@@ -161,6 +162,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ========== TOURNAMENT STATE (Firebase-Ready) ==========
+    const LIVE_LOCAL_STORAGE_KEY = 'copaPsyzon_fifa_liveState';
+
+    function createDefaultLiveState() {
+        return {
+            enabled: false,
+            youtubeUrl: "",
+            currentPlayer1: "",
+            currentPlayer2: "",
+            currentMatchTitle: "",
+            scorePlayer1: 0,
+            scorePlayer2: 0,
+            phaseName: "",
+            tableName: "",
+            commentsEnabled: true,
+            pinnedMessage: "",
+            comments: []
+        };
+    }
+
     let tournamentState = {
         name: '',
         participants: 8,
@@ -173,6 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         tournamentCode: null, // Ex: F1234
         top3: { first: '—', second: '—', third: '—' },
         createdAt: null,
+        live: createDefaultLiveState(),
     };
 
     let selectedGroupIndex = null;
@@ -357,10 +378,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editS1 = document.getElementById('edit-s1');
     const editS2 = document.getElementById('edit-s2');
     const btnSaveKnockout = document.getElementById('btn-save-knockout');
+    const SENSITIVE_PASSWORD = '153090';
     const SENSITIVE_IDS = new Set([
         'btn-encerrar', 'btn-resetar', 'btn-resetar-tudo', 'btn-apagar-cadastro', 'btn-resetar-codigos',
         'btn-toggle-test-mode', 'btn-test-exit-clear', 'btn-test-sim-full', 'btn-test-reset-all',
-        'btn-test-save-firebase', 'btn-test-remove-firebase', 'btn-test-history-remove', 'btn-test-ranking-clear'
+        'btn-test-save-firebase', 'btn-test-remove-firebase', 'btn-test-history-remove', 'btn-test-ranking-clear',
+        'btn-save-live-settings', 'btn-live-clear-comments', 'btn-live-toggle-comments', 'btn-live-delete-comment'
     ]);
     const modalSensitivePassword = document.getElementById('modal-sensitive-password');
     const btnConfirmSensitivePassword = document.getElementById('btn-confirm-sensitive-password');
@@ -381,7 +404,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         'btn-test-save-firebase': 'Testar salvamento no Firebase',
         'btn-test-remove-firebase': 'Remover teste do Firebase',
         'btn-test-history-remove': 'Remover histórico de teste',
-        'btn-test-ranking-clear': 'Limpar ranking de teste'
+        'btn-test-ranking-clear': 'Limpar ranking de teste',
+        'btn-save-live-settings': 'Salvar controle da live',
+        'btn-live-clear-comments': 'Limpar comentarios da live',
+        'btn-live-toggle-comments': 'Ativar/desativar comentarios da live',
+        'btn-live-delete-comment': 'Excluir comentario da live'
     };
     let pendingSensitiveAction = null;
     let pendingNextPhaseQualified = [];
@@ -868,6 +895,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             delete extra.__allowPersistInTestMode;
         }
         if (!db) return Promise.resolve();
+        ensureLiveState();
         const updatedAt = new Date().toISOString();
         tournamentState.updatedAt = updatedAt;
         const payload = { ...tournamentState, ...extra, updatedAt };
@@ -875,6 +903,493 @@ document.addEventListener('DOMContentLoaded', async () => {
             set(ref(db, 'tournaments/current'), payload),
             tournamentState.tournamentCode ? set(ref(db, `tournaments/${tournamentState.tournamentCode}`), payload) : Promise.resolve()
         ]);
+    }
+
+    function ensureLiveState() {
+        const current = tournamentState.live && typeof tournamentState.live === 'object' ? tournamentState.live : {};
+        const defaults = createDefaultLiveState();
+        tournamentState.live = {
+            ...defaults,
+            ...current,
+            enabled: current.enabled === true,
+            commentsEnabled: current.commentsEnabled !== false,
+            comments: Array.isArray(current.comments) ? current.comments.slice(0, 50) : []
+        };
+        return tournamentState.live;
+    }
+
+    function saveLiveLocalState() {
+        try {
+            localStorage.setItem(LIVE_LOCAL_STORAGE_KEY, JSON.stringify(ensureLiveState()));
+        } catch (error) {
+            console.warn('Nao foi possivel salvar a live localmente:', error);
+        }
+    }
+
+    function loadLiveStateFromLocalStorage() {
+        if (db) return;
+        try {
+            const saved = JSON.parse(localStorage.getItem(LIVE_LOCAL_STORAGE_KEY) || 'null');
+            if (saved && typeof saved === 'object') {
+                tournamentState.live = { ...createDefaultLiveState(), ...saved };
+            }
+        } catch (error) {
+            console.warn('Nao foi possivel carregar a live local:', error);
+        }
+        ensureLiveState();
+    }
+
+    async function persistLiveState() {
+        ensureLiveState();
+        if (db) {
+            await persistCurrentTournament({ live: tournamentState.live });
+        } else {
+            saveLiveLocalState();
+        }
+    }
+
+    function sanitizeLiveText(value, maxLength = 200) {
+        return String(value ?? '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/[\u0000-\u001f\u007f]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, maxLength);
+    }
+
+    function extractYouTubeVideoId(url) {
+        const raw = String(url || '').trim();
+        if (!raw) return '';
+        if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
+
+        try {
+            const parsed = new URL(raw);
+            const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+            const pathParts = parsed.pathname.split('/').filter(Boolean);
+
+            if (host === 'youtu.be' && pathParts[0]) {
+                return pathParts[0].slice(0, 11);
+            }
+
+            if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+                const watchId = parsed.searchParams.get('v');
+                if (watchId) return watchId.slice(0, 11);
+                if (['embed', 'shorts', 'live'].includes(pathParts[0]) && pathParts[1]) {
+                    return pathParts[1].slice(0, 11);
+                }
+            }
+        } catch (_) {
+            const match = raw.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([a-zA-Z0-9_-]{11})/);
+            if (match) return match[1];
+        }
+
+        return '';
+    }
+
+    function getYouTubeEmbedUrl(url) {
+        const id = extractYouTubeVideoId(url);
+        return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/embed/${id}` : '';
+    }
+
+    function setLiveText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    }
+
+    function setLiveFeedback(message, isWarning = false) {
+        const feedback = document.getElementById('liveSettingsFeedback');
+        if (!feedback) return;
+        feedback.textContent = message || '';
+        feedback.classList.toggle('is-warning', !!isWarning);
+    }
+
+    function getLiveParticipantNames() {
+        const names = new Set();
+        const pushName = (value) => {
+            const name = sanitizeLiveText(value, 40);
+            if (name && isRealPlayer(name)) names.add(name);
+        };
+
+        (tournamentState.registeredPlayers || []).forEach(player => {
+            pushName(player?.name || player?.nome || player?.nick);
+        });
+        (tournamentState.groups || []).forEach(group => {
+            (group.players || []).forEach(player => pushName(player?.name));
+        });
+
+        return Array.from(names).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    }
+
+    function populateLivePlayerSelect(selectId, manualId, selectedName) {
+        const select = document.getElementById(selectId);
+        const manual = document.getElementById(manualId);
+        if (!select) return;
+
+        const selected = sanitizeLiveText(selectedName, 40);
+        const names = getLiveParticipantNames();
+        select.replaceChildren();
+
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = names.length ? 'Selecionar participante' : 'Sem participantes cadastrados';
+        select.appendChild(empty);
+
+        names.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            select.appendChild(option);
+        });
+
+        if (selected && names.includes(selected)) {
+            select.value = selected;
+            if (manual) manual.value = '';
+        } else {
+            select.value = '';
+            if (manual) manual.value = selected;
+        }
+    }
+
+    function renderLiveTabStatus() {
+        const live = ensureLiveState();
+        const tab = document.querySelector('.tab[data-tab="ao-vivo"]');
+        if (!tab) return;
+        tab.classList.toggle('live-tab-active', !!live.enabled);
+    }
+
+    function updateLiveEmbed() {
+        const live = ensureLiveState();
+        const iframe = document.getElementById('liveYoutubeIframe');
+        const emptyState = document.getElementById('liveEmptyState');
+        const videoWrapper = document.getElementById('liveVideoWrapper');
+        const warning = document.getElementById('liveWarning');
+        const embedUrl = getYouTubeEmbedUrl(live.youtubeUrl);
+        const hasLink = !!sanitizeLiveText(live.youtubeUrl, 300);
+
+        if (iframe) {
+            if (embedUrl) {
+                iframe.src = `${embedUrl}?rel=0&modestbranding=1`;
+                iframe.hidden = false;
+            } else {
+                iframe.src = '';
+                iframe.hidden = true;
+            }
+        }
+
+        if (emptyState) {
+            emptyState.hidden = !!embedUrl;
+            emptyState.textContent = hasLink && !embedUrl
+                ? 'Link do YouTube invalido.'
+                : 'Nenhuma transmissao configurada no momento.';
+        }
+
+        if (videoWrapper) videoWrapper.classList.toggle('has-live-video', !!embedUrl);
+
+        if (warning) {
+            const showWarning = live.enabled && !embedUrl;
+            warning.hidden = !showWarning;
+            warning.textContent = showWarning ? 'Adicione um link do YouTube para exibir a transmissao.' : '';
+        }
+
+        const statusText = live.enabled ? 'Transmissao ao vivo agora' : (embedUrl ? 'Transmissao configurada, offline' : 'Nenhuma live ativa no momento.');
+        setLiveText('livePlayerStatus', statusText);
+
+        const badge = document.getElementById('livePlayerBadge');
+        if (badge) {
+            badge.textContent = live.enabled ? 'AO VIVO' : 'OFFLINE';
+            badge.classList.toggle('live-on', !!live.enabled);
+            badge.classList.toggle('offline', !live.enabled);
+        }
+
+        document.querySelectorAll('.live-status-dot').forEach(dot => dot.classList.toggle('is-live', !!live.enabled));
+    }
+
+    function renderLiveCurrentMatch() {
+        const live = ensureLiveState();
+        const title = sanitizeLiveText(live.currentMatchTitle, 80) || 'Aguardando definicao da partida atual.';
+        const player1 = sanitizeLiveText(live.currentPlayer1, 40) || 'Jogador 1';
+        const player2 = sanitizeLiveText(live.currentPlayer2, 40) || 'Jogador 2';
+        const score1 = Number.isFinite(Number(live.scorePlayer1)) ? Number(live.scorePlayer1) : 0;
+        const score2 = Number.isFinite(Number(live.scorePlayer2)) ? Number(live.scorePlayer2) : 0;
+
+        setLiveText('liveCurrentMatchTitle', title);
+        setLiveText('livePlayer1Name', player1);
+        setLiveText('livePlayer2Name', player2);
+        setLiveText('liveScore1', String(Math.max(0, score1)));
+        setLiveText('liveScore2', String(Math.max(0, score2)));
+        setLiveText('livePhaseName', sanitizeLiveText(live.phaseName, 50) || 'Fase nao definida');
+        setLiveText('liveTableName', sanitizeLiveText(live.tableName, 50) || 'Mesa nao definida');
+
+        const badge = document.getElementById('liveMatchBadge');
+        if (badge) {
+            badge.textContent = live.enabled ? 'AO VIVO' : 'OFFLINE';
+            badge.classList.toggle('is-live', !!live.enabled);
+        }
+        document.querySelectorAll('.live-mini-dot').forEach(dot => dot.classList.toggle('is-live', !!live.enabled));
+    }
+
+    function renderLiveInfo() {
+        const live = ensureLiveState();
+        const embedUrl = getYouTubeEmbedUrl(live.youtubeUrl);
+        const status = live.enabled ? 'Ao vivo agora' : (embedUrl ? 'Offline' : 'Nao configurada');
+        const player = embedUrl ? 'YouTube pronto' : 'Sem link';
+        const comments = live.commentsEnabled ? 'Ativados' : 'Desativados';
+
+        setLiveText('liveSectionStatus', live.enabled ? 'AO VIVO' : 'Offline');
+        setLiveText('liveInfoStatus', status);
+        setLiveText('liveInfoPlayer', player);
+        setLiveText('liveInfoComments', comments);
+
+        const sectionStatus = document.getElementById('liveSectionStatus');
+        if (sectionStatus) sectionStatus.classList.toggle('is-live', !!live.enabled);
+    }
+
+    function renderLiveAdminPanel() {
+        const panel = document.getElementById('liveAdminPanel');
+        if (!panel) return;
+        panel.hidden = role !== 'organizador';
+        if (role !== 'organizador') return;
+
+        const form = document.getElementById('liveSettingsForm');
+        if (form?.contains(document.activeElement)) return;
+
+        const live = ensureLiveState();
+        const youtubeInput = document.getElementById('liveYoutubeUrl');
+        const enabledInput = document.getElementById('liveEnabled');
+        const matchInput = document.getElementById('liveCurrentMatchInput');
+        const phaseInput = document.getElementById('livePhaseNameInput');
+        const score1Input = document.getElementById('liveScore1Input');
+        const score2Input = document.getElementById('liveScore2Input');
+        const tableInput = document.getElementById('liveTableNameInput');
+        const pinnedInput = document.getElementById('livePinnedMessageInput');
+        const toggleCommentsBtn = document.getElementById('btn-live-toggle-comments');
+
+        if (youtubeInput) youtubeInput.value = live.youtubeUrl || '';
+        if (enabledInput) enabledInput.checked = !!live.enabled;
+        if (matchInput) matchInput.value = live.currentMatchTitle || '';
+        if (phaseInput) phaseInput.value = live.phaseName || '';
+        if (score1Input) score1Input.value = live.scorePlayer1 ?? 0;
+        if (score2Input) score2Input.value = live.scorePlayer2 ?? 0;
+        if (tableInput) tableInput.value = live.tableName || '';
+        if (pinnedInput) pinnedInput.value = live.pinnedMessage || '';
+
+        populateLivePlayerSelect('livePlayer1Select', 'livePlayer1Manual', live.currentPlayer1);
+        populateLivePlayerSelect('livePlayer2Select', 'livePlayer2Manual', live.currentPlayer2);
+
+        if (toggleCommentsBtn) {
+            toggleCommentsBtn.innerHTML = live.commentsEnabled
+                ? '<i class="ph-fill ph-chat-circle"></i> Desativar comentarios'
+                : '<i class="ph-fill ph-chat-circle"></i> Ativar comentarios';
+        }
+    }
+
+    function renderLiveComments() {
+        const live = ensureLiveState();
+        const count = document.getElementById('liveCommentCount');
+        const pinned = document.getElementById('livePinnedMessage');
+        const disabled = document.getElementById('liveCommentsDisabled');
+        const form = document.getElementById('liveCommentForm');
+        const list = document.getElementById('liveCommentsList');
+        const comments = [...live.comments]
+            .filter(comment => comment && comment.text)
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+            .slice(0, 50);
+
+        if (count) count.textContent = String(comments.length);
+
+        if (pinned) {
+            const message = sanitizeLiveText(live.pinnedMessage, 160);
+            pinned.hidden = !message;
+            pinned.textContent = message ? `Mensagem fixada: ${message}` : '';
+        }
+
+        if (disabled) disabled.hidden = live.commentsEnabled;
+        if (form) form.hidden = !live.commentsEnabled;
+        if (!list) return;
+
+        list.replaceChildren();
+
+        if (!comments.length) {
+            const empty = document.createElement('div');
+            empty.className = 'live-comments-empty';
+            empty.textContent = 'Seja o primeiro a comentar.';
+            list.appendChild(empty);
+            return;
+        }
+
+        comments.forEach(comment => {
+            const item = document.createElement('article');
+            item.className = 'live-comment-item';
+
+            const meta = document.createElement('div');
+            meta.className = 'live-comment-meta';
+
+            const name = document.createElement('strong');
+            name.textContent = sanitizeLiveText(comment.name, 40) || 'Visitante';
+
+            const time = document.createElement('span');
+            const createdAt = Number(comment.createdAt) || Date.now();
+            time.textContent = new Date(createdAt).toLocaleString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            meta.append(name, time);
+
+            const text = document.createElement('p');
+            text.className = 'live-comment-text';
+            text.textContent = sanitizeLiveText(comment.text, 200);
+
+            item.append(meta, text);
+
+            if (role === 'organizador') {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'live-comment-delete';
+                deleteBtn.dataset.liveCommentDelete = String(comment.id || '');
+                deleteBtn.textContent = 'Excluir';
+                item.appendChild(deleteBtn);
+            }
+
+            list.appendChild(item);
+        });
+    }
+
+    function renderLiveSection() {
+        ensureLiveState();
+        updateLiveEmbed();
+        renderLiveCurrentMatch();
+        renderLiveInfo();
+        renderLiveComments();
+        renderLiveAdminPanel();
+        renderLiveTabStatus();
+    }
+
+    function normalizeLiveScore(value) {
+        const score = parseInt(value, 10);
+        if (!Number.isFinite(score) || score < 0) return 0;
+        return Math.min(score, 999);
+    }
+
+    async function saveLiveSettings() {
+        if (role !== 'organizador') return;
+        const youtubeUrl = sanitizeLiveText(document.getElementById('liveYoutubeUrl')?.value, 300);
+        const embedUrl = getYouTubeEmbedUrl(youtubeUrl);
+        if (youtubeUrl && !embedUrl) {
+            setLiveFeedback('Link do YouTube invalido. Use youtube.com/watch, youtu.be ou /embed/.', true);
+            return;
+        }
+
+        const player1Select = sanitizeLiveText(document.getElementById('livePlayer1Select')?.value, 40);
+        const player2Select = sanitizeLiveText(document.getElementById('livePlayer2Select')?.value, 40);
+        const player1Manual = sanitizeLiveText(document.getElementById('livePlayer1Manual')?.value, 40);
+        const player2Manual = sanitizeLiveText(document.getElementById('livePlayer2Manual')?.value, 40);
+        const live = ensureLiveState();
+
+        tournamentState.live = {
+            ...live,
+            enabled: document.getElementById('liveEnabled')?.checked === true,
+            youtubeUrl,
+            currentMatchTitle: sanitizeLiveText(document.getElementById('liveCurrentMatchInput')?.value, 80),
+            currentPlayer1: player1Manual || player1Select,
+            currentPlayer2: player2Manual || player2Select,
+            scorePlayer1: normalizeLiveScore(document.getElementById('liveScore1Input')?.value),
+            scorePlayer2: normalizeLiveScore(document.getElementById('liveScore2Input')?.value),
+            phaseName: sanitizeLiveText(document.getElementById('livePhaseNameInput')?.value, 50),
+            tableName: sanitizeLiveText(document.getElementById('liveTableNameInput')?.value, 50),
+            pinnedMessage: sanitizeLiveText(document.getElementById('livePinnedMessageInput')?.value, 160)
+        };
+
+        await persistLiveState();
+        renderLiveSection();
+        setLiveFeedback(tournamentState.live.enabled && !getYouTubeEmbedUrl(tournamentState.live.youtubeUrl)
+            ? 'Transmissao salva. Adicione um link do YouTube para exibir o player.'
+            : 'Transmissao atualizada com sucesso.',
+            tournamentState.live.enabled && !getYouTubeEmbedUrl(tournamentState.live.youtubeUrl)
+        );
+    }
+
+    async function addLiveComment(nameValue, textValue) {
+        const live = ensureLiveState();
+        if (!live.commentsEnabled) return;
+
+        const text = sanitizeLiveText(textValue, 200);
+        if (!text) return;
+
+        const name = sanitizeLiveText(nameValue, 40) || 'Visitante';
+        const comment = {
+            id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name,
+            text,
+            createdAt: Date.now(),
+            approved: true
+        };
+
+        live.comments = [comment, ...(live.comments || [])].slice(0, 50);
+        await persistLiveState();
+        renderLiveComments();
+    }
+
+    async function clearLiveComments() {
+        if (role !== 'organizador') return;
+        if (!confirm('Limpar todos os comentarios da live?')) return;
+        const live = ensureLiveState();
+        live.comments = [];
+        await persistLiveState();
+        renderLiveSection();
+    }
+
+    async function toggleLiveComments(enabled) {
+        if (role !== 'organizador') return;
+        const live = ensureLiveState();
+        live.commentsEnabled = typeof enabled === 'boolean' ? enabled : !live.commentsEnabled;
+        await persistLiveState();
+        renderLiveSection();
+    }
+
+    async function deleteLiveComment(commentId) {
+        if (role !== 'organizador' || !commentId) return;
+        const live = ensureLiveState();
+        live.comments = (live.comments || []).filter(comment => String(comment.id) !== String(commentId));
+        await persistLiveState();
+        renderLiveSection();
+    }
+
+    function bindLiveEvents() {
+        document.getElementById('liveSettingsForm')?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            withSensitiveGuard('btn-save-live-settings', saveLiveSettings);
+        });
+
+        document.getElementById('liveCommentForm')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const nameInput = document.getElementById('liveCommentName');
+            const textInput = document.getElementById('liveCommentText');
+            const text = sanitizeLiveText(textInput?.value, 200);
+            if (!text) {
+                if (textInput) textInput.value = '';
+                return;
+            }
+            await addLiveComment(nameInput?.value, text);
+            if (textInput) textInput.value = '';
+        });
+
+        document.getElementById('btn-live-clear-comments')?.addEventListener('click', () => {
+            withSensitiveGuard('btn-live-clear-comments', clearLiveComments);
+        });
+
+        document.getElementById('btn-live-toggle-comments')?.addEventListener('click', () => {
+            withSensitiveGuard('btn-live-toggle-comments', () => toggleLiveComments());
+        });
+
+        document.getElementById('liveCommentsList')?.addEventListener('click', (event) => {
+            const deleteBtn = event.target.closest('[data-live-comment-delete]');
+            if (!deleteBtn) return;
+            const id = deleteBtn.dataset.liveCommentDelete;
+            withSensitiveGuard('btn-live-delete-comment', () => deleteLiveComment(id));
+        });
     }
 
     async function recalculateGeneralRanking() {
@@ -1796,6 +2311,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (data) {
                 const isNew = !tournamentState.tournamentCode;
                 tournamentState = { ...tournamentState, ...data };
+                ensureLiveState();
+                renderLiveSection();
                 if (!(tournamentState.knockout?.repechage || []).length) repechageModalShown = false;
                 
                 // If it's the first load, populate inputs
@@ -1832,6 +2349,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updatePreview();
                 }
             } else if (role !== 'organizador') {
+                ensureLiveState();
+                renderLiveSection();
                 groupsContainer.innerHTML = `<div class="empty-state"><i class="ph ph-soccer-ball"></i><h3>Nenhum torneio ativo</h3><p>Aguarde o organizador iniciar a partida.</p></div>`;
                 updateStatus('aguardando');
                 if (prizeBanner) prizeBanner.style.display = 'none';
@@ -2484,9 +3003,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (targetContent) {
                 targetContent.style.display = 'block';
             }
+            if (tabId === 'ao-vivo') {
+                renderLiveSection();
+            }
             renderContextualTestToolbars();
         });
     });
+    bindLiveEvents();
+    loadLiveStateFromLocalStorage();
+    renderLiveSection();
 
     // ========== GENERATE TOURNAMENT CODE ==========
     async function generateTournamentCode(type = 'fifa') {
@@ -3566,15 +4091,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         pendingSensitiveAction = actionFn;
         const titleEl = document.querySelector('#modal-sensitive-password .modal-header h2');
         const textEl = document.querySelector('#modal-sensitive-password .modal-header p');
+        const inputEl = document.getElementById('sensitive-password-input');
+        const errorEl = document.getElementById('sensitive-password-error');
         const actionLabel = ACTION_LABELS[actionFn?.actionId] || 'Ação administrativa';
         if (titleEl) titleEl.textContent = 'Confirmar ação administrativa';
         if (textEl) textEl.textContent = `Confirme para executar: ${actionLabel}.`;
+        if (inputEl) inputEl.value = '';
+        if (errorEl) errorEl.style.display = 'none';
         modalSensitivePassword?.classList.add('active');
+        setTimeout(() => inputEl?.focus(), 0);
     }
 
     btnConfirmSensitivePassword?.addEventListener('click', async () => {
         if (!pendingSensitiveAction) {
             modalSensitivePassword?.classList.remove('active');
+            return;
+        }
+        const inputEl = document.getElementById('sensitive-password-input');
+        const errorEl = document.getElementById('sensitive-password-error');
+        if ((inputEl?.value || '') !== SENSITIVE_PASSWORD) {
+            if (errorEl) errorEl.style.display = 'block';
+            if (inputEl) {
+                inputEl.value = '';
+                inputEl.focus();
+            }
             return;
         }
         modalSensitivePassword?.classList.remove('active');
@@ -3583,7 +4123,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         await action();
     });
 
-    document.getElementById('btn-close-sensitive-password')?.addEventListener('click', () => modalSensitivePassword?.classList.remove('active'));
+    document.getElementById('sensitive-password-input')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            btnConfirmSensitivePassword?.click();
+        }
+    });
+
+    document.getElementById('btn-close-sensitive-password')?.addEventListener('click', () => {
+        pendingSensitiveAction = null;
+        modalSensitivePassword?.classList.remove('active');
+    });
 
     function shuffleArray(arr) {
         const c = [...arr];
@@ -3854,10 +4404,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     tournamentCode: null,
                     top3: { first: '—', second: '—', third: '—' },
                     createdAt: null,
-                    generalStats: {}
+                    generalStats: {},
+                    live: createDefaultLiveState()
                 };
                 repechageModalShown = false;
                 renderTournamentFromState();
+                renderLiveSection();
                 updateStatus('aguardando');
                 alert('Torneio resetado completamente.');
             } catch (e) {
@@ -3969,7 +4521,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 status: tournamentState.status,
                 registeredPlayers: tournamentState.registeredPlayers || [],
                 groups: tournamentState.groups || [],
-                knockout: tournamentState.knockout || null
+                knockout: tournamentState.knockout || null,
+                live: ensureLiveState()
             };
 
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
@@ -4190,7 +4743,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updatedAt: new Date().toISOString(),
                     registeredPlayers: registeredPlayers,
                     groups: groups,
-                    knockout: knockout
+                    knockout: knockout,
+                    live: tournamentState.live || createDefaultLiveState()
                 };
 
                 // ======= 6. SALVAR NO FIREBASE =======

@@ -5162,3 +5162,615 @@ body {
         overflow: visible !important;
     }
 }
+
+/* ========================
+   AO VIVO
+   ======================== */
+.tab-live {
+    position: relative;
+}
+
+.live-tab-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.42;
+}
+
+.tab.live-tab-active {
+    background: rgba(255, 0, 0, 0.12);
+    border: 1px solid rgba(255, 0, 0, 0.35);
+    border-bottom-color: rgba(214, 0, 0, 0.65);
+    color: #d60000;
+    box-shadow: 0 0 18px rgba(255, 0, 0, 0.25);
+    animation: livePulse 1.4s infinite ease-in-out;
+}
+
+.tab.live-tab-active.active {
+    color: #d60000;
+    border-bottom-color: #d60000;
+}
+
+.tab.live-tab-active .live-tab-dot {
+    background: #d60000;
+    opacity: 1;
+    box-shadow: 0 0 0 5px rgba(214, 0, 0, 0.12);
+    animation: liveDotPulse 1.4s infinite ease-in-out;
+}
+
+@keyframes livePulse {
+    0%, 100% {
+        box-shadow: 0 0 12px rgba(255, 0, 0, 0.16);
+    }
+
+    50% {
+        box-shadow: 0 0 22px rgba(255, 0, 0, 0.3);
+    }
+}
+
+@keyframes liveDotPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(0.72);
+        opacity: 0.55;
+    }
+}
+
+.live-section {
+    display: grid;
+    gap: 20px;
+    min-width: 0;
+    color: var(--text-primary);
+}
+
+.live-section-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 4px 2px;
+}
+
+.live-eyebrow {
+    display: block;
+    color: var(--green);
+    font-size: 0.74rem;
+    font-weight: 900;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+}
+
+.live-section-heading h2 {
+    margin-top: 4px;
+    font-family: 'TanNimbus', 'Inter', sans-serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: 0;
+}
+
+.live-section-heading p {
+    max-width: 600px;
+    margin-top: 8px;
+    color: var(--text-secondary);
+    font-size: 0.98rem;
+    font-weight: 600;
+}
+
+.live-section-status,
+.live-small-badge,
+.live-comment-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(13, 110, 253, 0.12);
+    border: 1px solid rgba(13, 110, 253, 0.18);
+    color: var(--blue);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.live-section-status.is-live,
+.live-small-badge.is-live {
+    background: rgba(214, 0, 0, 0.1);
+    border-color: rgba(214, 0, 0, 0.24);
+    color: #d60000;
+}
+
+.live-warning {
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(217, 119, 6, 0.22);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 247, 237, 0.76);
+    color: #9a3412;
+    font-weight: 800;
+    box-shadow: var(--shadow-card);
+}
+
+.live-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(320px, 0.9fr);
+    gap: 24px;
+    align-items: start;
+    min-width: 0;
+}
+
+.live-main-column,
+.live-side-column {
+    display: grid;
+    gap: 18px;
+    min-width: 0;
+}
+
+.glass-card {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.48)),
+        rgba(255, 255, 255, 0.62);
+    box-shadow: 0 16px 44px rgba(4, 45, 21, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+}
+
+.live-player-card,
+.live-current-match-card,
+.live-comments-card,
+.live-info-card,
+.live-admin-panel {
+    padding: 18px;
+}
+
+.live-player-header,
+.live-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.live-card-header h3,
+.live-player-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 900;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+}
+
+.live-player-header p {
+    margin-top: 3px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 650;
+}
+
+.live-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.live-status-dot,
+.live-mini-dot {
+    flex: 0 0 auto;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--text-muted);
+    box-shadow: 0 0 0 5px rgba(138, 158, 143, 0.12);
+}
+
+.live-status-dot.is-live,
+.live-mini-dot.is-live {
+    background: #d60000;
+    box-shadow: 0 0 0 6px rgba(214, 0, 0, 0.12);
+    animation: liveDotPulse 1.4s infinite ease-in-out;
+}
+
+.live-section .live-badge {
+    border: 1px solid rgba(100, 116, 139, 0.16);
+    background: rgba(100, 116, 139, 0.1);
+    color: #475569;
+}
+
+.live-section .live-badge.live-on {
+    border-color: rgba(214, 0, 0, 0.25);
+    background: rgba(214, 0, 0, 0.1);
+    color: #d60000;
+    animation: livePulse 1.4s infinite ease-in-out;
+}
+
+.live-video-shell {
+    overflow: hidden;
+    border-radius: 22px;
+}
+
+.live-video-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: 1px solid rgba(4, 45, 21, 0.1);
+    border-radius: 22px;
+    background: #07130c;
+}
+
+.live-video-wrapper iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.live-video-wrapper iframe[hidden],
+.live-empty-state[hidden] {
+    display: none;
+}
+
+.live-empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: rgba(255, 255, 255, 0.86);
+    text-align: center;
+    font-weight: 800;
+    background:
+        radial-gradient(circle at 50% 35%, rgba(22, 163, 74, 0.24), transparent 34%),
+        linear-gradient(145deg, #07130c, #0d2416);
+}
+
+.live-match-title {
+    margin-bottom: 18px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.live-scoreboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+}
+
+.live-player-name {
+    min-width: 0;
+    padding: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.76);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.54);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 900;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.live-score {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--green);
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.live-score span:nth-child(2) {
+    color: var(--text-muted);
+    font-size: 0.55em;
+}
+
+.live-extra-info,
+.live-info-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.live-extra-info {
+    grid-template-columns: 1fr 1fr;
+}
+
+.live-extra-info span,
+.live-info-list div {
+    padding: 0.75rem 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.74);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.48);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+.live-info-list div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.live-info-list strong {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    text-align: right;
+}
+
+.live-comment-form {
+    display: grid;
+    gap: 10px;
+}
+
+.live-comment-form input,
+.live-comment-form textarea,
+.live-admin-form input,
+.live-admin-form select,
+.live-admin-form textarea {
+    width: 100%;
+    min-width: 0;
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    padding: 0.85rem 1rem;
+    color: var(--text-primary);
+    font: inherit;
+    font-weight: 650;
+    outline: none;
+}
+
+.live-comment-form input:focus,
+.live-comment-form textarea:focus,
+.live-admin-form input:focus,
+.live-admin-form select:focus,
+.live-admin-form textarea:focus {
+    border-color: rgba(22, 163, 74, 0.48);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.14);
+}
+
+.live-admin-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.live-field-wide {
+    grid-column: 1 / -1;
+}
+
+.live-admin-form .field {
+    gap: 7px;
+}
+
+.live-admin-form .field input + input,
+.live-admin-form .field select + input {
+    margin-top: 8px;
+}
+
+.live-admin-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.live-settings-feedback {
+    min-height: 20px;
+    margin-top: 10px;
+    color: var(--green);
+    font-size: 0.86rem;
+    font-weight: 800;
+}
+
+.live-settings-feedback.is-warning {
+    color: #b45309;
+}
+
+.live-pinned-message,
+.live-comments-disabled,
+.live-comments-empty {
+    margin-bottom: 12px;
+    padding: 0.85rem 1rem;
+    border-radius: 16px;
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.live-pinned-message {
+    border: 1px solid rgba(217, 119, 6, 0.18);
+    background: rgba(255, 251, 235, 0.78);
+    color: #92400e;
+}
+
+.live-comments-disabled,
+.live-comments-empty {
+    border: 1px solid rgba(100, 116, 139, 0.14);
+    background: rgba(255, 255, 255, 0.48);
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.live-comments-list {
+    display: grid;
+    gap: 10px;
+    max-height: 460px;
+    margin-top: 12px;
+    overflow-y: auto;
+    padding-right: 3px;
+}
+
+.live-comment-item {
+    display: grid;
+    gap: 7px;
+    padding: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.live-comment-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 800;
+}
+
+.live-comment-meta strong {
+    min-width: 0;
+    color: var(--text-primary);
+    font-size: 0.84rem;
+    overflow-wrap: anywhere;
+}
+
+.live-comment-text {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 650;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.live-comment-delete {
+    justify-self: end;
+    min-height: 30px;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid rgba(230, 57, 70, 0.22);
+    border-radius: 999px;
+    background: rgba(230, 57, 70, 0.08);
+    color: var(--red);
+    cursor: pointer;
+    font-size: 0.74rem;
+    font-weight: 900;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tab.live-tab-active,
+    .tab.live-tab-active .live-tab-dot,
+    .live-status-dot.is-live,
+    .live-mini-dot.is-live,
+    .live-section .live-badge.live-on {
+        animation: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .live-section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .live-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .live-comments-list {
+        max-height: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .live-section {
+        gap: 16px;
+    }
+
+    .live-player-card,
+    .live-current-match-card,
+    .live-comments-card,
+    .live-info-card,
+    .live-admin-panel {
+        padding: 14px;
+        border-radius: 20px;
+    }
+
+    .live-player-header,
+    .live-card-header {
+        align-items: flex-start;
+    }
+
+    .live-scoreboard {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+
+    .live-score {
+        justify-content: center;
+        order: 2;
+    }
+
+    #livePlayer1Name {
+        order: 1;
+    }
+
+    #livePlayer2Name {
+        order: 3;
+    }
+
+    .live-extra-info,
+    .live-admin-form,
+    .live-admin-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .live-field-wide {
+        grid-column: auto;
+    }
+
+    .live-comment-form input,
+    .live-comment-form textarea,
+    .live-admin-form input,
+    .live-admin-form select,
+    .live-admin-form textarea {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 420px) {
+    .live-section-heading h2 {
+        font-size: 2rem;
+    }
+
+    .live-title-row {
+        align-items: flex-start;
+    }
+
+    .live-section-status,
+    .live-small-badge,
+    .live-comment-count,
+    .live-section .live-badge {
+        min-height: 28px;
+        padding: 0.3rem 0.62rem;
+        font-size: 0.66rem;
+    }
+
+    .live-player-name {
+        font-size: 0.95rem;
+    }
+}

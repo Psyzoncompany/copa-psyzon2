@@ -37,6 +37,10 @@
     <nav class="tabs-nav">
         <button class="tab active" data-tab="participantes"><i class="ph-fill ph-users-three"></i> Participantes</button>
         <button class="tab" data-tab="mata-mata"><i class="ph-fill ph-tree-structure"></i> Mata-mata</button>
+        <button class="tab tab-live" id="tab-live-button" data-tab="ao-vivo">
+            <span class="live-tab-dot" aria-hidden="true"></span>
+            <i class="ph-fill ph-broadcast"></i> AO VIVO
+        </button>
         <button class="tab" data-tab="ranking"><i class="ph-fill ph-trophy"></i> Ranking</button>
         <button class="tab" data-tab="historico"><i class="ph-fill ph-clock-counter-clockwise"></i> Histórico</button>
     </nav>
@@ -117,6 +121,23 @@
                         </label>
                         <button class="btn primary" type="submit"><i class="ph ph-plus-circle"></i> Adicionar</button>
                     </form>
+                    <div class="participant-filters">
+                        <label class="field">
+                            <span>Buscar</span>
+                            <input id="participant-search" type="search" placeholder="Nome do participante" autocomplete="off">
+                        </label>
+                        <label class="field">
+                            <span>Status</span>
+                            <select id="participant-status-filter">
+                                <option value="todos">Todos</option>
+                                <option value="ativo">Em disputa</option>
+                                <option value="classificado">Classificados</option>
+                                <option value="eliminado">Eliminados</option>
+                                <option value="campeao">Campeao</option>
+                                <option value="aguardando">Aguardando</option>
+                            </select>
+                        </label>
+                    </div>
                     <div id="participants-list" class="participants-list"></div>
                 </div>
             </section>
@@ -140,6 +161,196 @@
                         <div id="bracket-container" class="knockout-scroll-container"></div>
                     </div>
                 </div>
+            </section>
+
+            <section id="tab-ao-vivo" class="tab-content">
+                <section class="live-section" aria-labelledby="live-section-title">
+                    <div class="live-section-heading">
+                        <div>
+                            <span class="eyebrow">Transmissao oficial</span>
+                            <h1 id="live-section-title">AO VIVO</h1>
+                            <p>Acompanhe a partida em tempo real pela transmissao oficial da COPA PSYZON.</p>
+                        </div>
+                        <span id="liveSectionStatus" class="live-section-status">Offline</span>
+                    </div>
+
+                    <div id="liveWarning" class="live-warning" hidden></div>
+
+                    <div class="live-grid">
+                        <div class="live-main-column">
+                            <article class="live-player-card glass-card">
+                                <div class="live-player-header">
+                                    <div class="live-title-row">
+                                        <span class="live-status-dot" aria-hidden="true"></span>
+                                        <div>
+                                            <h2>Transmissao oficial</h2>
+                                            <p id="livePlayerStatus">Nenhuma live ativa no momento.</p>
+                                        </div>
+                                    </div>
+                                    <span id="livePlayerBadge" class="live-badge offline">OFFLINE</span>
+                                </div>
+
+                                <div class="live-video-wrapper" id="liveVideoWrapper">
+                                    <iframe
+                                        id="liveYoutubeIframe"
+                                        title="Transmissao ao vivo COPA PSYZON Sinuca"
+                                        frameborder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                        allowfullscreen
+                                        hidden>
+                                    </iframe>
+                                    <div id="liveEmptyState" class="live-empty-state">
+                                        Nenhuma transmissao configurada no momento.
+                                    </div>
+                                </div>
+                            </article>
+
+                            <article class="live-admin-panel glass-card" id="liveAdminPanel" hidden>
+                                <div class="live-card-header">
+                                    <div>
+                                        <span class="eyebrow">Organizador</span>
+                                        <h2>Controle da live</h2>
+                                    </div>
+                                </div>
+
+                                <form id="liveSettingsForm" class="live-admin-form">
+                                    <label class="field live-field-wide">
+                                        <span>Link da live do YouTube</span>
+                                        <input id="liveYoutubeUrl" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
+                                    </label>
+
+                                    <label class="checkbox-field live-field-wide">
+                                        <input type="checkbox" id="liveEnabled">
+                                        <span>Ativar AO VIVO</span>
+                                    </label>
+
+                                    <label class="field">
+                                        <span>Nome da partida</span>
+                                        <input id="liveCurrentMatchInput" type="text" maxlength="80" placeholder="Ex: Final">
+                                    </label>
+
+                                    <label class="field">
+                                        <span>Fase</span>
+                                        <select id="livePhaseNameInput">
+                                            <option value="">Fase nao definida</option>
+                                            <option value="16 avos">16 avos</option>
+                                            <option value="Oitavas">Oitavas</option>
+                                            <option value="Quartas">Quartas</option>
+                                            <option value="Semifinal">Semifinal</option>
+                                            <option value="Final">Final</option>
+                                            <option value="Disputa de 3o lugar">Disputa de 3o lugar</option>
+                                            <option value="Amistoso / Exibicao">Amistoso / Exibicao</option>
+                                        </select>
+                                    </label>
+
+                                    <label class="field">
+                                        <span>Jogador 1</span>
+                                        <select id="livePlayer1Select"></select>
+                                        <input id="livePlayer1Manual" type="text" maxlength="40" placeholder="Ou digite manualmente">
+                                    </label>
+
+                                    <label class="field">
+                                        <span>Jogador 2</span>
+                                        <select id="livePlayer2Select"></select>
+                                        <input id="livePlayer2Manual" type="text" maxlength="40" placeholder="Ou digite manualmente">
+                                    </label>
+
+                                    <label class="field">
+                                        <span>Placar jogador 1</span>
+                                        <input id="liveScore1Input" type="number" min="0" max="999" inputmode="numeric" placeholder="0">
+                                    </label>
+
+                                    <label class="field">
+                                        <span>Placar jogador 2</span>
+                                        <input id="liveScore2Input" type="number" min="0" max="999" inputmode="numeric" placeholder="0">
+                                    </label>
+
+                                    <label class="field">
+                                        <span>Mesa / campo</span>
+                                        <input id="liveTableNameInput" type="text" maxlength="50" placeholder="Ex: Mesa 1">
+                                    </label>
+
+                                    <label class="field">
+                                        <span>Mensagem fixada</span>
+                                        <textarea id="livePinnedMessageInput" maxlength="160" rows="3" placeholder="Mensagem para o publico"></textarea>
+                                    </label>
+
+                                    <button class="btn primary live-field-wide" id="btn-save-live-settings" type="submit">
+                                        <i class="ph-fill ph-floppy-disk"></i> Salvar transmissao
+                                    </button>
+                                </form>
+
+                                <div class="live-admin-actions">
+                                    <button class="btn secondary" id="btn-live-toggle-comments" type="button">
+                                        <i class="ph-fill ph-chat-circle"></i> Desativar comentarios
+                                    </button>
+                                    <button class="btn danger" id="btn-live-clear-comments" type="button">
+                                        <i class="ph-fill ph-trash"></i> Limpar comentarios
+                                    </button>
+                                </div>
+                                <p id="liveSettingsFeedback" class="live-settings-feedback" role="status"></p>
+                            </article>
+                        </div>
+
+                        <aside class="live-side-column">
+                            <article class="live-current-match-card glass-card">
+                                <div class="live-card-header">
+                                    <span class="live-mini-dot" aria-hidden="true"></span>
+                                    <h2>Partida na tela</h2>
+                                    <span id="liveMatchBadge" class="live-small-badge">OFFLINE</span>
+                                </div>
+
+                                <div class="live-match-title" id="liveCurrentMatchTitle">Aguardando partida</div>
+
+                                <div class="live-scoreboard">
+                                    <div class="live-player-name" id="livePlayer1Name">Jogador 1</div>
+                                    <div class="live-score">
+                                        <span id="liveScore1">0</span>
+                                        <span>x</span>
+                                        <span id="liveScore2">0</span>
+                                    </div>
+                                    <div class="live-player-name" id="livePlayer2Name">Jogador 2</div>
+                                </div>
+
+                                <div class="live-extra-info">
+                                    <span id="livePhaseName">Fase nao definida</span>
+                                    <span id="liveTableName">Mesa nao definida</span>
+                                </div>
+                            </article>
+
+                            <article class="live-comments-card glass-card">
+                                <div class="live-card-header">
+                                    <h2>Comentarios</h2>
+                                    <span id="liveCommentCount" class="live-comment-count">0</span>
+                                </div>
+
+                                <div id="livePinnedMessage" class="live-pinned-message" hidden></div>
+                                <div id="liveCommentsDisabled" class="live-comments-disabled" hidden>Comentarios desativados pelo organizador.</div>
+
+                                <form id="liveCommentForm" class="live-comment-form">
+                                    <input id="liveCommentName" placeholder="Seu nome" maxlength="40" autocomplete="name">
+                                    <textarea id="liveCommentText" placeholder="Escreva um comentario..." maxlength="200" rows="3"></textarea>
+                                    <button class="btn primary" type="submit">
+                                        <i class="ph-fill ph-paper-plane-tilt"></i> Enviar
+                                    </button>
+                                </form>
+
+                                <div id="liveCommentsList" class="live-comments-list"></div>
+                            </article>
+
+                            <article class="live-info-card glass-card">
+                                <div class="live-card-header">
+                                    <h2>Informacoes</h2>
+                                </div>
+                                <div class="live-info-list">
+                                    <div><span>Status</span><strong id="liveInfoStatus">Offline</strong></div>
+                                    <div><span>Player</span><strong id="liveInfoPlayer">Sem link</strong></div>
+                                    <div><span>Comentarios</span><strong id="liveInfoComments">Ativados</strong></div>
+                                </div>
+                            </article>
+                        </aside>
+                    </div>
+                </section>
             </section>
 
             <section id="tab-ranking" class="tab-content">

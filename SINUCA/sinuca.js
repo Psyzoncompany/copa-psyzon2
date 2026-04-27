@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCL2u-oSlw8EWQ96atPI9Tc-0cIl2k9K6M",
@@ -22,6 +22,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const FIREBASE_TOURNAMENT_PATH = 'tournaments/sinuca/current';
     const RESET_CODE_PASSWORD = '153090';
     const VALID_SIZES = [2, 4, 8, 16, 32, 64];
+
+    function createDefaultLiveState() {
+        return {
+            enabled: false,
+            youtubeUrl: "",
+            currentPlayer1: "",
+            currentPlayer2: "",
+            currentMatchTitle: "",
+            scorePlayer1: 0,
+            scorePlayer2: 0,
+            phaseName: "",
+            tableName: "",
+            commentsEnabled: true,
+            pinnedMessage: "",
+            comments: []
+        };
+    }
 
     const params = new URLSearchParams(window.location.search);
     const role = params.get('role') || localStorage.getItem('copaRole') || 'visitante';
@@ -52,11 +69,14 @@ document.addEventListener('DOMContentLoaded', () => {
         champion: null,
         status: 'aguardando',
         finishedHistoryId: null,
-        updatedAt: null
+        updatedAt: null,
+        live: createDefaultLiveState()
     };
 
     let state = loadState();
     let selectedHistoryId = null;
+    let participantSearchTerm = '';
+    let participantStatusFilter = 'todos';
 
     const $ = (selector) => document.querySelector(selector);
     const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -70,12 +90,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function persist() {
-        state.updatedAt = new Date().toISOString();
+    function storeStateSnapshot() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
 
+    function persist() {
+        state.updatedAt = new Date().toISOString();
+        ensureLiveState();
+        storeStateSnapshot();
+    }
+
+    function ensureLiveState() {
+        const current = state.live && typeof state.live === 'object' ? state.live : {};
+        const defaults = createDefaultLiveState();
+        state.live = {
+            ...defaults,
+            ...current,
+            enabled: current.enabled === true,
+            commentsEnabled: current.commentsEnabled !== false,
+            comments: Array.isArray(current.comments) ? current.comments.slice(0, 50) : []
+        };
+        return state.live;
+    }
+
     function publicTournamentState() {
+        ensureLiveState();
         return {
             ...state,
             modality: 'sinuca',
@@ -105,12 +144,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const remoteTime = remote.updatedAt ? Date.parse(remote.updatedAt) : 0;
             if (remoteTime >= localTime) {
                 state = { ...defaultState, ...remote };
-                persist();
+                ensureLiveState();
+                storeStateSnapshot();
             }
             await syncLocalCodesFromPool();
         } catch (error) {
             console.warn('Nao foi possivel carregar a Sinuca do Firebase:', error);
         }
+    }
+
+    function subscribeTournamentFromFirebase() {
+        onValue(ref(db, FIREBASE_TOURNAMENT_PATH), (snap) => {
+            if (!snap.exists()) return;
+            const remote = snap.val();
+            const localTime = state.updatedAt ? Date.parse(state.updatedAt) : 0;
+            const remoteTime = remote.updatedAt ? Date.parse(remote.updatedAt) : 0;
+            if (remoteTime < localTime) return;
+            state = { ...defaultState, ...remote };
+            ensureLiveState();
+            storeStateSnapshot();
+            renderAll();
+        }, (error) => {
+            console.warn('Nao foi possivel acompanhar a Sinuca em tempo real:', error);
+        });
     }
 
     async function syncLocalCodesFromPool() {
@@ -1100,6 +1156,406 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHistory();
     }
 
+    function getParticipantStatus(playerName) {
+        const name = String(playerName || '');
+        if (state.champion === name) {
+            return { key: 'campeao', label: 'Campeao', detail: 'Titulo confirmado', cls: 'champion' };
+        }
+
+        if (!state.bracket?.rounds?.length) {
+            return { key: 'aguardando', label: 'Aguardando', detail: 'Chaveamento pendente', cls: 'waiting' };
+        }
+
+        let lastAdvance = null;
+        for (let rIdx = 0; rIdx < state.bracket.rounds.length; rIdx++) {
+            const round = state.bracket.rounds[rIdx];
+            for (const match of round.matches || []) {
+                if (match.p1 !== name && match.p2 !== name) continue;
+                const winner = getWinner(match);
+                const opponent = match.p1 === name ? match.p2 : match.p1;
+
+                if (winner && winner !== name && isRealPlayer(winner)) {
+                    return { key: 'eliminado', label: 'Eliminado', detail: `Eliminado em ${round.name}`, cls: 'eliminated' };
+                }
+
+                if (!winner) {
+                    return isRealPlayer(opponent)
+                        ? { key: 'ativo', label: 'Em disputa', detail: `Jogando ${round.name}`, cls: 'active' }
+                        : { key: 'classificado', label: 'Classificado', detail: `Aguardando adversario em ${round.name}`, cls: 'qualified' };
+                }
+
+                if (winner === name) {
+                    const nextRound = state.bracket.rounds[rIdx + 1]?.name;
+                    lastAdvance = {
+                        key: nextRound ? 'classificado' : 'campeao',
+                        label: nextRound ? 'Classificado' : 'Campeao',
+                        detail: nextRound ? `Classificado para ${nextRound}` : 'Titulo confirmado',
+                        cls: nextRound ? 'qualified' : 'champion'
+                    };
+                }
+            }
+        }
+
+        return lastAdvance || { key: 'aguardando', label: 'Aguardando', detail: 'Aguardando partida', cls: 'waiting' };
+    }
+
+    function participantMatchesFilter(player) {
+        const name = String(player?.name || '');
+        const status = getParticipantStatus(name);
+        const searchOk = !participantSearchTerm || normalizeName(name).includes(normalizeName(participantSearchTerm));
+        const statusOk = participantStatusFilter === 'todos' || status.key === participantStatusFilter;
+        return searchOk && statusOk;
+    }
+
+    function sanitizeLiveText(value, maxLength = 200) {
+        return String(value ?? '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/[\u0000-\u001f\u007f]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, maxLength);
+    }
+
+    function extractYouTubeVideoId(url) {
+        const raw = String(url || '').trim();
+        if (!raw) return '';
+        if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
+
+        try {
+            const parsed = new URL(raw);
+            const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+            const pathParts = parsed.pathname.split('/').filter(Boolean);
+
+            if (host === 'youtu.be' && pathParts[0]) return pathParts[0].slice(0, 11);
+            if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+                const watchId = parsed.searchParams.get('v');
+                if (watchId) return watchId.slice(0, 11);
+                if (['embed', 'shorts', 'live'].includes(pathParts[0]) && pathParts[1]) return pathParts[1].slice(0, 11);
+            }
+        } catch (_) {
+            const match = raw.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([a-zA-Z0-9_-]{11})/);
+            if (match) return match[1];
+        }
+
+        return '';
+    }
+
+    function getYouTubeEmbedUrl(url) {
+        const id = extractYouTubeVideoId(url);
+        return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/embed/${id}` : '';
+    }
+
+    function setLiveText(id, value) {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    }
+
+    function setLiveFeedback(message, isWarning = false) {
+        const feedback = $('#liveSettingsFeedback');
+        if (!feedback) return;
+        feedback.textContent = message || '';
+        feedback.classList.toggle('is-warning', !!isWarning);
+    }
+
+    async function withLivePassword(action) {
+        if (!isOrganizer) return;
+        const password = prompt('Digite a senha do organizador:');
+        if (password !== RESET_CODE_PASSWORD) {
+            alert('Senha incorreta.');
+            return;
+        }
+        await action();
+    }
+
+    function renderLiveTabStatus() {
+        const live = ensureLiveState();
+        const tab = document.querySelector('.tab[data-tab="ao-vivo"]');
+        if (tab) tab.classList.toggle('live-tab-active', !!live.enabled);
+    }
+
+    function updateLiveEmbed() {
+        const live = ensureLiveState();
+        const iframe = $('#liveYoutubeIframe');
+        const emptyState = $('#liveEmptyState');
+        const warning = $('#liveWarning');
+        const embedUrl = getYouTubeEmbedUrl(live.youtubeUrl);
+        const hasLink = !!sanitizeLiveText(live.youtubeUrl, 300);
+
+        if (iframe) {
+            if (embedUrl) {
+                iframe.src = `${embedUrl}?rel=0&modestbranding=1`;
+                iframe.hidden = false;
+            } else {
+                iframe.src = '';
+                iframe.hidden = true;
+            }
+        }
+
+        if (emptyState) {
+            emptyState.hidden = !!embedUrl;
+            emptyState.textContent = hasLink && !embedUrl
+                ? 'Link do YouTube invalido.'
+                : 'Nenhuma transmissao configurada no momento.';
+        }
+
+        if (warning) {
+            const showWarning = live.enabled && !embedUrl;
+            warning.hidden = !showWarning;
+            warning.textContent = showWarning ? 'Adicione um link do YouTube para exibir a transmissao.' : '';
+        }
+
+        setLiveText('livePlayerStatus', live.enabled ? 'Transmissao ao vivo agora' : (embedUrl ? 'Transmissao configurada, offline' : 'Nenhuma live ativa no momento.'));
+        const badge = $('#livePlayerBadge');
+        if (badge) {
+            badge.textContent = live.enabled ? 'AO VIVO' : 'OFFLINE';
+            badge.classList.toggle('live-on', !!live.enabled);
+        }
+        $$('.live-status-dot').forEach(dot => dot.classList.toggle('is-live', !!live.enabled));
+    }
+
+    function renderLiveCurrentMatch() {
+        const live = ensureLiveState();
+        setLiveText('liveCurrentMatchTitle', sanitizeLiveText(live.currentMatchTitle, 80) || 'Aguardando definicao da partida atual.');
+        setLiveText('livePlayer1Name', sanitizeLiveText(live.currentPlayer1, 40) || 'Jogador 1');
+        setLiveText('livePlayer2Name', sanitizeLiveText(live.currentPlayer2, 40) || 'Jogador 2');
+        setLiveText('liveScore1', String(Math.max(0, Number(live.scorePlayer1) || 0)));
+        setLiveText('liveScore2', String(Math.max(0, Number(live.scorePlayer2) || 0)));
+        setLiveText('livePhaseName', sanitizeLiveText(live.phaseName, 50) || 'Fase nao definida');
+        setLiveText('liveTableName', sanitizeLiveText(live.tableName, 50) || 'Mesa nao definida');
+
+        const matchBadge = $('#liveMatchBadge');
+        if (matchBadge) {
+            matchBadge.textContent = live.enabled ? 'AO VIVO' : 'OFFLINE';
+            matchBadge.classList.toggle('is-live', !!live.enabled);
+        }
+        $$('.live-mini-dot').forEach(dot => dot.classList.toggle('is-live', !!live.enabled));
+    }
+
+    function populateLivePlayerSelect(selectId, manualId, selectedName) {
+        const select = document.getElementById(selectId);
+        const manual = document.getElementById(manualId);
+        if (!select) return;
+        const selected = sanitizeLiveText(selectedName, 40);
+        const names = (state.participants || []).map(player => player.name).filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+        select.replaceChildren();
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = names.length ? 'Selecionar participante' : 'Sem participantes cadastrados';
+        select.appendChild(empty);
+
+        names.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            select.appendChild(option);
+        });
+
+        if (selected && names.includes(selected)) {
+            select.value = selected;
+            if (manual) manual.value = '';
+        } else {
+            select.value = '';
+            if (manual) manual.value = selected;
+        }
+    }
+
+    function renderLiveAdminPanel() {
+        const panel = $('#liveAdminPanel');
+        if (!panel) return;
+        panel.hidden = !isOrganizer;
+        if (!isOrganizer) return;
+        const form = $('#liveSettingsForm');
+        if (form?.contains(document.activeElement)) return;
+
+        const live = ensureLiveState();
+        $('#liveYoutubeUrl').value = live.youtubeUrl || '';
+        $('#liveEnabled').checked = !!live.enabled;
+        $('#liveCurrentMatchInput').value = live.currentMatchTitle || '';
+        $('#livePhaseNameInput').value = live.phaseName || '';
+        $('#liveScore1Input').value = live.scorePlayer1 ?? 0;
+        $('#liveScore2Input').value = live.scorePlayer2 ?? 0;
+        $('#liveTableNameInput').value = live.tableName || '';
+        $('#livePinnedMessageInput').value = live.pinnedMessage || '';
+        populateLivePlayerSelect('livePlayer1Select', 'livePlayer1Manual', live.currentPlayer1);
+        populateLivePlayerSelect('livePlayer2Select', 'livePlayer2Manual', live.currentPlayer2);
+
+        const toggleComments = $('#btn-live-toggle-comments');
+        if (toggleComments) {
+            toggleComments.innerHTML = live.commentsEnabled
+                ? '<i class="ph-fill ph-chat-circle"></i> Desativar comentarios'
+                : '<i class="ph-fill ph-chat-circle"></i> Ativar comentarios';
+        }
+    }
+
+    function renderLiveInfo() {
+        const live = ensureLiveState();
+        const embedUrl = getYouTubeEmbedUrl(live.youtubeUrl);
+        setLiveText('liveSectionStatus', live.enabled ? 'AO VIVO' : 'Offline');
+        setLiveText('liveInfoStatus', live.enabled ? 'Ao vivo agora' : (embedUrl ? 'Offline' : 'Nao configurada'));
+        setLiveText('liveInfoPlayer', embedUrl ? 'YouTube pronto' : 'Sem link');
+        setLiveText('liveInfoComments', live.commentsEnabled ? 'Ativados' : 'Desativados');
+        $('#liveSectionStatus')?.classList.toggle('is-live', !!live.enabled);
+    }
+
+    function renderLiveComments() {
+        const live = ensureLiveState();
+        const comments = [...live.comments]
+            .filter(comment => comment && comment.text)
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+            .slice(0, 50);
+        setLiveText('liveCommentCount', String(comments.length));
+
+        const pinned = $('#livePinnedMessage');
+        if (pinned) {
+            const message = sanitizeLiveText(live.pinnedMessage, 160);
+            pinned.hidden = !message;
+            pinned.textContent = message ? `Mensagem fixada: ${message}` : '';
+        }
+
+        const disabled = $('#liveCommentsDisabled');
+        const form = $('#liveCommentForm');
+        if (disabled) disabled.hidden = live.commentsEnabled;
+        if (form) form.hidden = !live.commentsEnabled;
+
+        const list = $('#liveCommentsList');
+        if (!list) return;
+        list.replaceChildren();
+        if (!comments.length) {
+            const empty = document.createElement('div');
+            empty.className = 'live-comments-empty';
+            empty.textContent = 'Seja o primeiro a comentar.';
+            list.appendChild(empty);
+            return;
+        }
+
+        comments.forEach(comment => {
+            const item = document.createElement('article');
+            item.className = 'live-comment-item';
+
+            const meta = document.createElement('div');
+            meta.className = 'live-comment-meta';
+
+            const name = document.createElement('strong');
+            name.textContent = sanitizeLiveText(comment.name, 40) || 'Visitante';
+
+            const time = document.createElement('span');
+            time.textContent = new Date(Number(comment.createdAt) || Date.now()).toLocaleString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            meta.append(name, time);
+
+            const text = document.createElement('p');
+            text.className = 'live-comment-text';
+            text.textContent = sanitizeLiveText(comment.text, 200);
+            item.append(meta, text);
+
+            if (isOrganizer) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'live-comment-delete';
+                deleteBtn.dataset.liveCommentDelete = String(comment.id || '');
+                deleteBtn.textContent = 'Excluir';
+                item.appendChild(deleteBtn);
+            }
+
+            list.appendChild(item);
+        });
+    }
+
+    function renderLiveSection() {
+        ensureLiveState();
+        updateLiveEmbed();
+        renderLiveCurrentMatch();
+        renderLiveInfo();
+        renderLiveComments();
+        renderLiveAdminPanel();
+        renderLiveTabStatus();
+    }
+
+    function normalizeLiveScore(value) {
+        const score = parseInt(value, 10);
+        return Number.isFinite(score) && score > 0 ? Math.min(score, 999) : 0;
+    }
+
+    async function saveLiveSettings() {
+        if (!isOrganizer) return;
+        const youtubeUrl = sanitizeLiveText($('#liveYoutubeUrl')?.value, 300);
+        if (youtubeUrl && !getYouTubeEmbedUrl(youtubeUrl)) {
+            setLiveFeedback('Link do YouTube invalido. Use youtube.com/watch, youtu.be ou /embed/.', true);
+            return;
+        }
+
+        const live = ensureLiveState();
+        const p1Manual = sanitizeLiveText($('#livePlayer1Manual')?.value, 40);
+        const p2Manual = sanitizeLiveText($('#livePlayer2Manual')?.value, 40);
+        const p1Select = sanitizeLiveText($('#livePlayer1Select')?.value, 40);
+        const p2Select = sanitizeLiveText($('#livePlayer2Select')?.value, 40);
+
+        state.live = {
+            ...live,
+            enabled: $('#liveEnabled')?.checked === true,
+            youtubeUrl,
+            currentMatchTitle: sanitizeLiveText($('#liveCurrentMatchInput')?.value, 80),
+            currentPlayer1: p1Manual || p1Select,
+            currentPlayer2: p2Manual || p2Select,
+            scorePlayer1: normalizeLiveScore($('#liveScore1Input')?.value),
+            scorePlayer2: normalizeLiveScore($('#liveScore2Input')?.value),
+            phaseName: sanitizeLiveText($('#livePhaseNameInput')?.value, 50),
+            tableName: sanitizeLiveText($('#liveTableNameInput')?.value, 50),
+            pinnedMessage: sanitizeLiveText($('#livePinnedMessageInput')?.value, 160)
+        };
+        persist();
+        await syncTournamentToFirebase();
+        renderLiveSection();
+        setLiveFeedback('Transmissao atualizada com sucesso.');
+    }
+
+    async function addLiveComment(nameValue, textValue) {
+        const live = ensureLiveState();
+        if (!live.commentsEnabled) return;
+        const text = sanitizeLiveText(textValue, 200);
+        if (!text) return;
+        live.comments = [{
+            id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: sanitizeLiveText(nameValue, 40) || 'Visitante',
+            text,
+            createdAt: Date.now(),
+            approved: true
+        }, ...(live.comments || [])].slice(0, 50);
+        persist();
+        await syncTournamentToFirebase();
+        renderLiveComments();
+    }
+
+    async function clearLiveComments() {
+        const live = ensureLiveState();
+        if (!confirm('Limpar todos os comentarios da live?')) return;
+        live.comments = [];
+        persist();
+        await syncTournamentToFirebase();
+        renderLiveSection();
+    }
+
+    async function toggleLiveComments() {
+        const live = ensureLiveState();
+        live.commentsEnabled = !live.commentsEnabled;
+        persist();
+        await syncTournamentToFirebase();
+        renderLiveSection();
+    }
+
+    async function deleteLiveComment(commentId) {
+        const live = ensureLiveState();
+        live.comments = (live.comments || []).filter(comment => String(comment.id) !== String(commentId));
+        persist();
+        await syncTournamentToFirebase();
+        renderLiveSection();
+    }
+
     function renderParticipants() {
         $('#participant-count').textContent = `${state.participants.length} inscritos`;
         const list = $('#participants-list');
@@ -1107,13 +1563,27 @@ document.addEventListener('DOMContentLoaded', () => {
             list.innerHTML = `<div class="empty-state">Nenhum participante cadastrado ainda.</div>`;
             return;
         }
-        list.innerHTML = state.participants.map((p, idx) => `
+        const filtered = state.participants.filter(participantMatchesFilter);
+        $('#participant-count').textContent = participantSearchTerm || participantStatusFilter !== 'todos'
+            ? `${filtered.length}/${state.participants.length} exibidos`
+            : `${state.participants.length} inscritos`;
+        if (!filtered.length) {
+            list.innerHTML = `<div class="empty-state">Nenhum participante encontrado com esses filtros.</div>`;
+            return;
+        }
+        list.innerHTML = filtered.map((p, idx) => {
+            const status = getParticipantStatus(p.name);
+            return `
             <div class="participant-item">
                 <span class="participant-avatar">${initials(p.name)}</span>
-                <span class="participant-name">${idx + 1}. ${escapeHtml(p.name)}</span>
+                <span class="participant-main">
+                    <span class="participant-name">${idx + 1}. ${escapeHtml(p.name)}</span>
+                    <small>${escapeHtml(status.detail)}</small>
+                </span>
+                <span class="participant-status ${status.cls}">${escapeHtml(status.label)}</span>
                 ${isOrganizer ? `<button class="remove-participant" data-remove-id="${escapeHtml(p.id)}" title="Remover"><i class="ph ph-trash"></i></button>` : ''}
             </div>
-        `).join('');
+        `}).join('');
     }
 
     function renderCodes() {
@@ -1159,6 +1629,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAll() {
+        ensureLiveState();
         renderRole();
         renderTestPanel();
         renderParticipants();
@@ -1166,11 +1637,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBracket();
         renderRanking();
         renderHistory();
+        renderLiveSection();
     }
 
     function switchTab(tabName) {
         $$('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabName));
         $$('.tab-content').forEach(content => content.classList.toggle('active', content.id === `tab-${tabName}`));
+        if (tabName === 'ao-vivo') renderLiveSection();
     }
 
     $$('.tab').forEach(tab => {
@@ -1188,6 +1661,41 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isOrganizer) return;
         addParticipant($('#participant-name').value);
         $('#participant-name').value = '';
+    });
+
+    $('#participant-search')?.addEventListener('input', event => {
+        participantSearchTerm = event.target.value || '';
+        renderParticipants();
+    });
+
+    $('#participant-status-filter')?.addEventListener('change', event => {
+        participantStatusFilter = event.target.value || 'todos';
+        renderParticipants();
+    });
+
+    $('#liveSettingsForm')?.addEventListener('submit', event => {
+        event.preventDefault();
+        withLivePassword(saveLiveSettings);
+    });
+
+    $('#liveCommentForm')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const textInput = $('#liveCommentText');
+        const text = sanitizeLiveText(textInput?.value, 200);
+        if (!text) {
+            if (textInput) textInput.value = '';
+            return;
+        }
+        await addLiveComment($('#liveCommentName')?.value, text);
+        if (textInput) textInput.value = '';
+    });
+
+    $('#btn-live-clear-comments')?.addEventListener('click', () => withLivePassword(clearLiveComments));
+    $('#btn-live-toggle-comments')?.addEventListener('click', () => withLivePassword(toggleLiveComments));
+    $('#liveCommentsList')?.addEventListener('click', event => {
+        const deleteButton = event.target.closest('[data-live-comment-delete]');
+        if (!deleteButton) return;
+        withLivePassword(() => deleteLiveComment(deleteButton.dataset.liveCommentDelete));
     });
 
     document.addEventListener('click', event => {
@@ -1252,7 +1760,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#btn-finish-tournament').addEventListener('click', finishTournament);
     $('#btn-reset-tournament').addEventListener('click', () => {
         if (!confirm('Resetar todo o torneio de Sinuca atual?')) return;
-        state = { ...defaultState };
+        state = { ...defaultState, live: createDefaultLiveState() };
         persist();
         syncTournamentToFirebase();
         renderAll();
@@ -1266,5 +1774,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTournamentFromFirebase().finally(() => {
         renderAll();
         if (!isOrganizer) switchTab('mata-mata');
+        subscribeTournamentFromFirebase();
     });
 });
