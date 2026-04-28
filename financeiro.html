@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Financeiro - Copa Psyzon</title>
+    <link rel="stylesheet" href="./financeiro.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="./financeiro.js" defer></script>
+</head>
+
+<body>
+    <section class="financeiro-access" id="financeiro-access-lock" hidden>
+        <div class="financeiro-access-card">
+            <span class="financeiro-access-icon"><i class="ph ph-lock-key"></i></span>
+            <p class="financeiro-kicker">COPA PSYZON</p>
+            <h1>Área Financeira</h1>
+            <p>Acesso restrito ao organizador.</p>
+            <button type="button" class="financeiro-button financeiro-button-primary" id="btn-financeiro-unlock">
+                <i class="ph ph-lock-key-open"></i> Entrar como organizador
+            </button>
+            <a class="financeiro-button financeiro-button-ghost" href="./escolhaojogo.html">
+                <i class="ph ph-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </section>
+
+    <main class="financeiro-page" id="financeiro-app" hidden>
+        <header class="financeiro-header financeiro-glass-card">
+            <div class="financeiro-header-top">
+                <a class="financeiro-back" href="./escolhaojogo.html?role=organizador">
+                    <i class="ph ph-arrow-left"></i>
+                    <span>Escolha o jogo</span>
+                </a>
+                <button type="button" class="financeiro-back financeiro-exit" id="btn-financeiro-logout">
+                    <i class="ph ph-sign-out"></i>
+                    <span>Sair</span>
+                </button>
+            </div>
+
+            <div class="financeiro-hero">
+                <div>
+                    <span class="financeiro-kicker">COPA PSYZON</span>
+                    <h1>Financeiro COPA PSYZON</h1>
+                    <p>Controle de gastos, receitas, patrocinadores, participantes e empréstimos.</p>
+                </div>
+                <div class="financeiro-balance-pill">
+                    <small>Saldo geral</small>
+                    <strong id="financeiro-saldo-geral">R$ 0,00</strong>
+                    <span id="financeiro-saldo-real">Sem empréstimos: R$ 0,00</span>
+                </div>
+            </div>
+        </header>
+
+        <section class="financeiro-summary-grid" id="financeiro-summary-grid" aria-label="Resumo financeiro"></section>
+
+        <section class="financeiro-section financeiro-glass-card">
+            <div class="financeiro-section-title">
+                <div>
+                    <span class="financeiro-kicker">Cadastro</span>
+                    <h2>Nova movimentação</h2>
+                </div>
+                <span class="financeiro-sync-status" id="financeiro-sync-status">localStorage pronto</span>
+            </div>
+
+            <form class="financeiro-form" id="financeiro-movimentacao-form" autocomplete="off">
+                <input type="hidden" id="movimentacao-id">
+
+                <label>
+                    <span>Tipo de movimentação</span>
+                    <select class="financeiro-select" id="movimentacao-tipo" required>
+                        <option value="">Selecione</option>
+                        <option>Receita</option>
+                        <option>Despesa</option>
+                        <option>Patrocínio recebido</option>
+                        <option>Pagamento de participante</option>
+                        <option>Dinheiro emprestado recebido</option>
+                        <option>Dinheiro emprestado para alguém</option>
+                        <option>Pagamento de dívida</option>
+                        <option>Reembolso recebido</option>
+                        <option>Reembolso pago</option>
+                        <option>Outro</option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>Categoria</span>
+                    <select class="financeiro-select" id="movimentacao-categoria" required>
+                        <option value="">Selecione</option>
+                        <option>Alimentação</option>
+                        <option>Bebidas</option>
+                        <option>Premiação</option>
+                        <option>Estrutura</option>
+                        <option>Equipamentos</option>
+                        <option>Divulgação</option>
+                        <option>Design/Marketing</option>
+                        <option>Transporte</option>
+                        <option>Aluguel</option>
+                        <option>Patrocinador</option>
+                        <option>Inscrição de participante</option>
+                        <option>Empréstimo</option>
+                        <option>Outros</option>
+                    </select>
+                </label>
+
+                <label class="span-2">
+                    <span>Descrição</span>
+                    <input class="financeiro-input" type="text" id="movimentacao-descricao" maxlength="120" required>
+                </label>
+
+                <label>
+                    <span>Valor</span>
+                    <input class="financeiro-input financeiro-money" type="text" id="movimentacao-valor" inputmode="numeric" placeholder="R$ 0,00" required>
+                </label>
+
+                <label>
+                    <span>Data</span>
+                    <input class="financeiro-input" type="date" id="movimentacao-data" required>
+                </label>
+
+                <label>
+                    <span>Forma de pagamento</span>
+                    <select class="financeiro-select" id="movimentacao-pagamento">
+                        <option>Pix</option>
+                        <option>Dinheiro</option>
+                        <option>Cartão</option>
+                        <option>Transferência</option>
+                        <option>Outro</option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>Status</span>
+                    <select class="financeiro-select" id="movimentacao-status">
+                        <option>Pago</option>
+                        <option>Pendente</option>
+                        <option>Cancelado</option>
+                    </select>
+                </label>
+
+                <label class="span-2">
+                    <span>Pessoa/empresa relacionada</span>
+                    <input class="financeiro-input" type="text" id="movimentacao-pessoa" list="financeiro-pessoas-list" maxlength="100">
+                </label>
+
+                <label class="span-2">
+                    <span>Observações</span>
+                    <textarea class="financeiro-input" id="movimentacao-observacoes" rows="3" maxlength="260"></textarea>
+                </label>
+
+                <div class="financeiro-form-actions span-2">
+                    <button type="submit" class="financeiro-button financeiro-button-primary" id="btn-save-movimentacao">
+                        <i class="ph ph-floppy-disk"></i> Salvar movimentação
+                    </button>
+                    <button type="button" class="financeiro-button financeiro-button-ghost" id="btn-clear-movimentacao">
+                        <i class="ph ph-eraser"></i> Limpar formulário
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <section class="financeiro-section financeiro-glass-card">
+            <div class="financeiro-section-title">
+                <div>
+                    <span class="financeiro-kicker">Busca</span>
+                    <h2>Movimentações</h2>
+                </div>
+                <button type="button" class="financeiro-button financeiro-button-ghost" id="btn-clear-filters">
+                    <i class="ph ph-funnel-x"></i> Limpar filtros
+                </button>
+            </div>
+
+            <div class="financeiro-filters">
+                <label>
+                    <span>Buscar</span>
+                    <input class="financeiro-input" type="search" id="filter-search" placeholder="Descrição, pessoa, categoria">
+                </label>
+                <label>
+                    <span>Tipo</span>
+                    <select class="financeiro-select" id="filter-type">
+                        <option value="">Todos</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Categoria</span>
+                    <select class="financeiro-select" id="filter-category">
+                        <option value="">Todas</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Status</span>
+                    <select class="financeiro-select" id="filter-status">
+                        <option value="">Todos</option>
+                        <option>Pago</option>
+                        <option>Pendente</option>
+                        <option>Cancelado</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Mês</span>
+                    <input class="financeiro-input" type="month" id="filter-month">
+                </label>
+                <label>
+                    <span>Pagamento</span>
+                    <select class="financeiro-select" id="filter-payment">
+                        <option value="">Todos</option>
+                        <option>Pix</option>
+                        <option>Dinheiro</option>
+                        <option>Cartão</option>
+                        <option>Transferência</option>
+                        <option>Outro</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="financeiro-table-wrap">
+                <table class="financeiro-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>Categoria</th>
+                            <th>Descrição</th>
+                            <th>Pessoa/empresa</th>
+                            <th>Pagamento</th>
+                            <th>Status</th>
+                            <th>Valor</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="financeiro-movimentacoes-tbody"></tbody>
+                </table>
+            </div>
+            <div class="financeiro-mobile-list" id="financeiro-movimentacoes-mobile"></div>
+            <div class="financeiro-empty" id="financeiro-movimentacoes-empty" hidden>
+                <i class="ph ph-receipt"></i>
+                <strong>Nenhuma movimentação encontrada</strong>
+                <span>Registre entradas, gastos ou ajuste os filtros.</span>
+            </div>
+        </section>
+
+        <section class="financeiro-duo-grid">
+            <article class="financeiro-section financeiro-glass-card">
+                <div class="financeiro-section-title">
+                    <div>
+                        <span class="financeiro-kicker">Receitas</span>
+                        <h2>Patrocinadores</h2>
+                    </div>
+                </div>
+                <div class="financeiro-mini-summary" id="patrocinadores-summary"></div>
+                <form class="financeiro-compact-form" id="patrocinador-form">
+                    <input type="hidden" id="patrocinador-id">
+                    <input class="financeiro-input" id="patrocinador-nome" placeholder="Nome do patrocinador" required>
+                    <input class="financeiro-input financeiro-money" id="patrocinador-prometido" placeholder="Valor prometido" inputmode="numeric">
+                    <input class="financeiro-input financeiro-money" id="patrocinador-pago" placeholder="Valor pago" inputmode="numeric">
+                    <select class="financeiro-select" id="patrocinador-status">
+                        <option>Pago</option>
+                        <option>Parcial</option>
+                        <option>Pendente</option>
+                    </select>
+                    <select class="financeiro-select" id="patrocinador-pagamento">
+                        <option>Pix</option>
+                        <option>Dinheiro</option>
+                        <option>Cartão</option>
+                        <option>Transferência</option>
+                        <option>Outro</option>
+                    </select>
+                    <input class="financeiro-input" id="patrocinador-data" type="date">
+                    <textarea class="financeiro-input compact-span" id="patrocinador-observacao" rows="2" placeholder="Observação"></textarea>
+                    <button type="submit" class="financeiro-button financeiro-button-primary compact-span">
+                        <i class="ph ph-plus-circle"></i> Salvar patrocinador
+                    </button>
+                </form>
+                <div class="financeiro-card-list" id="patrocinadores-list"></div>
+            </article>
+
+            <article class="financeiro-section financeiro-glass-card">
+                <div class="financeiro-section-title">
+                    <div>
+                        <span class="financeiro-kicker">Inscrições</span>
+                        <h2>Participantes Pagos</h2>
+                    </div>
+                </div>
+                <div class="financeiro-mini-summary" id="participantes-summary"></div>
+                <form class="financeiro-compact-form" id="participante-pago-form">
+                    <input type="hidden" id="participante-pago-id">
+                    <input class="financeiro-input" id="participante-pago-nome" list="financeiro-participantes-list" placeholder="Nome do participante" required>
+                    <select class="financeiro-select" id="participante-pago-jogo">
+                        <option>FIFA</option>
+                        <option>Sinuca</option>
+                        <option>CS</option>
+                        <option>Futsal</option>
+                        <option>Outro</option>
+                    </select>
+                    <input class="financeiro-input financeiro-money" id="participante-pago-valor" placeholder="Valor pago" inputmode="numeric" required>
+                    <input class="financeiro-input" id="participante-pago-data" type="date">
+                    <select class="financeiro-select" id="participante-pago-status">
+                        <option>Pago</option>
+                        <option>Pendente</option>
+                    </select>
+                    <select class="financeiro-select" id="participante-pago-pagamento">
+                        <option>Pix</option>
+                        <option>Dinheiro</option>
+                        <option>Cartão</option>
+                        <option>Transferência</option>
+                        <option>Outro</option>
+                    </select>
+                    <button type="submit" class="financeiro-button financeiro-button-primary compact-span">
+                        <i class="ph ph-user-plus"></i> Salvar participante
+                    </button>
+                </form>
+                <div class="financeiro-card-list" id="participantes-pagos-list"></div>
+            </article>
+        </section>
+
+        <section class="financeiro-section financeiro-glass-card">
+            <div class="financeiro-section-title">
+                <div>
+                    <span class="financeiro-kicker">Caixa</span>
+                    <h2>Empréstimos</h2>
+                </div>
+            </div>
+
+            <div class="financeiro-loan-grid">
+                <article class="financeiro-loan-panel">
+                    <h3><i class="ph ph-arrow-down-left"></i> Dinheiro recebido emprestado</h3>
+                    <form class="financeiro-compact-form" id="emprestimo-recebido-form">
+                        <input type="hidden" id="emprestimo-recebido-id">
+                        <input class="financeiro-input" id="emprestimo-recebido-nome" placeholder="Nome de quem emprestou" required>
+                        <input class="financeiro-input financeiro-money" id="emprestimo-recebido-valor" placeholder="Valor" inputmode="numeric" required>
+                        <input class="financeiro-input" id="emprestimo-recebido-data" type="date">
+                        <select class="financeiro-select" id="emprestimo-recebido-status">
+                            <option>Aberto</option>
+                            <option>Pago</option>
+                            <option>Parcial</option>
+                        </select>
+                        <textarea class="financeiro-input compact-span" id="emprestimo-recebido-observacao" rows="2" placeholder="Observações"></textarea>
+                        <button type="submit" class="financeiro-button financeiro-button-primary compact-span">
+                            <i class="ph ph-plus-circle"></i> Salvar empréstimo recebido
+                        </button>
+                    </form>
+                    <div class="financeiro-card-list" id="emprestimos-recebidos-list"></div>
+                </article>
+
+                <article class="financeiro-loan-panel">
+                    <h3><i class="ph ph-arrow-up-right"></i> Dinheiro emprestado para alguém</h3>
+                    <form class="financeiro-compact-form" id="emprestimo-concedido-form">
+                        <input type="hidden" id="emprestimo-concedido-id">
+                        <input class="financeiro-input" id="emprestimo-concedido-nome" placeholder="Nome da pessoa" required>
+                        <input class="financeiro-input financeiro-money" id="emprestimo-concedido-valor" placeholder="Valor" inputmode="numeric" required>
+                        <input class="financeiro-input" id="emprestimo-concedido-data" type="date">
+                        <select class="financeiro-select" id="emprestimo-concedido-status">
+                            <option>Aberto</option>
+                            <option>Recebido</option>
+                            <option>Parcial</option>
+                        </select>
+                        <textarea class="financeiro-input compact-span" id="emprestimo-concedido-observacao" rows="2" placeholder="Observações"></textarea>
+                        <button type="submit" class="financeiro-button financeiro-button-primary compact-span">
+                            <i class="ph ph-plus-circle"></i> Salvar empréstimo concedido
+                        </button>
+                    </form>
+                    <div class="financeiro-card-list" id="emprestimos-concedidos-list"></div>
+                </article>
+            </div>
+        </section>
+
+        <section class="financeiro-section financeiro-report financeiro-glass-card" id="financeiro-report-section">
+            <div class="financeiro-section-title">
+                <div>
+                    <span class="financeiro-kicker">Fechamento</span>
+                    <h2>Relatório</h2>
+                </div>
+            </div>
+            <div class="financeiro-report-grid" id="financeiro-report-grid"></div>
+            <textarea class="financeiro-report-text" id="financeiro-report-text" readonly></textarea>
+            <div class="financeiro-form-actions">
+                <button type="button" class="financeiro-button financeiro-button-primary" id="btn-export-csv">
+                    <i class="ph ph-file-csv"></i> Exportar relatório em CSV
+                </button>
+                <button type="button" class="financeiro-button financeiro-button-warning" id="btn-copy-report">
+                    <i class="ph ph-copy"></i> Gerar resumo para copiar
+                </button>
+                <button type="button" class="financeiro-button financeiro-button-ghost" id="btn-print-report">
+                    <i class="ph ph-printer"></i> Imprimir relatório
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <datalist id="financeiro-participantes-list"></datalist>
+    <datalist id="financeiro-pessoas-list"></datalist>
+    <div class="financeiro-toast-stack" id="financeiro-toast-stack" aria-live="polite"></div>
+</body>
+
+</html>

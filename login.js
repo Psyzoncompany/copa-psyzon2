@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const mainTitle = document.getElementById('main-title');
     const mainSubtitle = document.getElementById('main-subtitle');
+    const participanteLink = document.querySelector('a[href="participante.html"]');
 
     if (btnOrganizador && btnVoltar && roleActions && loginForm) {
         btnOrganizador.addEventListener('click', () => {
@@ -55,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 .then((userCredential) => {
                     // Login sucesso
                     localStorage.setItem('copaRole', 'organizador');
+                    sessionStorage.setItem('copaPsyzonOrganizer', 'true');
                     window.location.href = 'escolhaojogo.html?role=organizador';
                 })
                 .catch((error) => {
@@ -79,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnVisitante = document.getElementById('btn-visitante');
     if (btnVisitante) {
         btnVisitante.addEventListener('click', () => {
+            sessionStorage.removeItem('copaPsyzonOrganizer');
             localStorage.setItem('copaRole', 'visitante');
             window.location.href = 'escolhaojogo.html?role=visitante';
         });
@@ -87,8 +90,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnApostador = document.getElementById('btn-apostador');
     if (btnApostador) {
         btnApostador.addEventListener('click', () => {
+            sessionStorage.removeItem('copaPsyzonOrganizer');
             localStorage.setItem('copaRole', 'apostador');
             window.location.href = 'escolhaojogo.html?role=apostador';
+        });
+    }
+
+    if (participanteLink) {
+        participanteLink.addEventListener('click', () => {
+            sessionStorage.removeItem('copaPsyzonOrganizer');
+            localStorage.setItem('copaRole', 'participante');
         });
     }
 });

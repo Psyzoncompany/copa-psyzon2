@@ -119,6 +119,10 @@ body {
     cursor: not-allowed;
 }
 
+.game-option[hidden] {
+    display: none !important;
+}
+
 .game-icon {
     width: 54px;
     height: 54px;
@@ -160,6 +164,23 @@ body {
     --game-icon-url: url("imgs/SVG LOGOS/FUTSAL SVG.svg");
 }
 
+.game-icon.financeiro {
+    background:
+        radial-gradient(circle at 28% 22%, rgba(250, 204, 21, 0.95), transparent 34%),
+        linear-gradient(145deg, #0B5D3B, #16A34A 54%, #2563EB);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.36), 0 10px 22px rgba(11, 93, 59, 0.2);
+}
+
+.game-icon.financeiro::before {
+    display: none;
+}
+
+.game-icon.financeiro i {
+    color: #fff;
+    font-size: 29px;
+    filter: drop-shadow(0 4px 9px rgba(4, 45, 21, 0.28));
+}
+
 .game-copy {
     min-width: 0;
     display: grid;
@@ -177,6 +198,13 @@ body {
     color: #64748b;
     font-size: 12px;
     font-weight: 700;
+}
+
+.game-copy em {
+    color: #0B5D3B;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 850;
 }
 
 .game-option > .ph-arrow-right {
@@ -199,6 +227,8 @@ body {
 
 .choice-footer {
     margin-top: 18px;
+    display: grid;
+    gap: 10px;
 }
 
 .back-link {
@@ -216,10 +246,43 @@ body {
     font-weight: 850;
 }
 
+.organizer-tools {
+    display: grid;
+    gap: 8px;
+}
+
+.organizer-access {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    border-radius: 999px;
+    border: 1px solid rgba(22, 163, 74, 0.28);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(236, 253, 245, 0.62));
+    color: #0B5D3B;
+    font-family: inherit;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(4, 45, 21, 0.08), inset 0 1px 0 rgba(255,255,255,0.78);
+}
+
+.organizer-access:hover {
+    border-color: rgba(37, 99, 235, 0.32);
+    transform: translateY(-1px);
+}
+
+.organizer-exit {
+    color: #7f1d1d;
+    border-color: rgba(239, 68, 68, 0.22);
+    background: rgba(255, 255, 255, 0.58);
+}
+
 @media (max-width: 640px) {
     body {
         background-image: url('imgs/imagem de fundo-mobile.webp');
-        background-attachment: scroll;
+        background-attachment: fixed;
     }
 
     .game-choice-page {
@@ -309,9 +372,11 @@ body {
 
     .choice-footer {
         margin-top: 10px;
+        gap: 8px;
     }
 
-    .back-link {
+    .back-link,
+    .organizer-access {
         min-height: 38px;
         font-size: 13px;
     }
@@ -356,7 +421,8 @@ body {
         margin-top: 8px;
     }
 
-    .back-link {
+    .back-link,
+    .organizer-access {
         min-height: 34px;
     }
 }
