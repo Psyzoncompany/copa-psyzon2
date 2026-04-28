@@ -40,6 +40,7 @@
     ];
 
     const PAYMENT_METHODS = ['Pix', 'Dinheiro', 'Cartão', 'Transferência', 'Outro'];
+    const DEFAULT_EDITION_NAME = 'Edição principal';
     const INCOME_TYPES = new Set([
         'Receita',
         'Patrocínio recebido',
@@ -73,17 +74,39 @@
     let financeiroInitialized = false;
     let latestTotals = calculateFinanceiroTotals();
     let participantOptions = [];
+    let currentFinanceiroTab = 'visao';
+    let activeQuickFilter = 'all';
 
     const $ = (selector, root = document) => root.querySelector(selector);
     const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
     function createDefaultFinanceiroData() {
+        const edition = createDefaultEdition(DEFAULT_EDITION_NAME);
         return {
-            movimentacoes: [],
-            patrocinadores: [],
-            participantesPagos: [],
-            emprestimos: [],
+            movimentacoes: edition.movimentacoes,
+            patrocinadores: edition.patrocinadores,
+            participantesPagos: edition.participantesPagos,
+            emprestimos: edition.emprestimos,
+            notas: edition.notes,
+            edicoes: [edition],
+            activeEditionId: edition.id,
+            historico: [],
             updatedAt: new Date().toISOString()
+        };
+    }
+
+    function createDefaultEdition(name = DEFAULT_EDITION_NAME, raw = {}) {
+        const now = new Date().toISOString();
+        return {
+            id: raw.id || createId('ed'),
+            name: normalizeText(raw.name || raw.nome, name),
+            notes: normalizeText(raw.notes || raw.notas, ''),
+            movimentacoes: normalizeArray(raw.movimentacoes).map(normalizeMovement),
+            patrocinadores: normalizeArray(raw.patrocinadores).map(normalizeSponsor),
+            participantesPagos: normalizeArray(raw.participantesPagos).map(normalizePaidParticipant),
+            emprestimos: normalizeArray(raw.emprestimos).map(normalizeLoan),
+            createdAt: raw.createdAt || now,
+            updatedAt: raw.updatedAt || now
         };
     }
 
@@ -202,12 +225,50 @@
 
     function normalizeFinanceiroData(raw = {}) {
         const base = createDefaultFinanceiroData();
+        let edicoes = normalizeArray(raw.edicoes).map((edition) => createDefaultEdition(DEFAULT_EDITION_NAME, edition));
+
+        if (!edicoes.length) {
+            edicoes = [createDefaultEdition(DEFAULT_EDITION_NAME, {
+                id: raw.activeEditionId || 'edicao_principal',
+                name: raw.editionName || raw.edicaoNome || DEFAULT_EDITION_NAME,
+                notes: raw.notas || raw.notes || '',
+                movimentacoes: raw.movimentacoes,
+                patrocinadores: raw.patrocinadores,
+                participantesPagos: raw.participantesPagos,
+                emprestimos: raw.emprestimos,
+                createdAt: raw.createdAt,
+                updatedAt: raw.updatedAt
+            })];
+        }
+
+        const requestedEditionId = raw.activeEditionId || edicoes[0]?.id;
+        const activeEdition = edicoes.find((edition) => edition.id === requestedEditionId) || edicoes[0] || base.edicoes[0];
         return {
-            movimentacoes: normalizeArray(raw.movimentacoes).map(normalizeMovement),
-            patrocinadores: normalizeArray(raw.patrocinadores).map(normalizeSponsor),
-            participantesPagos: normalizeArray(raw.participantesPagos).map(normalizePaidParticipant),
-            emprestimos: normalizeArray(raw.emprestimos).map(normalizeLoan),
+            movimentacoes: activeEdition.movimentacoes,
+            patrocinadores: activeEdition.patrocinadores,
+            participantesPagos: activeEdition.participantesPagos,
+            emprestimos: activeEdition.emprestimos,
+            notas: activeEdition.notes || '',
+            edicoes,
+            activeEditionId: activeEdition.id,
+            historico: normalizeArray(raw.historico).map(normalizeHistoryEntry),
             updatedAt: raw.updatedAt || base.updatedAt
+        };
+    }
+
+    function normalizeHistoryEntry(raw = {}) {
+        const now = new Date().toISOString();
+        return {
+            id: raw.id || createId('hist'),
+            editionId: raw.editionId || raw.edicaoId || null,
+            editionName: raw.editionName || raw.edicaoNome || DEFAULT_EDITION_NAME,
+            action: normalizeText(raw.action || raw.acao, 'Atualização'),
+            detail: normalizeText(raw.detail || raw.detalhe, ''),
+            movementId: raw.movementId || raw.movimentacaoId || null,
+            type: raw.type || null,
+            value: toNumber(raw.value ?? raw.valor),
+            status: raw.status || null,
+            createdAt: raw.createdAt || now
         };
     }
 
@@ -232,14 +293,75 @@
         const remote = normalizeFinanceiroData(remoteData);
         const localTime = new Date(local.updatedAt || 0).getTime();
         const remoteTime = new Date(remote.updatedAt || 0).getTime();
+        const editionMap = new Map();
 
-        return {
-            movimentacoes: mergeArrayById(local.movimentacoes, remote.movimentacoes, normalizeMovement),
-            patrocinadores: mergeArrayById(local.patrocinadores, remote.patrocinadores, normalizeSponsor),
-            participantesPagos: mergeArrayById(local.participantesPagos, remote.participantesPagos, normalizePaidParticipant),
-            emprestimos: mergeArrayById(local.emprestimos, remote.emprestimos, normalizeLoan),
+        [...local.edicoes, ...remote.edicoes].forEach((edition) => {
+            const current = editionMap.get(edition.id);
+            if (!current) {
+                editionMap.set(edition.id, edition);
+                return;
+            }
+
+            const merged = {
+                ...newestItem(current, edition),
+                movimentacoes: mergeArrayById(current.movimentacoes, edition.movimentacoes, normalizeMovement),
+                patrocinadores: mergeArrayById(current.patrocinadores, edition.patrocinadores, normalizeSponsor),
+                participantesPagos: mergeArrayById(current.participantesPagos, edition.participantesPagos, normalizePaidParticipant),
+                emprestimos: mergeArrayById(current.emprestimos, edition.emprestimos, normalizeLoan)
+            };
+            editionMap.set(edition.id, merged);
+        });
+
+        const historyMap = new Map();
+        [...local.historico, ...remote.historico].forEach((entry) => {
+            const current = historyMap.get(entry.id);
+            historyMap.set(entry.id, current ? newestItem(current, entry) : entry);
+        });
+
+        const activeEditionId = remoteTime > localTime ? remote.activeEditionId : local.activeEditionId;
+
+        return normalizeFinanceiroData({
+            edicoes: Array.from(editionMap.values()),
+            activeEditionId,
+            historico: Array.from(historyMap.values()),
             updatedAt: new Date(Math.max(localTime, remoteTime, Date.now())).toISOString()
-        };
+        });
+    }
+
+    function getActiveEdition() {
+        if (!financeiroState.edicoes?.length) {
+            financeiroState = normalizeFinanceiroData(financeiroState);
+        }
+
+        let edition = financeiroState.edicoes.find((item) => item.id === financeiroState.activeEditionId);
+        if (!edition) {
+            edition = financeiroState.edicoes[0] || createDefaultEdition(DEFAULT_EDITION_NAME);
+            financeiroState.activeEditionId = edition.id;
+            if (!financeiroState.edicoes.some((item) => item.id === edition.id)) {
+                financeiroState.edicoes.unshift(edition);
+            }
+        }
+
+        return edition;
+    }
+
+    function syncRootToActiveEdition() {
+        const edition = getActiveEdition();
+        edition.movimentacoes = financeiroState.movimentacoes.map(normalizeMovement);
+        edition.patrocinadores = financeiroState.patrocinadores.map(normalizeSponsor);
+        edition.participantesPagos = financeiroState.participantesPagos.map(normalizePaidParticipant);
+        edition.emprestimos = financeiroState.emprestimos.map(normalizeLoan);
+        edition.notes = financeiroState.notas || '';
+        edition.updatedAt = new Date().toISOString();
+    }
+
+    function loadActiveEditionToRoot() {
+        const edition = getActiveEdition();
+        financeiroState.movimentacoes = edition.movimentacoes.map(normalizeMovement);
+        financeiroState.patrocinadores = edition.patrocinadores.map(normalizeSponsor);
+        financeiroState.participantesPagos = edition.participantesPagos.map(normalizePaidParticipant);
+        financeiroState.emprestimos = edition.emprestimos.map(normalizeLoan);
+        financeiroState.notas = edition.notes || '';
     }
 
     function formatCurrency(value) {
@@ -299,6 +421,34 @@
         `;
         stack.appendChild(toast);
         window.setTimeout(() => toast.remove(), 3600);
+    }
+
+    function addHistoryEntry(action, detail = '', movement = null) {
+        const edition = getActiveEdition();
+        const entry = normalizeHistoryEntry({
+            editionId: edition.id,
+            editionName: edition.name,
+            action,
+            detail,
+            movementId: movement?.id || null,
+            type: movement?.type || null,
+            value: movement?.value || 0,
+            status: movement?.status || null,
+            createdAt: new Date().toISOString()
+        });
+        financeiroState.historico = [entry, ...normalizeArray(financeiroState.historico).map(normalizeHistoryEntry)].slice(0, 600);
+    }
+
+    function switchFinanceiroTab(tab) {
+        currentFinanceiroTab = tab || 'visao';
+        $$('[data-financeiro-tab]').forEach((button) => {
+            button.classList.toggle('active', button.dataset.financeiroTab === currentFinanceiroTab);
+        });
+        $$('[data-financeiro-panel]').forEach((panel) => {
+            panel.hidden = panel.dataset.financeiroPanel !== currentFinanceiroTab;
+        });
+        if (currentFinanceiroTab === 'historico') renderHistorico();
+        if (currentFinanceiroTab === 'relatorio') renderRelatorio();
     }
 
     function checkOrganizerAccess(options = {}) {
@@ -406,6 +556,7 @@
 
     async function saveFinanceiroData(options = {}) {
         const shouldRender = options.render !== false;
+        syncRootToActiveEdition();
         financeiroState.updatedAt = new Date().toISOString();
         writeLocalFinanceiroData();
 
@@ -470,6 +621,32 @@
                 .join('');
         }
         if (peopleList) peopleList.innerHTML = html;
+    }
+
+    function renderEditionControls() {
+        const select = $('#financeiro-edition-select');
+        const updated = $('#financeiro-edition-updated');
+        const historyEditionFilter = $('#history-edition-filter');
+        const edition = getActiveEdition();
+
+        if (select) {
+            select.innerHTML = financeiroState.edicoes
+                .map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`)
+                .join('');
+            select.value = edition.id;
+        }
+
+        if (historyEditionFilter) {
+            const currentValue = historyEditionFilter.value;
+            historyEditionFilter.innerHTML = '<option value="">Todas</option>' + financeiroState.edicoes
+                .map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`)
+                .join('');
+            historyEditionFilter.value = currentValue;
+        }
+
+        if (updated) {
+            updated.textContent = `Atualizada em ${new Date(edition.updatedAt || financeiroState.updatedAt).toLocaleString('pt-BR')}`;
+        }
     }
 
     function calculateFinanceiroTotals() {
@@ -568,13 +745,7 @@
             ['ph-arrow-circle-down', latestTotals.totalRecebido, 'Total recebido', 'Entradas pagas no caixa', 'receita'],
             ['ph-arrow-circle-up', latestTotals.totalGasto, 'Total gasto', 'Saídas pagas do caixa', 'despesa'],
             ['ph-wallet', latestTotals.saldoAtual, 'Saldo atual', 'Recebido menos gasto', 'saldo'],
-            ['ph-chart-line-up', latestTotals.lucroPrejuizo, 'Lucro ou prejuízo', 'Resultado real do evento', latestTotals.lucroPrejuizo < 0 ? 'despesa' : 'receita'],
-            ['ph-handshake', latestTotals.patrocinioRecebido, 'Patrocínios recebidos', 'Aportes pagos por marcas', 'patrocinio'],
-            ['ph-users-three', latestTotals.participantesPagosValor, 'Participantes pagos', `${latestTotals.participantesPagos} participantes confirmados`, 'receita'],
-            ['ph-bank', latestTotals.emprestimosRecebidos, 'Empréstimos recebidos', 'Entradas que são dívida', 'saldo'],
-            ['ph-hand-coins', latestTotals.emprestimosConcedidos, 'Empréstimos concedidos', 'Dinheiro que saiu para terceiros', 'despesa'],
-            ['ph-clock-countdown', latestTotals.pendenciasReceber, 'Pendências a receber', 'Valores prometidos ou abertos', 'pendencia'],
-            ['ph-warning-circle', latestTotals.pendenciasPagar, 'Pendências a pagar', 'Dívidas e saídas abertas', 'pendencia']
+            ['ph-chart-line-up', latestTotals.lucroPrejuizo, 'Lucro ou prejuízo', 'Resultado real do evento', latestTotals.lucroPrejuizo < 0 ? 'despesa' : 'receita']
         ];
 
         grid.innerHTML = cards.map(([icon, value, label, description, tone]) => `
@@ -585,6 +756,26 @@
                 <small>${escapeHtml(description)}</small>
             </article>
         `).join('');
+
+        const secondary = $('#financeiro-secondary-metrics');
+        if (secondary) {
+            const compact = [
+                ['Saldo sem empréstimos', latestTotals.saldoSemEmprestimos],
+                ['Patrocínios', latestTotals.patrocinioRecebido],
+                ['Participantes', `${latestTotals.participantesPagos} pagos`],
+                ['Inscrições', latestTotals.participantesPagosValor],
+                ['Empréstimos recebidos', latestTotals.emprestimosRecebidos],
+                ['Empréstimos concedidos', latestTotals.emprestimosConcedidos],
+                ['A receber', latestTotals.pendenciasReceber],
+                ['A pagar', latestTotals.pendenciasPagar]
+            ];
+            secondary.innerHTML = compact.map(([label, value]) => `
+                <div class="financeiro-metric-pill">
+                    <small>${escapeHtml(label)}</small>
+                    <strong>${typeof value === 'number' ? formatCurrency(value) : escapeHtml(value)}</strong>
+                </div>
+            `).join('');
+        }
     }
 
     function getFilteredMovimentacoes() {
@@ -598,6 +789,7 @@
         return financeiroState.movimentacoes
             .map(normalizeMovement)
             .filter((movement) => {
+                const direction = getMovementDirection(movement);
                 const haystack = [
                     movement.type,
                     movement.category,
@@ -613,6 +805,11 @@
                 if (status && movement.status !== status) return false;
                 if (payment && movement.paymentMethod !== payment) return false;
                 if (month && !String(movement.date || '').startsWith(month)) return false;
+                if (activeQuickFilter === 'income' && direction !== 'income') return false;
+                if (activeQuickFilter === 'expense' && direction !== 'expense') return false;
+                if (activeQuickFilter === 'pending' && movement.status !== 'Pendente') return false;
+                if (activeQuickFilter === 'paid' && movement.status !== 'Pago') return false;
+                if (activeQuickFilter === 'month' && !String(movement.date || '').startsWith(currentMonthValue())) return false;
                 return true;
             })
             .sort((a, b) => {
@@ -885,10 +1082,59 @@
         renderLoanList('#emprestimos-concedidos-list', [...manual, ...automatic].filter((loan) => loan.direction === 'concedido'));
     }
 
+    function getFilteredHistory() {
+        const search = normalizeText($('#history-search')?.value, '').toLowerCase();
+        const editionId = $('#history-edition-filter')?.value || '';
+        const action = $('#history-action-filter')?.value || '';
+
+        return normalizeArray(financeiroState.historico)
+            .map(normalizeHistoryEntry)
+            .filter((entry) => {
+                const haystack = [entry.editionName, entry.action, entry.detail, entry.type, entry.status].join(' ').toLowerCase();
+                if (search && !haystack.includes(search)) return false;
+                if (editionId && entry.editionId !== editionId) return false;
+                if (action && entry.action !== action) return false;
+                return true;
+            })
+            .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    }
+
+    function renderHistorico() {
+        const list = $('#financeiro-history-list');
+        const empty = $('#financeiro-history-empty');
+        const actionFilter = $('#history-action-filter');
+        if (!list) return;
+
+        const actions = Array.from(new Set(normalizeArray(financeiroState.historico).map((entry) => normalizeHistoryEntry(entry).action))).sort();
+        if (actionFilter) {
+            const currentValue = actionFilter.value;
+            actionFilter.innerHTML = '<option value="">Todas</option>' + actions
+                .map((action) => `<option>${escapeHtml(action)}</option>`)
+                .join('');
+            actionFilter.value = currentValue;
+        }
+
+        const history = getFilteredHistory();
+        if (empty) empty.hidden = history.length > 0;
+
+        list.innerHTML = history.map((entry) => `
+            <article class="financeiro-history-item">
+                <div>
+                    <strong>${escapeHtml(entry.action)}</strong>
+                    <p>${escapeHtml(entry.editionName)} • ${escapeHtml(entry.detail || 'Sem detalhe')}</p>
+                    ${entry.value ? `<p>${escapeHtml(entry.type || 'Movimentação')} • ${formatCurrency(entry.value)} ${entry.status ? `• ${escapeHtml(entry.status)}` : ''}</p>` : ''}
+                </div>
+                <span class="financeiro-history-date">${new Date(entry.createdAt).toLocaleString('pt-BR')}</span>
+            </article>
+        `).join('');
+    }
+
     function generateFinanceiroTextReport(copyToClipboard = false) {
         latestTotals = calculateFinanceiroTotals();
+        const edition = getActiveEdition();
         const report = [
             'RELATÓRIO FINANCEIRO - COPA PSYZON',
+            `Edição: ${edition.name}`,
             '',
             `Total recebido: ${formatCurrency(latestTotals.totalRecebido)}`,
             `Total gasto: ${formatCurrency(latestTotals.totalGasto)}`,
@@ -903,7 +1149,8 @@
             `Pendências a pagar: ${formatCurrency(latestTotals.pendenciasPagar)}`,
             '',
             'Observações:',
-            `${financeiroState.movimentacoes.length} movimentações registradas. Dados atualizados em ${new Date(financeiroState.updatedAt).toLocaleString('pt-BR')}.`
+            `${financeiroState.movimentacoes.length} movimentações registradas. Dados atualizados em ${new Date(edition.updatedAt || financeiroState.updatedAt).toLocaleString('pt-BR')}.`,
+            financeiroState.notas ? `Notas: ${financeiroState.notas}` : ''
         ].join('\n');
 
         const textarea = $('#financeiro-report-text');
@@ -954,13 +1201,16 @@
     }
 
     function renderAllFinanceiro() {
+        renderEditionControls();
         renderDatalists();
         renderFinanceiroDashboard();
         renderMovimentacoes();
         renderPatrocinadores();
         renderParticipantesPagos();
         renderEmprestimos();
+        renderHistorico();
         renderRelatorio();
+        switchFinanceiroTab(currentFinanceiroTab);
     }
 
     function collectMovementForm() {
@@ -1015,6 +1265,7 @@
             financeiroState.movimentacoes.unshift(movement);
         }
 
+        addHistoryEntry(existing ? 'Movimentação editada' : 'Movimentação criada', movement.description, movement);
         resetMovementForm();
         await saveFinanceiroData({ toast: existing ? 'Movimentação atualizada' : 'Movimentação salva' });
         return true;
@@ -1042,6 +1293,7 @@
         if (!movement) return;
         if (!confirm('Excluir esta movimentação?')) return;
 
+        addHistoryEntry('Movimentação excluída', movement.description, movement);
         financeiroState.movimentacoes = financeiroState.movimentacoes.filter((item) => item.id !== id);
 
         if (movement.source === 'patrocinador') {
@@ -1065,6 +1317,7 @@
             return updated;
         });
         if (updated) syncSourceFromMovement(updated);
+        if (updated) addHistoryEntry('Status alterado', `${updated.description}: ${status}`, updated);
         await saveFinanceiroData({ toast: `Status alterado para ${status}` });
     }
 
@@ -1236,6 +1489,12 @@
             ? financeiroState.patrocinadores.map((item) => item.id === id ? sponsor : item)
             : [sponsor, ...financeiroState.patrocinadores];
         syncSponsorMovement(sponsor);
+        addHistoryEntry(existing ? 'Patrocinador editado' : 'Patrocinador criado', sponsor.name, {
+            id: sponsor.id,
+            type: 'Patrocínio recebido',
+            value: sponsor.paidValue || sponsor.promisedValue,
+            status: sponsor.status
+        });
         $('#patrocinador-form').reset();
         $('#patrocinador-id').value = '';
         $('#patrocinador-data').value = todayInputValue();
@@ -1268,6 +1527,12 @@
             ? financeiroState.participantesPagos.map((item) => item.id === id ? participant : item)
             : [participant, ...financeiroState.participantesPagos];
         syncParticipantMovement(participant);
+        addHistoryEntry(existing ? 'Participante editado' : 'Participante criado', `${participant.name} - ${participant.game}`, {
+            id: participant.id,
+            type: 'Pagamento de participante',
+            value: participant.value,
+            status: participant.status
+        });
         $('#participante-pago-form').reset();
         $('#participante-pago-id').value = '';
         $('#participante-pago-data').value = todayInputValue();
@@ -1301,6 +1566,12 @@
             ? financeiroState.emprestimos.map((item) => item.id === id ? loan : item)
             : [loan, ...financeiroState.emprestimos];
         syncLoanMovement(loan);
+        addHistoryEntry(existing ? 'Empréstimo editado' : 'Empréstimo criado', loan.name, {
+            id: loan.id,
+            type: loan.direction === 'recebido' ? 'Empréstimo recebido' : 'Empréstimo concedido',
+            value: loan.value,
+            status: loan.status
+        });
         $(`#${prefix}-form`).reset();
         $(`#${prefix}-id`).value = '';
         $(`#${prefix}-data`).value = todayInputValue();
@@ -1323,6 +1594,13 @@
 
     async function deleteSponsor(id) {
         if (!confirm('Excluir este patrocinador?')) return;
+        const sponsor = financeiroState.patrocinadores.find((item) => item.id === id);
+        if (sponsor) addHistoryEntry('Patrocinador excluído', sponsor.name, {
+            id: sponsor.id,
+            type: 'Patrocínio recebido',
+            value: sponsor.paidValue || sponsor.promisedValue,
+            status: sponsor.status
+        });
         financeiroState.patrocinadores = financeiroState.patrocinadores.filter((item) => item.id !== id);
         removeAutoMovement('patrocinador', id);
         await saveFinanceiroData({ toast: 'Patrocinador excluído' });
@@ -1343,6 +1621,13 @@
 
     async function deletePaidParticipant(id) {
         if (!confirm('Excluir este participante pago?')) return;
+        const participant = financeiroState.participantesPagos.find((item) => item.id === id);
+        if (participant) addHistoryEntry('Participante excluído', participant.name, {
+            id: participant.id,
+            type: 'Pagamento de participante',
+            value: participant.value,
+            status: participant.status
+        });
         financeiroState.participantesPagos = financeiroState.participantesPagos.filter((item) => item.id !== id);
         removeAutoMovement('participantePago', id);
         await saveFinanceiroData({ toast: 'Participante excluído' });
@@ -1363,6 +1648,13 @@
 
     async function deleteLoan(id) {
         if (!confirm('Excluir este empréstimo?')) return;
+        const loan = financeiroState.emprestimos.find((item) => item.id === id);
+        if (loan) addHistoryEntry('Empréstimo excluído', loan.name, {
+            id: loan.id,
+            type: loan.direction === 'recebido' ? 'Empréstimo recebido' : 'Empréstimo concedido',
+            value: loan.value,
+            status: loan.status
+        });
         financeiroState.emprestimos = financeiroState.emprestimos.filter((item) => item.id !== id);
         removeAutoMovement('emprestimo', id);
         await saveFinanceiroData({ toast: 'Empréstimo excluído' });
@@ -1375,8 +1667,10 @@
 
     function exportFinanceiroCSV() {
         latestTotals = calculateFinanceiroTotals();
+        const edition = getActiveEdition();
         const rows = [
             ['Relatório Financeiro - COPA PSYZON'],
+            ['Edição', edition.name],
             ['Atualizado em', new Date(financeiroState.updatedAt).toLocaleString('pt-BR')],
             [],
             ['Resumo', 'Valor'],
@@ -1454,11 +1748,81 @@
     }
 
     function clearFilters() {
+        activeQuickFilter = 'all';
         ['filter-search', 'filter-type', 'filter-category', 'filter-status', 'filter-month', 'filter-payment'].forEach((id) => {
             const input = document.getElementById(id);
             if (input) input.value = '';
         });
+        $$('#financeiro-quick-filters button').forEach((button) => button.classList.toggle('active', button.dataset.quickFilter === 'all'));
         filterMovimentacoes();
+    }
+
+    function currentMonthValue() {
+        return todayInputValue().slice(0, 7);
+    }
+
+    function applyQuickFilter(filter) {
+        clearFilters();
+        activeQuickFilter = filter || 'all';
+        $$('#financeiro-quick-filters button').forEach((button) => {
+            button.classList.toggle('active', button.dataset.quickFilter === filter);
+        });
+
+        if (filter === 'pending') $('#filter-status').value = 'Pendente';
+        if (filter === 'paid') $('#filter-status').value = 'Pago';
+        if (filter === 'month') $('#filter-month').value = currentMonthValue();
+        filterMovimentacoes();
+    }
+
+    async function switchEdition(editionId) {
+        if (!editionId || editionId === financeiroState.activeEditionId) return;
+        syncRootToActiveEdition();
+        financeiroState.activeEditionId = editionId;
+        loadActiveEditionToRoot();
+        clearFilters();
+        await saveFinanceiroData({ toast: 'Edição carregada', toastDetail: getActiveEdition().name });
+    }
+
+    async function createFinanceiroEdition() {
+        const name = normalizeText(prompt('Nome da nova edição financeira:'), '');
+        if (!name) return;
+
+        syncRootToActiveEdition();
+        const edition = createDefaultEdition(name);
+        financeiroState.edicoes.unshift(edition);
+        financeiroState.activeEditionId = edition.id;
+        loadActiveEditionToRoot();
+        addHistoryEntry('Edição criada', name, null);
+        clearFilters();
+        await saveFinanceiroData({ toast: 'Nova edição criada', toastDetail: name });
+    }
+
+    function openNotesModal() {
+        const modal = $('#financeiro-notes-modal');
+        const textarea = $('#financeiro-notes-text');
+        if (textarea) textarea.value = financeiroState.notas || '';
+        if (modal) modal.hidden = false;
+        textarea?.focus();
+    }
+
+    function closeNotesModal() {
+        const modal = $('#financeiro-notes-modal');
+        if (modal) modal.hidden = true;
+    }
+
+    async function saveEditionNotes() {
+        financeiroState.notas = $('#financeiro-notes-text')?.value || '';
+        addHistoryEntry('Bloco de notas atualizado', getActiveEdition().name, null);
+        closeNotesModal();
+        await saveFinanceiroData({ toast: 'Anotações salvas' });
+    }
+
+    function clearHistoryFilters() {
+        ['history-search', 'history-edition-filter', 'history-action-filter'].forEach((id) => {
+            const input = document.getElementById(id);
+            if (input) input.value = '';
+        });
+        renderHistorico();
     }
 
     function handleMovementAction(event) {
@@ -1501,10 +1865,25 @@
         $('#btn-export-csv')?.addEventListener('click', exportFinanceiroCSV);
         $('#btn-copy-report')?.addEventListener('click', () => generateFinanceiroTextReport(true));
         $('#btn-print-report')?.addEventListener('click', printFinanceiroReport);
+        $('#financeiro-edition-select')?.addEventListener('change', (event) => switchEdition(event.target.value));
+        $('#btn-new-edition')?.addEventListener('click', createFinanceiroEdition);
+        $('#btn-open-notes')?.addEventListener('click', openNotesModal);
+        $('#btn-close-notes')?.addEventListener('click', closeNotesModal);
+        $('#btn-cancel-notes')?.addEventListener('click', closeNotesModal);
+        $('#btn-save-notes')?.addEventListener('click', saveEditionNotes);
+        $('#btn-clear-history-filters')?.addEventListener('click', clearHistoryFilters);
         $('#btn-financeiro-logout')?.addEventListener('click', () => {
             sessionStorage.removeItem('copaPsyzonOrganizer');
             localStorage.setItem('copaRole', 'visitante');
             window.location.href = './escolhaojogo.html?role=visitante';
+        });
+
+        $$('[data-financeiro-tab]').forEach((button) => {
+            button.addEventListener('click', () => switchFinanceiroTab(button.dataset.financeiroTab));
+        });
+
+        $$('#financeiro-quick-filters [data-quick-filter]').forEach((button) => {
+            button.addEventListener('click', () => applyQuickFilter(button.dataset.quickFilter));
         });
 
         $('#patrocinador-form')?.addEventListener('submit', saveSponsor);
@@ -1521,6 +1900,12 @@
             const input = document.getElementById(id);
             if (!input) return;
             input.addEventListener(input.type === 'search' ? 'input' : 'change', filterMovimentacoes);
+        });
+
+        ['history-search', 'history-edition-filter', 'history-action-filter'].forEach((id) => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            input.addEventListener(input.type === 'search' ? 'input' : 'change', renderHistorico);
         });
 
         $('#financeiro-movimentacoes-tbody')?.addEventListener('click', handleMovementAction);
@@ -1572,6 +1957,7 @@
         renderParticipantesPagos,
         renderEmprestimos,
         renderRelatorio,
+        renderHistorico,
         addMovimentacao,
         editMovimentacao,
         deleteMovimentacao,
@@ -1584,6 +1970,8 @@
         generateFinanceiroTextReport,
         printFinanceiroReport,
         checkOrganizerAccess,
-        showFinanceiroOnlyForOrganizer
+        showFinanceiroOnlyForOrganizer,
+        switchEdition,
+        createFinanceiroEdition
     });
 })();

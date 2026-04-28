@@ -56,9 +56,34 @@
             </div>
         </header>
 
-        <section class="financeiro-summary-grid" id="financeiro-summary-grid" aria-label="Resumo financeiro"></section>
+        <section class="financeiro-toolbar financeiro-glass-card">
+            <label class="financeiro-edition-picker">
+                <span>Edição ativa</span>
+                <select class="financeiro-select" id="financeiro-edition-select"></select>
+            </label>
+            <button type="button" class="financeiro-button financeiro-button-primary" id="btn-new-edition">
+                <i class="ph ph-plus-circle"></i> Nova edição
+            </button>
+            <button type="button" class="financeiro-button financeiro-button-warning" id="btn-open-notes">
+                <i class="ph ph-notebook"></i> Bloco de notas
+            </button>
+            <span class="financeiro-sync-status" id="financeiro-edition-updated">Edição atual</span>
+        </section>
 
-        <section class="financeiro-section financeiro-glass-card">
+        <nav class="financeiro-tabs financeiro-glass-card" aria-label="Navegação do financeiro">
+            <button type="button" class="active" data-financeiro-tab="visao"><i class="ph ph-chart-pie-slice"></i> Resumo</button>
+            <button type="button" data-financeiro-tab="movimentacoes"><i class="ph ph-receipt"></i> Movimentações</button>
+            <button type="button" data-financeiro-tab="cadastros"><i class="ph ph-folders"></i> Cadastros</button>
+            <button type="button" data-financeiro-tab="historico"><i class="ph ph-clock-counter-clockwise"></i> Histórico</button>
+            <button type="button" data-financeiro-tab="relatorio"><i class="ph ph-file-text"></i> Relatório</button>
+        </nav>
+
+        <section class="financeiro-dashboard-panel" data-financeiro-panel="visao">
+            <section class="financeiro-summary-grid" id="financeiro-summary-grid" aria-label="Resumo financeiro"></section>
+            <div class="financeiro-secondary-metrics financeiro-glass-card" id="financeiro-secondary-metrics"></div>
+        </section>
+
+        <section class="financeiro-section financeiro-glass-card" data-financeiro-panel="movimentacoes" hidden>
             <div class="financeiro-section-title">
                 <div>
                     <span class="financeiro-kicker">Cadastro</span>
@@ -163,7 +188,7 @@
             </form>
         </section>
 
-        <section class="financeiro-section financeiro-glass-card">
+        <section class="financeiro-section financeiro-glass-card" data-financeiro-panel="movimentacoes" hidden>
             <div class="financeiro-section-title">
                 <div>
                     <span class="financeiro-kicker">Busca</span>
@@ -172,6 +197,15 @@
                 <button type="button" class="financeiro-button financeiro-button-ghost" id="btn-clear-filters">
                     <i class="ph ph-funnel-x"></i> Limpar filtros
                 </button>
+            </div>
+
+            <div class="financeiro-quick-filters" id="financeiro-quick-filters">
+                <button type="button" class="active" data-quick-filter="all">Tudo</button>
+                <button type="button" data-quick-filter="income">Receitas</button>
+                <button type="button" data-quick-filter="expense">Despesas</button>
+                <button type="button" data-quick-filter="pending">Pendentes</button>
+                <button type="button" data-quick-filter="paid">Pagas</button>
+                <button type="button" data-quick-filter="month">Mês atual</button>
             </div>
 
             <div class="financeiro-filters">
@@ -243,7 +277,7 @@
             </div>
         </section>
 
-        <section class="financeiro-duo-grid">
+        <section class="financeiro-duo-grid" data-financeiro-panel="cadastros" hidden>
             <article class="financeiro-section financeiro-glass-card">
                 <div class="financeiro-section-title">
                     <div>
@@ -317,7 +351,7 @@
             </article>
         </section>
 
-        <section class="financeiro-section financeiro-glass-card">
+        <section class="financeiro-section financeiro-glass-card" data-financeiro-panel="cadastros" hidden>
             <div class="financeiro-section-title">
                 <div>
                     <span class="financeiro-kicker">Caixa</span>
@@ -368,7 +402,43 @@
             </div>
         </section>
 
-        <section class="financeiro-section financeiro-report financeiro-glass-card" id="financeiro-report-section">
+        <section class="financeiro-section financeiro-glass-card" data-financeiro-panel="historico" hidden>
+            <div class="financeiro-section-title">
+                <div>
+                    <span class="financeiro-kicker">Histórico</span>
+                    <h2>Histórico por edição</h2>
+                </div>
+                <button type="button" class="financeiro-button financeiro-button-ghost" id="btn-clear-history-filters">
+                    <i class="ph ph-funnel-x"></i> Limpar filtros
+                </button>
+            </div>
+            <div class="financeiro-filters">
+                <label>
+                    <span>Buscar</span>
+                    <input class="financeiro-input" type="search" id="history-search" placeholder="Movimentação, ação, pessoa">
+                </label>
+                <label>
+                    <span>Edição</span>
+                    <select class="financeiro-select" id="history-edition-filter">
+                        <option value="">Todas</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Ação</span>
+                    <select class="financeiro-select" id="history-action-filter">
+                        <option value="">Todas</option>
+                    </select>
+                </label>
+            </div>
+            <div class="financeiro-history-list" id="financeiro-history-list"></div>
+            <div class="financeiro-empty" id="financeiro-history-empty" hidden>
+                <i class="ph ph-clock-counter-clockwise"></i>
+                <strong>Nenhum histórico encontrado</strong>
+                <span>As alterações das movimentações aparecem aqui.</span>
+            </div>
+        </section>
+
+        <section class="financeiro-section financeiro-report financeiro-glass-card" id="financeiro-report-section" data-financeiro-panel="relatorio" hidden>
             <div class="financeiro-section-title">
                 <div>
                     <span class="financeiro-kicker">Fechamento</span>
@@ -393,6 +463,28 @@
 
     <datalist id="financeiro-participantes-list"></datalist>
     <datalist id="financeiro-pessoas-list"></datalist>
+    <div class="financeiro-notes-modal" id="financeiro-notes-modal" hidden>
+        <article class="financeiro-notes-card financeiro-glass-card">
+            <div class="financeiro-section-title">
+                <div>
+                    <span class="financeiro-kicker">Bloco de notas</span>
+                    <h2>Anotações da edição</h2>
+                </div>
+                <button type="button" class="financeiro-action-btn" id="btn-close-notes" title="Fechar">
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+            <textarea class="financeiro-input financeiro-notes-text" id="financeiro-notes-text" rows="10" placeholder="Anote combinados, pendências, links, comprovantes ou lembretes desta edição."></textarea>
+            <div class="financeiro-form-actions">
+                <button type="button" class="financeiro-button financeiro-button-primary" id="btn-save-notes">
+                    <i class="ph ph-floppy-disk"></i> Salvar anotações
+                </button>
+                <button type="button" class="financeiro-button financeiro-button-ghost" id="btn-cancel-notes">
+                    <i class="ph ph-x-circle"></i> Fechar
+                </button>
+            </div>
+        </article>
+    </div>
     <div class="financeiro-toast-stack" id="financeiro-toast-stack" aria-live="polite"></div>
 </body>
 

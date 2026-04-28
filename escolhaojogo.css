@@ -160,6 +160,17 @@ body {
     --game-icon-url: url("imgs/SVG LOGOS/SVG CS GO.svg");
 }
 
+.game-icon.cs::before {
+    display: none;
+}
+
+.game-icon.cs img {
+    display: block;
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+}
+
 .game-icon.futsal {
     --game-icon-url: url("imgs/SVG LOGOS/FUTSAL SVG.svg");
 }
@@ -342,6 +353,11 @@ body {
         height: 32px;
     }
 
+    .game-icon.cs img {
+        width: 34px;
+        height: 34px;
+    }
+
     .game-copy {
         gap: 1px;
     }
@@ -415,6 +431,11 @@ body {
     .game-icon::before {
         width: 28px;
         height: 28px;
+    }
+
+    .game-icon.cs img {
+        width: 30px;
+        height: 30px;
     }
 
     .choice-footer {
