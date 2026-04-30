@@ -64,9 +64,9 @@
             <button type="button" class="financeiro-button financeiro-button-primary" id="btn-new-edition">
                 <i class="ph ph-plus-circle"></i> Nova edição
             </button>
-            <button type="button" class="financeiro-button financeiro-button-warning" id="btn-open-notes">
+            <a class="financeiro-button financeiro-button-warning" id="btn-open-notes" href="./notas.html?role=organizador">
                 <i class="ph ph-notebook"></i> Bloco de notas
-            </button>
+            </a>
             <span class="financeiro-sync-status" id="financeiro-edition-updated">Edição atual</span>
         </section>
 
@@ -463,28 +463,6 @@
 
     <datalist id="financeiro-participantes-list"></datalist>
     <datalist id="financeiro-pessoas-list"></datalist>
-    <div class="financeiro-notes-modal" id="financeiro-notes-modal" hidden>
-        <article class="financeiro-notes-card financeiro-glass-card">
-            <div class="financeiro-section-title">
-                <div>
-                    <span class="financeiro-kicker">Bloco de notas</span>
-                    <h2>Anotações da edição</h2>
-                </div>
-                <button type="button" class="financeiro-action-btn" id="btn-close-notes" title="Fechar">
-                    <i class="ph ph-x"></i>
-                </button>
-            </div>
-            <textarea class="financeiro-input financeiro-notes-text" id="financeiro-notes-text" rows="10" placeholder="Anote combinados, pendências, links, comprovantes ou lembretes desta edição."></textarea>
-            <div class="financeiro-form-actions">
-                <button type="button" class="financeiro-button financeiro-button-primary" id="btn-save-notes">
-                    <i class="ph ph-floppy-disk"></i> Salvar anotações
-                </button>
-                <button type="button" class="financeiro-button financeiro-button-ghost" id="btn-cancel-notes">
-                    <i class="ph ph-x-circle"></i> Fechar
-                </button>
-            </div>
-        </article>
-    </div>
     <div class="financeiro-toast-stack" id="financeiro-toast-stack" aria-live="polite"></div>
 </body>
 

@@ -56,6 +56,18 @@
         'Reembolso pago'
     ]);
     const REAL_INCOME_EXCLUDED = new Set(['Dinheiro emprestado recebido']);
+    const CRITICAL_ACTION_PASSWORD = '153090';
+    const FINANCE_NOTE_TABS = [
+        { id: 'geral', label: 'Geral', icon: 'ph-notebook' },
+        { id: 'gastos', label: 'Gastos', icon: 'ph-receipt' },
+        { id: 'patrocinadores', label: 'Patrocinadores', icon: 'ph-handshake' },
+        { id: 'participantes', label: 'Participantes', icon: 'ph-users-three' },
+        { id: 'emprestimos', label: 'Emprestimos', icon: 'ph-bank' },
+        { id: 'pendencias', label: 'Pendencias', icon: 'ph-warning-circle' },
+        { id: 'ideias', label: 'Ideias', icon: 'ph-lightbulb' }
+    ];
+    const FINANCE_NOTE_STATUS = ['Aberto', 'Em andamento', 'Resolvido', 'Pago', 'Pendente'];
+    const FINANCE_NOTE_TAB_IDS = FINANCE_NOTE_TABS.map((tab) => tab.id);
     const REAL_EXPENSE_EXCLUDED = new Set(['Dinheiro emprestado para alguém', 'Pagamento de dívida']);
 
     const firebaseConfig = {
@@ -76,7 +88,6 @@
     let participantOptions = [];
     let currentFinanceiroTab = 'visao';
     let activeQuickFilter = 'all';
-
     const $ = (selector, root = document) => root.querySelector(selector);
     const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
@@ -88,6 +99,7 @@
             participantesPagos: edition.participantesPagos,
             emprestimos: edition.emprestimos,
             notas: edition.notes,
+            financeNotes: edition.financeNotes,
             edicoes: [edition],
             activeEditionId: edition.id,
             historico: [],
@@ -101,6 +113,7 @@
             id: raw.id || createId('ed'),
             name: normalizeText(raw.name || raw.nome, name),
             notes: normalizeText(raw.notes || raw.notas, ''),
+            financeNotes: normalizeFinanceNotes(raw.financeNotes || raw.notasFinanceiras, raw.notes || raw.notas || '', raw.id),
             movimentacoes: normalizeArray(raw.movimentacoes).map(normalizeMovement),
             patrocinadores: normalizeArray(raw.patrocinadores).map(normalizeSponsor),
             participantesPagos: normalizeArray(raw.participantesPagos).map(normalizePaidParticipant),
@@ -146,6 +159,210 @@
         if (Array.isArray(value)) return value;
         if (value && typeof value === 'object') return Object.values(value);
         return [];
+    }
+
+    function getFinanceNoteTab(tab) {
+        return FINANCE_NOTE_TAB_IDS.includes(tab) ? tab : 'geral';
+    }
+
+    function createDefaultFinanceNotes() {
+        return {
+            tabs: FINANCE_NOTE_TAB_IDS.reduce((acc, tab) => {
+                acc[tab] = [];
+                return acc;
+            }, {}),
+            version: 1,
+            updatedAt: new Date().toISOString()
+        };
+    }
+
+    function stableLegacyNoteId(sourceId = '') {
+        const source = String(sourceId || 'edicao_principal')
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]+/g, '_')
+            .replace(/^_+|_+$/g, '') || 'edicao_principal';
+        return `legacy_${source}`;
+    }
+
+    function normalizeFinanceNoteStatus(status) {
+        const text = normalizeText(status, 'Aberto');
+        const found = FINANCE_NOTE_STATUS.find((item) => item.toLowerCase() === text.toLowerCase());
+        return found || 'Aberto';
+    }
+
+    function sanitizeFinanceNoteContent(html) {
+        const raw = String(html || '');
+        if (!raw) return '';
+        if (typeof document === 'undefined' || !document.createElement) return escapeHtml(raw);
+
+        const template = document.createElement('template');
+        template.innerHTML = raw;
+        template.content.querySelectorAll('script, style, iframe, object, embed, link, meta').forEach((node) => node.remove());
+
+        const allowed = new Set(['DIV', 'P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'H2', 'H3', 'UL', 'OL', 'LI', 'SPAN', 'MARK', 'HR']);
+        template.content.querySelectorAll('*').forEach((node) => {
+            if (!allowed.has(node.tagName)) {
+                const parent = node.parentNode;
+                while (node.firstChild) parent.insertBefore(node.firstChild, node);
+                node.remove();
+                return;
+            }
+
+            const className = String(node.getAttribute('class') || '');
+            const checked = node.getAttribute('data-checked') === 'true' ? 'true' : 'false';
+            const checkId = node.getAttribute('data-check-id') || createId('chk');
+            const align = ['left', 'center', 'right'].includes(node.style?.textAlign) ? node.style.textAlign : '';
+            const highlighted = Boolean(node.style?.backgroundColor && node.style.backgroundColor !== 'transparent');
+            const classes = className.split(/\s+/).filter(Boolean);
+            const isCheck = classes.some((item) => ['note-check', 'finance-note-check'].includes(item));
+            const isCheckBox = classes.some((item) => ['note-check-box', 'finance-note-check-box'].includes(item));
+            const isCheckText = classes.some((item) => ['note-check-text', 'finance-note-check-text'].includes(item));
+            const isPending = classes.some((item) => ['note-pending-line', 'finance-note-pending-line'].includes(item));
+
+            Array.from(node.attributes).forEach((attribute) => node.removeAttribute(attribute.name));
+
+            if (node.classList && isCheck) {
+                node.setAttribute('class', 'note-check');
+                node.setAttribute('data-checked', checked);
+                node.setAttribute('data-check-id', checkId);
+            } else if (node.classList && isCheckBox) {
+                node.setAttribute('class', 'note-check-box');
+                node.setAttribute('contenteditable', 'false');
+            } else if (node.classList && isCheckText) {
+                node.setAttribute('class', 'note-check-text');
+            } else if (node.classList && isPending) {
+                node.setAttribute('class', 'note-pending-line');
+            } else if (node.tagName === 'MARK' || highlighted || className.includes('financeiro-note-important') || className.includes('note-important')) {
+                node.setAttribute('class', 'note-important');
+            }
+
+            if (align && ['DIV', 'P', 'H2', 'H3'].includes(node.tagName)) {
+                node.setAttribute('style', `text-align: ${align};`);
+            }
+        });
+
+        return template.innerHTML.trim();
+    }
+
+    function htmlToPlainText(html) {
+        const raw = String(html || '');
+        if (!raw) return '';
+        const container = document.createElement('div');
+        container.innerHTML = sanitizeFinanceNoteContent(raw);
+        container.querySelectorAll('.note-check').forEach((item) => {
+            const checked = item.dataset.checked === 'true' ? '[x]' : '[ ]';
+            const text = item.querySelector('.note-check-text')?.textContent || item.textContent || '';
+            item.replaceWith(document.createTextNode(`${checked} ${text.trim()}\n`));
+        });
+        return (container.innerText || container.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    function extractChecklistFromContent(content) {
+        const container = document.createElement('div');
+        container.innerHTML = sanitizeFinanceNoteContent(content);
+        return $$('.note-check', container).map((item) => ({
+            id: item.dataset.checkId || createId('chk'),
+            text: normalizeText(item.querySelector('.note-check-text')?.textContent || item.textContent, 'Tarefa'),
+            checked: item.dataset.checked === 'true'
+        }));
+    }
+
+    function normalizeFinanceNote(raw = {}, fallbackTab = 'geral') {
+        const now = new Date().toISOString();
+        const tab = getFinanceNoteTab(raw.tab || raw.category || raw.categoria || fallbackTab);
+        const content = sanitizeFinanceNoteContent(raw.content || raw.conteudo || '');
+        const checklist = content
+            ? extractChecklistFromContent(content)
+            : normalizeArray(raw.checklist).map((item) => ({
+                id: item.id || createId('chk'),
+                text: normalizeText(item.text || item.label || item.titulo, 'Tarefa'),
+                checked: Boolean(item.checked || item.done || item.concluido)
+            }));
+
+        return {
+            id: raw.id || createId('note'),
+            title: normalizeText(raw.title || raw.titulo, 'Nova nota'),
+            content,
+            plainText: normalizeText(raw.plainText || raw.texto || htmlToPlainText(content), ''),
+            tab,
+            value: toNumber(raw.value ?? raw.valor),
+            status: normalizeFinanceNoteStatus(raw.status),
+            pinned: Boolean(raw.pinned || raw.fixada),
+            favorite: Boolean(raw.favorite || raw.favorita),
+            archived: Boolean(raw.archived || raw.arquivada),
+            deleted: Boolean(raw.deleted || raw.excluida),
+            checklist,
+            createdAt: raw.createdAt || raw.criadaEm || now,
+            updatedAt: raw.updatedAt || raw.editadaEm || raw.createdAt || now,
+            deletedAt: raw.deletedAt || null
+        };
+    }
+
+    function migrateOldFinanceNotes(legacyText = '', sourceId = '') {
+        const text = normalizeText(legacyText, '');
+        if (!text) return null;
+        const now = new Date().toISOString();
+        const safeText = escapeHtml(text).replace(/\n/g, '<br>');
+        return normalizeFinanceNote({
+            id: stableLegacyNoteId(sourceId),
+            title: 'Anotacao antiga',
+            content: `<p>${safeText}</p>`,
+            plainText: text,
+            tab: 'geral',
+            status: 'Aberto',
+            createdAt: now,
+            updatedAt: now
+        }, 'geral');
+    }
+
+    function normalizeFinanceNotes(raw = {}, legacyText = '', sourceId = '') {
+        const normalized = createDefaultFinanceNotes();
+        const hasTabs = raw && typeof raw === 'object' && raw.tabs && typeof raw.tabs === 'object';
+        const source = hasTabs ? raw.tabs : raw;
+        let receivedAnyNote = false;
+
+        if (Array.isArray(source)) {
+            normalized.tabs.geral = source.map((note) => normalizeFinanceNote(note, 'geral'));
+            receivedAnyNote = normalized.tabs.geral.length > 0;
+        } else if (source && typeof source === 'object') {
+            FINANCE_NOTE_TAB_IDS.forEach((tab) => {
+                const notes = normalizeArray(source[tab]).map((note) => normalizeFinanceNote(note, tab));
+                normalized.tabs[tab] = notes;
+                if (notes.length) receivedAnyNote = true;
+            });
+        }
+
+        if (!receivedAnyNote && !hasTabs) {
+            const legacy = migrateOldFinanceNotes(legacyText, sourceId);
+            if (legacy) normalized.tabs.geral = [legacy];
+        }
+
+        normalized.updatedAt = raw?.updatedAt || new Date().toISOString();
+        return normalized;
+    }
+
+    function mergeFinanceNotes(localNotes, remoteNotes) {
+        const local = normalizeFinanceNotes(localNotes);
+        const remote = normalizeFinanceNotes(remoteNotes);
+        const map = new Map();
+
+        [...getAllFinanceNotesFromData(local), ...getAllFinanceNotesFromData(remote)].forEach((note) => {
+            const current = map.get(note.id);
+            map.set(note.id, current ? newestItem(current, note) : note);
+        });
+
+        const merged = createDefaultFinanceNotes();
+        Array.from(map.values()).forEach((note) => {
+            const normalized = normalizeFinanceNote(note, note.tab);
+            merged.tabs[normalized.tab].push(normalized);
+        });
+        merged.updatedAt = newestItem(local, remote).updatedAt || new Date().toISOString();
+        return merged;
+    }
+
+    function getAllFinanceNotesFromData(data) {
+        const notes = data?.tabs || {};
+        return FINANCE_NOTE_TAB_IDS.flatMap((tab) => normalizeArray(notes[tab]).map((note) => normalizeFinanceNote(note, tab)));
     }
 
     function normalizeStatus(status) {
@@ -232,6 +449,7 @@
                 id: raw.activeEditionId || 'edicao_principal',
                 name: raw.editionName || raw.edicaoNome || DEFAULT_EDITION_NAME,
                 notes: raw.notas || raw.notes || '',
+                financeNotes: raw.financeNotes || raw.notasFinanceiras,
                 movimentacoes: raw.movimentacoes,
                 patrocinadores: raw.patrocinadores,
                 participantesPagos: raw.participantesPagos,
@@ -249,6 +467,7 @@
             participantesPagos: activeEdition.participantesPagos,
             emprestimos: activeEdition.emprestimos,
             notas: activeEdition.notes || '',
+            financeNotes: normalizeFinanceNotes(activeEdition.financeNotes, activeEdition.notes || '', activeEdition.id),
             edicoes,
             activeEditionId: activeEdition.id,
             historico: normalizeArray(raw.historico).map(normalizeHistoryEntry),
@@ -307,7 +526,8 @@
                 movimentacoes: mergeArrayById(current.movimentacoes, edition.movimentacoes, normalizeMovement),
                 patrocinadores: mergeArrayById(current.patrocinadores, edition.patrocinadores, normalizeSponsor),
                 participantesPagos: mergeArrayById(current.participantesPagos, edition.participantesPagos, normalizePaidParticipant),
-                emprestimos: mergeArrayById(current.emprestimos, edition.emprestimos, normalizeLoan)
+                emprestimos: mergeArrayById(current.emprestimos, edition.emprestimos, normalizeLoan),
+                financeNotes: mergeFinanceNotes(current.financeNotes, edition.financeNotes)
             };
             editionMap.set(edition.id, merged);
         });
@@ -352,6 +572,7 @@
         edition.participantesPagos = financeiroState.participantesPagos.map(normalizePaidParticipant);
         edition.emprestimos = financeiroState.emprestimos.map(normalizeLoan);
         edition.notes = financeiroState.notas || '';
+        edition.financeNotes = normalizeFinanceNotes(financeiroState.financeNotes, edition.notes || '', edition.id);
         edition.updatedAt = new Date().toISOString();
     }
 
@@ -362,6 +583,7 @@
         financeiroState.participantesPagos = edition.participantesPagos.map(normalizePaidParticipant);
         financeiroState.emprestimos = edition.emprestimos.map(normalizeLoan);
         financeiroState.notas = edition.notes || '';
+        financeiroState.financeNotes = normalizeFinanceNotes(edition.financeNotes, edition.notes || '', edition.id);
     }
 
     function formatCurrency(value) {
@@ -1797,26 +2019,6 @@
         await saveFinanceiroData({ toast: 'Nova edição criada', toastDetail: name });
     }
 
-    function openNotesModal() {
-        const modal = $('#financeiro-notes-modal');
-        const textarea = $('#financeiro-notes-text');
-        if (textarea) textarea.value = financeiroState.notas || '';
-        if (modal) modal.hidden = false;
-        textarea?.focus();
-    }
-
-    function closeNotesModal() {
-        const modal = $('#financeiro-notes-modal');
-        if (modal) modal.hidden = true;
-    }
-
-    async function saveEditionNotes() {
-        financeiroState.notas = $('#financeiro-notes-text')?.value || '';
-        addHistoryEntry('Bloco de notas atualizado', getActiveEdition().name, null);
-        closeNotesModal();
-        await saveFinanceiroData({ toast: 'Anotações salvas' });
-    }
-
     function clearHistoryFilters() {
         ['history-search', 'history-edition-filter', 'history-action-filter'].forEach((id) => {
             const input = document.getElementById(id);
@@ -1867,10 +2069,6 @@
         $('#btn-print-report')?.addEventListener('click', printFinanceiroReport);
         $('#financeiro-edition-select')?.addEventListener('change', (event) => switchEdition(event.target.value));
         $('#btn-new-edition')?.addEventListener('click', createFinanceiroEdition);
-        $('#btn-open-notes')?.addEventListener('click', openNotesModal);
-        $('#btn-close-notes')?.addEventListener('click', closeNotesModal);
-        $('#btn-cancel-notes')?.addEventListener('click', closeNotesModal);
-        $('#btn-save-notes')?.addEventListener('click', saveEditionNotes);
         $('#btn-clear-history-filters')?.addEventListener('click', clearHistoryFilters);
         $('#btn-financeiro-logout')?.addEventListener('click', () => {
             sessionStorage.removeItem('copaPsyzonOrganizer');

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Notas Financeiras - Copa Psyzon</title>
+    <link rel="stylesheet" href="./notas.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="./notas.js" defer></script>
+</head>
+
+<body>
+    <section class="notes-access" id="notes-access-lock" hidden>
+        <article class="notes-access-card">
+            <span class="notes-access-icon"><i class="ph ph-lock-key"></i></span>
+            <span class="notes-kicker">COPA PSYZON</span>
+            <h1>Notas Financeiras</h1>
+            <p>Acesso restrito ao organizador.</p>
+            <button type="button" class="notes-button notes-button-primary" id="btn-notes-unlock">
+                <i class="ph ph-lock-key-open"></i> Entrar
+            </button>
+            <a class="notes-button notes-button-ghost" href="./financeiro.html">
+                <i class="ph ph-arrow-left"></i> Financeiro
+            </a>
+        </article>
+    </section>
+
+    <main class="notes-page" id="notes-app" hidden>
+        <header class="notes-topbar notes-glass">
+            <a class="notes-icon-link" href="./financeiro.html?role=organizador" title="Financeiro">
+                <i class="ph ph-arrow-left"></i>
+                <span>Financeiro</span>
+            </a>
+            <div class="notes-brand">
+                <span class="notes-kicker">COPA PSYZON</span>
+                <h1>Notas</h1>
+            </div>
+            <label class="notes-edition-picker">
+                <span>Edicao</span>
+                <select id="notes-edition-select"></select>
+            </label>
+            <span class="notes-pill" id="notes-sync-status">localStorage pronto</span>
+            <span class="notes-pill saving-state" id="notes-save-status">Salvo automaticamente</span>
+            <button type="button" class="notes-icon-button notes-danger-soft" id="btn-notes-logout" title="Sair">
+                <i class="ph ph-sign-out"></i>
+            </button>
+        </header>
+
+        <section class="notes-metrics" id="notes-summary"></section>
+
+        <section class="notes-shell notes-glass" id="notes-shell">
+            <aside class="notes-sidebar">
+                <div class="notes-sidebar-head">
+                    <div>
+                        <span class="notes-kicker">Biblioteca</span>
+                        <strong id="notes-list-title">Geral</strong>
+                    </div>
+                    <button type="button" class="notes-icon-button notes-primary-soft" id="btn-note-new" title="Nova nota">
+                        <i class="ph ph-plus"></i>
+                    </button>
+                </div>
+
+                <label class="notes-search">
+                    <i class="ph ph-magnifying-glass"></i>
+                    <input type="search" id="note-search" placeholder="Buscar nas notas...">
+                </label>
+
+                <div class="notes-filter-grid">
+                    <select id="note-filter">
+                        <option value="all">Todas</option>
+                        <option value="pending">Pendentes</option>
+                        <option value="paid">Pagas</option>
+                        <option value="resolved">Resolvidas</option>
+                        <option value="with-value">Com valor</option>
+                        <option value="recent">Recentes</option>
+                    </select>
+                    <select id="note-sort">
+                        <option value="recent">Mais recentes</option>
+                        <option value="old">Mais antigas</option>
+                        <option value="value-desc">Maior valor</option>
+                        <option value="value-asc">Menor valor</option>
+                        <option value="az">A-Z</option>
+                        <option value="za">Z-A</option>
+                    </select>
+                </div>
+
+                <nav class="notes-tabs" id="note-tabs" aria-label="Categorias"></nav>
+
+                <div class="notes-side-actions">
+                    <button type="button" id="btn-note-archived"><i class="ph ph-archive"></i> Arquivadas</button>
+                    <button type="button" id="btn-note-trash"><i class="ph ph-trash"></i> Lixeira</button>
+                </div>
+
+                <div class="notes-list-head">
+                    <span id="notes-list-count">0 notas</span>
+                    <div class="notes-menu-wrap">
+                        <button type="button" class="notes-icon-button" id="btn-note-export" title="Exportar">
+                            <i class="ph ph-export"></i>
+                        </button>
+                        <div class="notes-export-menu" id="note-export-popover" hidden>
+                            <label>
+                                <span>Escopo</span>
+                                <select id="note-export-scope">
+                                    <option value="current">Nota atual</option>
+                                    <option value="tab">Aba atual</option>
+                                    <option value="all">Tudo</option>
+                                </select>
+                            </label>
+                            <div class="notes-export-grid">
+                                <button type="button" data-note-export-format="txt"><i class="ph ph-file-text"></i> TXT</button>
+                                <button type="button" data-note-export-format="pdf"><i class="ph ph-file-pdf"></i> PDF</button>
+                                <button type="button" data-note-export-format="json"><i class="ph ph-file-code"></i> JSON</button>
+                                <button type="button" data-note-export-format="copy"><i class="ph ph-copy"></i> Copiar</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="notes-icon-button" id="btn-note-import" title="Importar backup">
+                        <i class="ph ph-upload-simple"></i>
+                    </button>
+                    <input type="file" id="note-import-file" accept="application/json,.json" hidden>
+                </div>
+
+                <div class="notes-list" id="note-list"></div>
+            </aside>
+
+            <section class="notes-editor-area">
+                <div class="notes-empty-editor" id="note-empty-editor">
+                    <i class="ph ph-notebook"></i>
+                    <strong>Notas Financeiras</strong>
+                    <span>COPA PSYZON</span>
+                </div>
+
+                <article class="notes-editor-panel" id="note-editor-panel" hidden>
+                    <div class="notes-mobile-editor-top">
+                        <button type="button" class="notes-button notes-button-ghost" id="btn-note-back">
+                            <i class="ph ph-arrow-left"></i> Voltar
+                        </button>
+                    </div>
+
+                    <div class="notes-editor-actions" id="note-editor-actions">
+                        <button type="button" data-note-action="pin" title="Fixar"><i class="ph ph-push-pin"></i></button>
+                        <button type="button" data-note-action="favorite" title="Favoritar"><i class="ph ph-star"></i></button>
+                        <button type="button" data-note-action="duplicate" title="Duplicar"><i class="ph ph-copy-simple"></i></button>
+                        <button type="button" data-note-action="archive" title="Arquivar"><i class="ph ph-archive"></i></button>
+                        <button type="button" data-note-action="copy" title="Copiar"><i class="ph ph-copy"></i></button>
+                        <button type="button" data-note-action="exportCurrent" title="Exportar"><i class="ph ph-export"></i></button>
+                        <button type="button" data-note-action="clearContent" title="Limpar"><i class="ph ph-eraser"></i></button>
+                        <button type="button" class="danger" data-note-action="delete" title="Excluir"><i class="ph ph-trash"></i></button>
+                    </div>
+
+                    <input class="notes-title-input" id="note-title" maxlength="120" placeholder="Titulo da nota">
+
+                    <div class="notes-fields">
+                        <label>
+                            <span>Status</span>
+                            <select id="note-status">
+                                <option>Aberto</option>
+                                <option>Em andamento</option>
+                                <option>Resolvido</option>
+                                <option>Pago</option>
+                                <option>Pendente</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span>Valor</span>
+                            <input id="note-value" inputmode="numeric" placeholder="R$ 0,00">
+                        </label>
+                        <div class="notes-meta" id="note-meta"></div>
+                        <div class="notes-progress" id="note-check-progress">0 de 0 concluidos</div>
+                    </div>
+
+                    <div class="notes-toolbar" id="note-toolbar" aria-label="Ferramentas">
+                        <button type="button" data-note-command="bold" title="Negrito"><i class="ph ph-text-bolder"></i></button>
+                        <button type="button" data-note-command="italic" title="Italico"><i class="ph ph-text-italic"></i></button>
+                        <button type="button" data-note-command="underline" title="Sublinhado"><i class="ph ph-text-underline"></i></button>
+                        <button type="button" data-note-format="h2" title="Titulo"><i class="ph ph-text-h-two"></i></button>
+                        <button type="button" data-note-format="h3" title="Subtitulo"><i class="ph ph-text-h-three"></i></button>
+                        <button type="button" data-note-command="insertUnorderedList" title="Marcadores"><i class="ph ph-list-bullets"></i></button>
+                        <button type="button" data-note-command="insertOrderedList" title="Numerada"><i class="ph ph-list-numbers"></i></button>
+                        <button type="button" data-note-insert="checklist" title="Checklist"><i class="ph ph-check-square"></i></button>
+                        <button type="button" data-note-insert="hr" title="Separador"><i class="ph ph-minus"></i></button>
+                        <button type="button" data-note-command="justifyLeft" title="Esquerda"><i class="ph ph-text-align-left"></i></button>
+                        <button type="button" data-note-command="justifyCenter" title="Centro"><i class="ph ph-text-align-center"></i></button>
+                        <button type="button" data-note-command="justifyRight" title="Direita"><i class="ph ph-text-align-right"></i></button>
+                        <button type="button" data-note-command="removeFormat" title="Limpar formatacao"><i class="ph ph-broom"></i></button>
+                        <button type="button" data-note-insert="date" title="Data"><i class="ph ph-calendar"></i></button>
+                        <button type="button" data-note-insert="time" title="Horario"><i class="ph ph-clock"></i></button>
+                        <button type="button" data-note-insert="money" title="Valor"><i class="ph ph-currency-circle-dollar"></i></button>
+                        <button type="button" data-note-insert="highlight" title="Destaque"><i class="ph ph-highlighter-circle"></i></button>
+                        <button type="button" data-note-insert="pending" title="Pendencia"><i class="ph ph-warning-circle"></i></button>
+                    </div>
+
+                    <div class="notes-editor" id="note-editor" contenteditable="true" spellcheck="true" data-placeholder="Escreva sua nota..."></div>
+                </article>
+            </section>
+        </section>
+    </main>
+
+    <div class="notes-toast-stack" id="notes-toast-stack" aria-live="polite"></div>
+</body>
+
+</html>
