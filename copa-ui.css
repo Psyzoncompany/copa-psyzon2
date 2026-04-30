@@ -1,0 +1,1212 @@
+:root {
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --card-padding: 14px;
+  --card-padding-compact: 10px;
+  --text-xs: 0.72rem;
+  --text-sm: 0.84rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.35rem;
+  --copa-green-dark: #042d15;
+  --copa-green: #16a34a;
+  --copa-yellow: #facc15;
+  --copa-blue: #2563eb;
+  --copa-danger: #dc2626;
+  --copa-text: #0f172a;
+  --copa-muted: #64748b;
+  --copa-glass: rgba(255, 255, 255, 0.68);
+  --copa-glass-strong: rgba(255, 255, 255, 0.84);
+  --copa-border: rgba(255, 255, 255, 0.72);
+  --copa-shadow: 0 14px 38px rgba(4, 45, 21, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  letter-spacing: 0 !important;
+}
+
+.glass-card,
+.compact-card,
+.card,
+.game-choice-card,
+.login-card,
+.financeiro-glass-card,
+.financeiro-summary-card,
+.financeiro-loan-panel,
+.financeiro-item-card,
+.notes-glass,
+.notes-metric,
+.note-item,
+.profile-card,
+.rp-glass-card,
+.table-card,
+.history-card,
+.participant-panel,
+.history-detail-card,
+.group-card,
+.group-card-modern,
+.ranking-shell,
+.ranking-top3-card,
+.ranking-highlight-card {
+  border-color: var(--copa-border) !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.54)),
+    var(--copa-glass) !important;
+  box-shadow: var(--copa-shadow) !important;
+  backdrop-filter: blur(22px) saturate(145%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(145%) !important;
+}
+
+.section-header,
+.financeiro-section-title,
+.card-header,
+.card-title-row,
+.live-player-header,
+.live-card-header,
+.rp-card-title,
+.rp-player-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.section-header h1,
+.section-header h2,
+.financeiro-section-title h2,
+.card-header h3,
+.card-title-row h2,
+.bracket-bar h2,
+.ranking-header-row h2,
+.live-player-header h2,
+.live-player-header h3,
+.live-card-header h2,
+.live-card-header h3 {
+  font-size: clamp(1.05rem, 1.6vw, var(--text-xl)) !important;
+  line-height: 1.12 !important;
+  letter-spacing: 0 !important;
+}
+
+.action-row,
+.financeiro-form-actions,
+.live-admin-actions,
+.history-actions,
+.rp-chat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.info-grid,
+.financeiro-secondary-metrics,
+.financeiro-mini-summary,
+.test-meta-grid,
+.ficha-stats-bar {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-sm) !important;
+}
+
+.compact-list,
+.participants-list,
+.history-list,
+.financeiro-card-list,
+.financeiro-history-list,
+.notes-list,
+.live-comments-list {
+  gap: var(--space-sm) !important;
+}
+
+.status-pill,
+.role-badge,
+.glass-pill,
+.live-badge,
+.live-small-badge,
+.financeiro-sync-status,
+.notes-pill,
+.participant-status,
+.rp-status-pill,
+.rp-badge,
+.rp-live-badge,
+.rp-mini-lock,
+.soon-pill {
+  min-height: 28px !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  font-size: var(--text-xs) !important;
+  font-weight: 850 !important;
+  letter-spacing: 0 !important;
+}
+
+.primary-action,
+.btn-primary,
+.btn.primary,
+.btn.success,
+.financeiro-button-primary,
+.notes-button-primary {
+  color: #fff !important;
+  background: linear-gradient(135deg, #0b5d3b, var(--copa-green)) !important;
+}
+
+.secondary-action,
+.btn-secondary,
+.btn.secondary,
+.btn-role,
+.financeiro-button-ghost,
+.notes-button-ghost {
+  color: var(--copa-green-dark) !important;
+  background: rgba(255, 255, 255, 0.62) !important;
+  border-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.btn,
+.financeiro-button,
+.notes-button,
+.notes-icon-button,
+.notes-icon-link,
+.icon-button,
+.history-button,
+.rp-btn,
+.game-switch-link,
+.topbar-game-choice,
+.live-google-button {
+  height: auto !important;
+  min-height: 38px !important;
+  padding: 8px 12px !important;
+  border-radius: var(--radius-md) !important;
+  font-size: var(--text-sm) !important;
+  font-weight: 850 !important;
+  line-height: 1.15 !important;
+  gap: 7px !important;
+}
+
+.btn.danger,
+.btn-red,
+.btn-red-outline,
+.btn-test-danger,
+.financeiro-exit,
+.notes-danger-soft,
+.history-button.danger {
+  color: #991b1b !important;
+  border-color: rgba(220, 38, 38, 0.22) !important;
+  background: rgba(254, 226, 226, 0.72) !important;
+}
+
+.field,
+.financeiro-form label,
+.live-admin-form .field,
+.rp-field {
+  gap: 5px !important;
+  margin-bottom: var(--space-sm) !important;
+}
+
+.field input,
+.field select,
+.field textarea,
+.input-group,
+.financeiro-input,
+.financeiro-select,
+.notes-search,
+.notes-filter-grid select,
+.notes-fields select,
+.notes-fields input,
+.rp-field input,
+.rp-field textarea,
+.live-comment-form input,
+.live-comment-form textarea,
+.live-admin-form input,
+.live-admin-form select,
+.live-admin-form textarea {
+  min-height: 38px !important;
+  border-radius: var(--radius-md) !important;
+  font-size: var(--text-sm) !important;
+}
+
+textarea,
+.field textarea,
+.financeiro-input:is(textarea),
+.rp-field textarea {
+  min-height: 76px !important;
+}
+
+.main-content {
+  padding: var(--space-lg) !important;
+  margin-top: 0 !important;
+}
+
+.hero-header {
+  margin-bottom: var(--space-sm) !important;
+}
+
+.hero-logos {
+  margin-bottom: var(--space-xs) !important;
+}
+
+.hero-logos img {
+  height: clamp(70px, 12vh, 104px) !important;
+}
+
+.hero-title {
+  font-size: clamp(2rem, 5vw, 2.65rem) !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  word-spacing: 0 !important;
+}
+
+.hero-subtitle,
+.choice-kicker,
+.financeiro-kicker,
+.notes-kicker,
+.eyebrow,
+.rp-eyebrow {
+  letter-spacing: 0 !important;
+}
+
+.login-card {
+  max-width: 392px !important;
+  padding: 22px !important;
+  border-radius: 26px !important;
+}
+
+.card-title {
+  margin-bottom: var(--space-xs) !important;
+  font-size: clamp(1.45rem, 3vw, 1.75rem) !important;
+  letter-spacing: 0 !important;
+}
+
+.card-subtitle {
+  margin-bottom: var(--space-lg) !important;
+  font-size: var(--text-sm) !important;
+}
+
+.login-form,
+.card-actions {
+  gap: var(--space-sm) !important;
+}
+
+.input-group {
+  height: 44px !important;
+  padding-inline: var(--space-md) !important;
+}
+
+.divider {
+  margin: var(--space-md) 0 !important;
+}
+
+.btn-row {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm) !important;
+  margin-top: 0 !important;
+}
+
+#screen-login .login-form,
+#screen-register .login-form,
+#screen-choice .card-actions {
+  margin-top: var(--space-md) !important;
+}
+
+.scroll-container {
+  gap: var(--space-sm) !important;
+  max-height: min(46vh, 420px) !important;
+}
+
+.footer {
+  padding: var(--space-md) var(--space-lg) !important;
+}
+
+.game-choice-page {
+  align-items: center !important;
+  padding: var(--space-lg) !important;
+}
+
+.game-choice-card {
+  width: min(100%, 700px) !important;
+  padding: 22px !important;
+  border-radius: 26px !important;
+}
+
+.choice-logo {
+  width: min(170px, 62vw) !important;
+  margin-bottom: var(--space-sm) !important;
+}
+
+.choice-header h1 {
+  margin-top: 0 !important;
+  font-size: clamp(2rem, 5vw, 2.8rem) !important;
+}
+
+.choice-header p {
+  margin: var(--space-sm) auto var(--space-lg) !important;
+  font-size: var(--text-sm) !important;
+}
+
+.game-list {
+  grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)) !important;
+  gap: var(--space-sm) !important;
+}
+
+.game-option {
+  min-height: 68px !important;
+  grid-template-columns: 48px minmax(0, 1fr) auto !important;
+  gap: var(--space-sm) !important;
+  padding: var(--space-sm) var(--space-md) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.game-icon {
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.game-icon::before {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.game-copy strong {
+  font-size: var(--text-md) !important;
+}
+
+.game-copy small,
+.game-copy em {
+  font-size: var(--text-xs) !important;
+}
+
+.choice-footer {
+  margin-top: var(--space-md) !important;
+}
+
+.back-link {
+  min-height: 38px !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.topbar {
+  min-height: 56px !important;
+  padding: 8px 16px !important;
+}
+
+.topbar-logo,
+.brand img {
+  height: 32px !important;
+  max-width: 104px !important;
+}
+
+.topbar-title h1,
+.brand strong {
+  font-size: 1rem !important;
+  line-height: 1.1 !important;
+}
+
+.topbar-right,
+.top-actions,
+.topbar-game-switch {
+  gap: var(--space-sm) !important;
+}
+
+.tabs-nav,
+.financeiro-tabs,
+.notes-tabs {
+  gap: 6px !important;
+  padding: 7px 16px !important;
+  border-radius: 0 !important;
+}
+
+.tab,
+.financeiro-tabs button,
+.notes-tabs button {
+  min-height: 36px !important;
+  padding: 7px 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+  font-size: var(--text-sm) !important;
+}
+
+.tab.active,
+.financeiro-tabs button.active,
+.notes-tabs button.active {
+  color: #052e1b !important;
+  border-color: rgba(22, 163, 74, 0.28) !important;
+  background: rgba(236, 253, 245, 0.82) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 8px 22px rgba(22, 163, 74, 0.10) !important;
+}
+
+.dashboard,
+.sinuca-shell {
+  height: calc(100dvh - 104px) !important;
+  max-width: 1680px !important;
+  gap: var(--space-md) !important;
+  padding: var(--space-md) var(--space-lg) !important;
+  overflow: hidden !important;
+}
+
+.sidebar {
+  flex-basis: 300px !important;
+  gap: var(--space-sm) !important;
+  max-height: calc(100dvh - 122px) !important;
+  padding-right: 4px !important;
+}
+
+.content-area {
+  gap: var(--space-md) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.tab-content {
+  min-height: 0 !important;
+  padding-right: 6px !important;
+  padding-bottom: var(--space-lg) !important;
+  overflow-y: auto !important;
+}
+
+.card,
+.glass-card,
+.participant-panel,
+.table-card,
+.history-card,
+.history-detail-card {
+  padding: var(--card-padding) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.card-header {
+  min-height: auto !important;
+  padding: 0 !important;
+}
+
+.card-body,
+.actions-grid,
+.live-admin-form,
+.participant-form,
+.participant-filters {
+  gap: var(--space-sm) !important;
+}
+
+.actions-grid,
+.live-admin-actions,
+.financeiro-form-actions {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+}
+
+.sidebar .card,
+.sidebar .glass-card {
+  padding: var(--card-padding-compact) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.sidebar .card-header h3,
+.sidebar .card-title-row h2 {
+  font-size: var(--text-sm) !important;
+}
+
+.sidebar .btn {
+  width: auto !important;
+}
+
+.groups-grid {
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)) !important;
+  gap: var(--space-md) !important;
+}
+
+.group-card,
+.group-card-modern {
+  border-radius: var(--radius-lg) !important;
+  padding: var(--card-padding) !important;
+}
+
+.group-title,
+.group-card-modern .group-title {
+  padding: 0 0 var(--space-sm) !important;
+  font-size: var(--text-sm) !important;
+}
+
+.table-container,
+.financeiro-table-wrap,
+#tab-ranking .table-responsive {
+  max-height: min(56vh, 620px) !important;
+  overflow: auto !important;
+  border-radius: var(--radius-md) !important;
+}
+
+table th,
+table td,
+.financeiro-table th,
+.financeiro-table td,
+.group-table th,
+.group-table td {
+  padding: 8px 10px !important;
+  font-size: var(--text-sm) !important;
+  line-height: 1.2 !important;
+}
+
+.match-card,
+.bracket-match,
+.next-phase-match-card {
+  border-radius: var(--radius-md) !important;
+}
+
+.match-team,
+.bracket-slot {
+  min-height: 44px !important;
+  padding: 8px 10px !important;
+}
+
+#tab-mata-mata .bracket-stage,
+#tab-mata-mata .knockout-panel {
+  min-height: calc(100dvh - 150px) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+#tab-mata-mata .bracket-toolbar,
+#tab-mata-mata .knockout-header {
+  padding: var(--space-lg) var(--space-lg) var(--space-sm) !important;
+}
+
+#tab-mata-mata .bracket-scroll,
+#tab-mata-mata .knockout-scroll-frame {
+  margin: 0 var(--space-md) var(--space-md) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+#tab-mata-mata .knockout-scroll-container,
+#tab-mata-mata .bracket-scroll .bracket-tree,
+#tab-mata-mata .bracket-tree {
+  min-height: 0 !important;
+}
+
+#tab-mata-mata .knockout-scroll-container {
+  padding: var(--space-md) !important;
+}
+
+#tab-mata-mata .bracket-round {
+  flex-basis: 250px !important;
+  min-width: 250px !important;
+  gap: var(--space-sm) !important;
+}
+
+#tab-mata-mata .bracket-round-matches {
+  gap: var(--space-md) !important;
+}
+
+#tab-mata-mata .match-card,
+#tab-mata-mata .bracket-match {
+  padding: 0 !important;
+  border-radius: var(--radius-md) !important;
+}
+
+#tab-mata-mata .bracket-match-head,
+#tab-mata-mata .match-header {
+  min-height: 36px !important;
+  padding: 8px 10px !important;
+}
+
+#tab-mata-mata .team-avatar {
+  width: 30px !important;
+  height: 30px !important;
+  flex-basis: 30px !important;
+}
+
+#tab-mata-mata .team-name-bracket,
+#tab-mata-mata .slot-player-name {
+  font-size: var(--text-sm) !important;
+}
+
+.ranking-shell {
+  padding: var(--card-padding) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.ranking-top3,
+.ranking-highlights {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+  gap: var(--space-sm) !important;
+}
+
+.ranking-top3-card,
+.ranking-highlight-card,
+.ranking-player-card,
+.ranking-list-item {
+  padding: var(--card-padding-compact) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.history-card,
+.financeiro-item-card,
+.note-item,
+.participant-item {
+  padding: var(--card-padding-compact) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.live-section {
+  gap: var(--space-md) !important;
+}
+
+.live-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr) !important;
+  gap: var(--space-md) !important;
+}
+
+.live-player-card,
+.live-current-match-card,
+.live-comments-card,
+.live-info-card,
+.live-admin-panel {
+  padding: var(--card-padding) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.live-video-wrapper,
+.live-video-shell {
+  border-radius: var(--radius-lg) !important;
+}
+
+.live-comments-list {
+  min-height: 220px !important;
+  max-height: min(46vh, 520px) !important;
+  margin-top: var(--space-sm) !important;
+}
+
+.financeiro-page,
+.notes-page {
+  width: min(100%, 1500px) !important;
+  gap: var(--space-md) !important;
+  padding: var(--space-md) !important;
+}
+
+.financeiro-header,
+.financeiro-section,
+.financeiro-toolbar,
+.financeiro-tabs,
+.financeiro-secondary-metrics,
+.notes-topbar,
+.notes-shell {
+  border-radius: var(--radius-lg) !important;
+}
+
+.financeiro-header {
+  padding: var(--card-padding) !important;
+}
+
+.financeiro-header-top {
+  margin-bottom: var(--space-sm) !important;
+}
+
+.financeiro-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 300px) !important;
+  gap: var(--space-md) !important;
+}
+
+.financeiro-header h1 {
+  margin-top: 2px !important;
+  font-size: clamp(1.65rem, 4vw, 2.6rem) !important;
+}
+
+.financeiro-header p {
+  margin-top: var(--space-xs) !important;
+  font-size: var(--text-sm) !important;
+}
+
+.financeiro-balance-pill {
+  min-height: 92px !important;
+  padding: var(--space-md) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.financeiro-balance-pill strong {
+  font-size: clamp(1.55rem, 3vw, 2.1rem) !important;
+}
+
+.financeiro-toolbar {
+  grid-template-columns: minmax(220px, 1fr) auto auto auto !important;
+  padding: var(--space-sm) !important;
+}
+
+.financeiro-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important;
+  gap: var(--space-sm) !important;
+}
+
+.financeiro-summary-card {
+  min-height: 108px !important;
+  padding: var(--card-padding) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.financeiro-summary-icon {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.financeiro-summary-card strong {
+  font-size: clamp(1.08rem, 1.8vw, 1.4rem) !important;
+}
+
+.financeiro-section {
+  padding: var(--card-padding) !important;
+}
+
+.financeiro-form,
+.financeiro-filters {
+  gap: var(--space-sm) !important;
+}
+
+.financeiro-duo-grid,
+.financeiro-loan-grid {
+  gap: var(--space-md) !important;
+}
+
+.financeiro-card-list {
+  max-height: min(48vh, 520px) !important;
+  overflow: auto !important;
+}
+
+.financeiro-item-card {
+  gap: var(--space-sm) !important;
+}
+
+.notes-page {
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
+}
+
+.notes-topbar {
+  min-height: 58px !important;
+  padding: var(--space-sm) !important;
+  gap: var(--space-sm) !important;
+}
+
+.notes-brand h1 {
+  font-size: clamp(1.35rem, 2.7vw, 2rem) !important;
+}
+
+.notes-metrics {
+  gap: var(--space-sm) !important;
+}
+
+.notes-metric {
+  min-height: 64px !important;
+  padding: var(--card-padding-compact) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.notes-shell {
+  min-height: 0 !important;
+}
+
+.notes-sidebar {
+  padding: var(--space-md) !important;
+}
+
+.notes-sidebar-head strong {
+  font-size: clamp(1.35rem, 2.4vw, 1.8rem) !important;
+}
+
+.notes-editor-panel {
+  gap: var(--space-sm) !important;
+  padding: var(--space-md) !important;
+}
+
+.notes-title-input {
+  min-height: 48px !important;
+  font-size: clamp(1.45rem, 3vw, 2.1rem) !important;
+}
+
+.notes-toolbar {
+  padding: var(--space-xs) !important;
+  gap: var(--space-xs) !important;
+}
+
+.notes-toolbar button,
+.notes-editor-actions button {
+  width: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+}
+
+.notes-editor {
+  padding: var(--space-lg) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.ficha-topbar {
+  padding: var(--space-sm) var(--space-lg) !important;
+}
+
+.ficha-topbar h1 {
+  font-size: var(--text-lg) !important;
+}
+
+.ficha-stats-bar,
+.ficha-search,
+.fichas-container {
+  padding-inline: var(--space-lg) !important;
+}
+
+.ficha-stats-bar {
+  padding-block: var(--space-md) !important;
+}
+
+.ficha-stat {
+  min-width: 150px !important;
+  padding: var(--card-padding-compact) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.fichas-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+  gap: var(--space-md) !important;
+}
+
+.ficha-card {
+  gap: var(--space-sm) !important;
+  padding: var(--card-padding) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.ficha-avatar {
+  width: 52px !important;
+  height: 52px !important;
+}
+
+.profile-wrapper {
+  max-width: 460px !important;
+  padding: var(--space-md) !important;
+}
+
+.profile-card {
+  gap: var(--space-lg) !important;
+  padding: var(--space-xl) var(--space-lg) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.background-blob {
+  display: none !important;
+}
+
+.avatar-wrapper {
+  width: 82px !important;
+  height: 82px !important;
+}
+
+.main-badges,
+.stats-grid {
+  gap: var(--space-sm) !important;
+}
+
+.main-badges,
+.stat-box {
+  padding: var(--card-padding-compact) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.rp-topbar {
+  min-height: 56px !important;
+  padding: 8px 16px !important;
+}
+
+.rp-shell {
+  gap: var(--space-md) !important;
+  padding: var(--space-md) var(--space-lg) !important;
+}
+
+.rp-session-header {
+  gap: var(--space-md) !important;
+}
+
+.rp-title-block h1 {
+  font-size: clamp(1.7rem, 4vw, 2.5rem) !important;
+}
+
+.rp-title-block p {
+  margin-top: var(--space-xs) !important;
+  font-size: var(--text-sm) !important;
+}
+
+.rp-watch-layout {
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr) !important;
+  gap: var(--space-md) !important;
+}
+
+.rp-player-heading,
+.rp-player-footer,
+.rp-card-title,
+.rp-chat-header {
+  padding: var(--space-md) !important;
+}
+
+.rp-organizer-panel,
+.rp-chat-panel {
+  padding: var(--card-padding) !important;
+}
+
+@media (max-width: 1100px) {
+  .dashboard,
+  .sinuca-shell {
+    height: calc(100dvh - 104px) !important;
+  }
+
+  .sidebar {
+    flex-basis: 280px !important;
+  }
+
+  .live-grid,
+  .rp-watch-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .financeiro-hero,
+  .financeiro-toolbar {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    min-height: 54px !important;
+  }
+
+  .dashboard,
+  .sinuca-shell {
+    height: auto !important;
+    min-height: calc(100dvh - 100px) !important;
+    display: block !important;
+    padding: var(--space-sm) !important;
+    overflow: visible !important;
+  }
+
+  .content-area,
+  .tab-content {
+    overflow: visible !important;
+  }
+
+  .sidebar {
+    max-height: calc(100dvh - 80px) !important;
+  }
+
+  .tabs-nav {
+    padding-inline: var(--space-sm) !important;
+  }
+
+  .tab {
+    min-height: 34px !important;
+    padding: 6px 10px !important;
+  }
+
+  .topbar-game-switch {
+    display: none !important;
+  }
+
+  .live-side-column {
+    margin-top: 0 !important;
+    padding: 0 !important;
+    pointer-events: auto !important;
+  }
+
+  .notes-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto auto !important;
+  }
+
+  .notes-edition-picker,
+  .notes-pill {
+    display: none !important;
+  }
+
+  .rp-session-header,
+  .section-header,
+  .financeiro-section-title {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .main-content {
+    justify-content: flex-start !important;
+    padding: var(--space-sm) !important;
+  }
+
+  .hero-logos img {
+    height: 68px !important;
+  }
+
+  .login-card,
+  .game-choice-card {
+    max-width: 100% !important;
+    padding: var(--card-padding) !important;
+    border-radius: var(--radius-lg) !important;
+  }
+
+  .card-title,
+  .choice-header h1 {
+    font-size: clamp(1.5rem, 8vw, 2rem) !important;
+  }
+
+  .game-list,
+  .groups-grid,
+  .financeiro-summary-grid,
+  .fichas-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .game-option {
+    min-height: 60px !important;
+    grid-template-columns: 44px minmax(0, 1fr) !important;
+  }
+
+  .game-option > .ph-arrow-right,
+  .soon-pill {
+    grid-column: auto !important;
+  }
+
+  .btn-row,
+  .actions-grid,
+  .financeiro-form-actions,
+  .live-admin-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .btn,
+  .financeiro-button,
+  .notes-button,
+  .rp-btn {
+    min-height: 40px !important;
+    padding-inline: 10px !important;
+    white-space: normal !important;
+  }
+
+  #tab-mata-mata .bracket-tree {
+    gap: var(--space-md) !important;
+  }
+
+  #tab-mata-mata .bracket-round {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .financeiro-page,
+  .notes-page,
+  .rp-shell {
+    padding: var(--space-sm) !important;
+    gap: var(--space-sm) !important;
+  }
+
+  .financeiro-header,
+  .financeiro-section,
+  .financeiro-toolbar,
+  .financeiro-tabs,
+  .notes-shell,
+  .notes-topbar {
+    border-radius: var(--radius-md) !important;
+  }
+
+  .ficha-stats-bar,
+  .ficha-search,
+  .fichas-container {
+    padding-inline: var(--space-sm) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .btn-row,
+  .actions-grid,
+  .financeiro-form-actions,
+  .live-admin-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  table th,
+  table td {
+    padding: 7px 8px !important;
+  }
+}
+
+/* Vertical scroll repair */
+html {
+  height: auto !important;
+  min-height: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+body:not(.rp-chat-fullscreen) {
+  height: auto !important;
+  min-height: 100dvh !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.dashboard,
+.sinuca-shell {
+  height: auto !important;
+  min-height: calc(100dvh - 104px) !important;
+  overflow: visible !important;
+  align-items: flex-start !important;
+}
+
+.content-area,
+.tab-content {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+}
+
+.tab-content.active {
+  overflow-y: visible !important;
+}
+
+.sidebar {
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+
+.financeiro-page,
+.notes-page,
+.rp-page {
+  height: auto !important;
+  min-height: 100dvh !important;
+  overflow: visible !important;
+}
+
+.notes-shell,
+.notes-sidebar,
+.notes-editor-area,
+.notes-editor-panel {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+.game-choice-card {
+  max-height: none !important;
+}
+
+#tab-mata-mata .bracket-scroll,
+#tab-mata-mata .knockout-scroll-frame,
+#tab-mata-mata .knockout-scroll-container,
+.table-container,
+.financeiro-table-wrap,
+.financeiro-card-list,
+.live-comments-list,
+.notes-list,
+.notes-editor {
+  -webkit-overflow-scrolling: touch;
+}

@@ -257,39 +257,6 @@ body {
     font-weight: 850;
 }
 
-.organizer-tools {
-    display: grid;
-    gap: 8px;
-}
-
-.organizer-access {
-    min-height: 42px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    border-radius: 999px;
-    border: 1px solid rgba(22, 163, 74, 0.28);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(236, 253, 245, 0.62));
-    color: #0B5D3B;
-    font-family: inherit;
-    font-weight: 900;
-    cursor: pointer;
-    box-shadow: 0 10px 24px rgba(4, 45, 21, 0.08), inset 0 1px 0 rgba(255,255,255,0.78);
-}
-
-.organizer-access:hover {
-    border-color: rgba(37, 99, 235, 0.32);
-    transform: translateY(-1px);
-}
-
-.organizer-exit {
-    color: #7f1d1d;
-    border-color: rgba(239, 68, 68, 0.22);
-    background: rgba(255, 255, 255, 0.58);
-}
-
 @media (max-width: 640px) {
     body {
         background-image: url('imgs/imagem de fundo-mobile.webp');
@@ -391,8 +358,7 @@ body {
         gap: 8px;
     }
 
-    .back-link,
-    .organizer-access {
+    .back-link {
         min-height: 38px;
         font-size: 13px;
     }
@@ -442,8 +408,7 @@ body {
         margin-top: 8px;
     }
 
-    .back-link,
-    .organizer-access {
+    .back-link {
         min-height: 34px;
     }
 }

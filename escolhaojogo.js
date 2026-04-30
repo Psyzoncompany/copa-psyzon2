@@ -3,8 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const role = params.get('role') || localStorage.getItem('copaRole') || 'visitante';
     let safeRole = ['organizador', 'visitante', 'apostador', 'participante'].includes(role) ? role : 'visitante';
     const financeButton = document.getElementById('financeiro-option');
-    const organizerAccessButton = document.getElementById('btn-organizer-access');
-    const organizerExitButton = document.getElementById('btn-organizer-exit');
 
     localStorage.setItem('copaRole', safeRole);
 
@@ -24,8 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function showFinanceiroOnlyForOrganizer() {
         const allowed = isOrganizerSession();
         if (financeButton) financeButton.hidden = !allowed;
-        if (organizerAccessButton) organizerAccessButton.hidden = true;
-        if (organizerExitButton) organizerExitButton.hidden = !allowed;
     }
 
     document.querySelectorAll('.game-option:not(.disabled)').forEach(button => {
@@ -37,15 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = routes[game];
         });
     });
-
-    if (organizerExitButton) {
-        organizerExitButton.addEventListener('click', () => {
-            sessionStorage.removeItem('copaPsyzonOrganizer');
-            safeRole = 'visitante';
-            localStorage.setItem('copaRole', 'visitante');
-            showFinanceiroOnlyForOrganizer();
-        });
-    }
 
     showFinanceiroOnlyForOrganizer();
 });

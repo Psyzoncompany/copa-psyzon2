@@ -1251,7 +1251,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getYouTubeEmbedUrl(url) {
         const id = extractYouTubeVideoId(url);
-        return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/embed/${id}` : '';
+        return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : '';
     }
 
     function getYouTubeWatchUrl(url) {
