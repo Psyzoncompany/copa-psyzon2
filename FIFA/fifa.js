@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let livePlayerMuted = false;
     let livePlayerPlaying = false;
     let liveControlsHideTimer = null;
+    const KNOCKOUT_VIEW_STORAGE_KEY = 'copaPsyzon_knockoutViewMode';
+    let knockoutViewMode = localStorage.getItem(KNOCKOUT_VIEW_STORAGE_KEY) === 'list' ? 'list' : 'tree';
 
     document.querySelectorAll('[data-game-switch]').forEach(link => {
         const game = link.dataset.gameSwitch;
@@ -2918,7 +2920,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     warningHTML += `<div class="knockout-warning-banner knockout-alert"><i class="ph ph-warning-circle"></i><span>Repescagem pendente: edite os resultados para liberar a próxima fase.</span></div>`;
                 }
 
-                let bracketHTML = `<div class="mata-mata-tab knockout-panel bracket-stage fifa-bracket-stage">
+                const viewToggleHTML = `<div class="knockout-view-toggle" role="group" aria-label="Formato do mata-mata">
+                    <button type="button" class="${knockoutViewMode === 'tree' ? 'active' : ''}" data-knockout-view="tree"><i class="ph ph-tree-structure"></i> Arvore</button>
+                    <button type="button" class="${knockoutViewMode === 'list' ? 'active' : ''}" data-knockout-view="list"><i class="ph ph-list-bullets"></i> Lista</button>
+                </div>`;
+
+                let bracketHTML = `<div class="mata-mata-tab knockout-panel bracket-stage fifa-bracket-stage knockout-view-${knockoutViewMode}">
                     <div class="bracket-overlay"></div>
                     <div class="knockout-header bracket-toolbar">
                         <div class="knockout-header-copy">
@@ -2931,11 +2938,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <span class="knockout-pill glass-pill"><i class="ph ph-flag"></i> Fase atual: ${currentPhase}</span>
                             ${champion ? `<span class="knockout-pill glass-pill champion"><i class="ph-fill ph-trophy"></i> Campeão: ${formatName(champion)}</span>` : ''}
                         </div>
+                        ${viewToggleHTML}
                     </div>
                     ${warningHTML}
                     <div class="knockout-scroll-indicator"><i class="ph ph-arrows-left-right"></i>${window.matchMedia('(max-width: 768px)').matches ? 'Fases eliminatórias' : 'Linha de fases do mata-mata'}</div>
                     <div class="knockout-scroll-frame bracket-scroll"><div class="knockout-scroll-container" tabindex="0" aria-label="Chaveamento mata-mata"><div class="bracket-container bracket-tree knockout-track${isKnockoutPreview ? ' preview-mode' : ''}">
-                    ${isKnockoutPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}`;
+                    `;
 
                 function playerBadge(name) {
                     const cleaned = formatName(displayParticipantName(name || 'A definir'));
@@ -3071,6 +3079,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 bracketHTML += `</div></div></div></div>`;
                 mataMataContainer.innerHTML = bracketHTML;
                 setupKnockoutScrollInteractions(mataMataContainer);
+                mataMataContainer.querySelectorAll('[data-knockout-view]').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const nextMode = button.dataset.knockoutView === 'list' ? 'list' : 'tree';
+                        knockoutViewMode = nextMode;
+                        localStorage.setItem(KNOCKOUT_VIEW_STORAGE_KEY, nextMode);
+                        const panel = mataMataContainer.querySelector('.knockout-panel');
+                        if (panel) {
+                            panel.classList.toggle('knockout-view-tree', nextMode === 'tree');
+                            panel.classList.toggle('knockout-view-list', nextMode === 'list');
+                        }
+                        mataMataContainer.querySelectorAll('[data-knockout-view]').forEach(viewButton => {
+                            viewButton.classList.toggle('active', viewButton.dataset.knockoutView === nextMode);
+                        });
+                    });
+                });
 
                 // Add Listeners
                 if (!isKnockoutPreview) {

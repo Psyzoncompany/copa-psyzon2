@@ -27,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const RESET_CODE_PASSWORD = '153090';
     const RP_PRIVATE_PASSWORD = 'Ro153090';
     const VALID_SIZES = [2, 4, 8, 16, 32, 64];
+    const KNOCKOUT_VIEW_STORAGE_KEY = 'copaPsyzon_knockoutViewMode';
+    let knockoutViewMode = localStorage.getItem(KNOCKOUT_VIEW_STORAGE_KEY) === 'list' ? 'list' : 'tree';
 
     function createDefaultLiveState() {
         return {
@@ -944,6 +946,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isPreview) normalizeAutoAdvances();
         const container = $('#bracket-container');
         const alerts = $('#knockout-alerts');
+        const panel = $('#tab-mata-mata .knockout-panel');
+        if (panel) {
+            panel.classList.toggle('knockout-view-tree', knockoutViewMode === 'tree');
+            panel.classList.toggle('knockout-view-list', knockoutViewMode === 'list');
+        }
+        $$('[data-knockout-view]').forEach(button => {
+            button.classList.toggle('active', button.dataset.knockoutView === knockoutViewMode);
+        });
 
         const activeBracket = isPreview ? createBracketPreview() : state.bracket;
         const activeChampion = isPreview ? null : state.champion;
@@ -964,7 +974,6 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         };
         container.innerHTML = `<div class="bracket-tree${isPreview ? ' preview-mode' : ''}">
-            ${isPreview ? '<div class="preview-badge">PREVIEW</div>' : ''}
             ${activeBracket.rounds.map((round, rIdx) => `
                 <section class="phase-column bracket-round" style="--slot:${slotBase * (2 ** rIdx)}px">
                     <div class="phase-title bracket-round-title">
@@ -1961,6 +1970,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const winButton = event.target.closest('[data-winner]');
         if (winButton) defineWinner(Number(winButton.dataset.r), Number(winButton.dataset.m), winButton.dataset.winner);
+
+        const viewButton = event.target.closest('[data-knockout-view]');
+        if (viewButton) {
+            knockoutViewMode = viewButton.dataset.knockoutView === 'list' ? 'list' : 'tree';
+            localStorage.setItem(KNOCKOUT_VIEW_STORAGE_KEY, knockoutViewMode);
+            renderBracket();
+            return;
+        }
 
         const deleteHistoryButton = event.target.closest('[data-history-delete]');
         if (deleteHistoryButton) {
