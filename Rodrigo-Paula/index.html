@@ -45,7 +45,7 @@
                 </div>
 
                 <div class="rp-session-badges">
-                    <span id="syncStatus" class="rp-badge">
+                    <span id="sync-status" class="rp-badge">
                         <i class="ph-fill ph-arrows-clockwise"></i>
                         <span>Conectando...</span>
                     </span>
@@ -68,9 +68,7 @@
                         </div>
 
                         <div class="rp-video-frame" id="videoFrame">
-                            <video id="moviePlayer" controls playsinline preload="metadata" controlslist="nodownload noplaybackrate">
-                                Seu navegador não suporta vídeo HTML5.
-                            </video>
+                            <div id="video-container" class="rp-video-container"></div>
 
                             <div id="videoNotice" class="rp-video-notice">
                                 <i class="ph-fill ph-play-circle"></i>
@@ -124,13 +122,28 @@
                             </label>
 
                             <label class="rp-field rp-field-wide">
-                                <span>Link MP4 do filme</span>
-                                <input id="videoUrlInput" type="url" autocomplete="off" placeholder="https://exemplo.com/filme.mp4">
+                                <span>Link do filme</span>
+                                <input id="videoUrlInput" type="url" autocomplete="off" placeholder="Cole link MP4, Google Drive, Mega ou página externa">
                             </label>
+
+                            <div id="mediaStatusCard" class="rp-media-status rp-field-wide">
+                                <div>
+                                    <span>Tipo</span>
+                                    <strong id="mediaStatusType">Aguardando link</strong>
+                                </div>
+                                <div>
+                                    <span>Modo</span>
+                                    <strong id="mediaStatusMode">Não carregado</strong>
+                                </div>
+                                <div>
+                                    <span>Sincronização</span>
+                                    <strong id="mediaStatusSync" class="rp-status-neutral">Aguardando</strong>
+                                </div>
+                            </div>
 
                             <button class="rp-btn rp-btn-primary" type="submit">
                                 <i class="ph-fill ph-film-strip"></i>
-                                Atualizar filme
+                                Carregar filme
                             </button>
                             <button id="sharePaulaButton" class="rp-btn rp-btn-rose" type="button">
                                 <i class="ph-fill ph-heart"></i>
@@ -141,6 +154,43 @@
                                 Copiar link da sala
                             </button>
                         </form>
+
+                        <section class="rp-upload-card" aria-label="Enviar filme">
+                            <div class="rp-upload-heading">
+                                <div>
+                                    <span class="rp-eyebrow">Upload</span>
+                                    <h3>Enviar filme</h3>
+                                </div>
+                                <span class="rp-upload-limit">Limite 1GB</span>
+                            </div>
+
+                            <label class="rp-upload-drop" for="uploadFileInput">
+                                <i class="ph-fill ph-cloud-arrow-up"></i>
+                                <span>Selecionar arquivo de vídeo</span>
+                                <small>MP4, WebM, OGG, MOV, MKV ou AVI</small>
+                                <input id="uploadFileInput" type="file" accept=".mp4,.webm,.ogg,.mov,.mkv,.avi,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo">
+                            </label>
+
+                            <div class="rp-upload-meta">
+                                <strong id="uploadFileName">Nenhum arquivo selecionado</strong>
+                                <span id="uploadFileSize">Escolha um filme para enviar.</span>
+                            </div>
+
+                            <p id="uploadWarning" class="rp-upload-warning" hidden></p>
+
+                            <div class="rp-upload-progress" aria-label="Progresso do upload">
+                                <span id="uploadProgress"></span>
+                            </div>
+                            <div class="rp-upload-footer">
+                                <span id="uploadStatus">Aguardando arquivo</span>
+                                <strong id="uploadProgressText">0%</strong>
+                            </div>
+
+                            <button id="uploadButton" class="rp-btn rp-btn-primary" type="button" disabled>
+                                <i class="ph-fill ph-upload-simple"></i>
+                                Enviar filme
+                            </button>
+                        </section>
                         <p id="settingsFeedback" class="rp-feedback" role="status"></p>
                     </article>
                 </div>

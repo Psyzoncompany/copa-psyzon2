@@ -1411,8 +1411,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (iframe) {
             if (embedUrl) {
                 const origin = encodeURIComponent(window.location.origin);
-                const playerUrl = `${embedUrl}?enablejsapi=1&origin=${origin}&rel=0&modestbranding=1&controls=0&playsinline=1`;
-                if (iframe.src !== playerUrl) iframe.src = playerUrl;
+                const playerUrl = `${embedUrl}?enablejsapi=1&origin=${origin}&rel=0&modestbranding=1&controls=0&playsinline=1&autoplay=1&mute=1`;
+                if (iframe.src !== playerUrl) {
+                    iframe.src = playerUrl;
+                    livePlayerMuted = true;
+                    livePlayerPlaying = true;
+                }
                 iframe.hidden = false;
             } else {
                 if (iframe.src) iframe.src = '';
@@ -1558,6 +1562,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderLiveInfo() {
         const live = ensureLiveState();
         const embedUrl = getYouTubeEmbedUrl(live.youtubeUrl);
+        const infoCard = $('.live-info-card');
+        const playerHeader = $('.live-player-header');
+        if (infoCard) infoCard.hidden = !isOrganizer;
+        if (playerHeader) playerHeader.hidden = !isOrganizer;
         setLiveText('liveSectionStatus', live.enabled ? 'AO VIVO' : 'Offline');
         setLiveText('liveInfoStatus', live.enabled ? 'Ao vivo agora' : (embedUrl ? 'Offline' : 'Nao configurada'));
         setLiveText('liveInfoPlayer', embedUrl ? 'YouTube pronto' : 'Sem link');
@@ -1826,7 +1834,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function switchTab(tabName) {
         $$('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabName));
         $$('.tab-content').forEach(content => content.classList.toggle('active', content.id === `tab-${tabName}`));
-        if (tabName === 'ao-vivo') renderLiveSection();
+        if (tabName === 'ao-vivo') {
+            renderLiveSection();
+            setTimeout(() => postLivePlayerCommand('playVideo'), 350);
+        }
     }
 
     function getInitialTab() {

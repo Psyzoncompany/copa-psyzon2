@@ -1132,8 +1132,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (iframe) {
             if (embedUrl) {
                 const origin = encodeURIComponent(window.location.origin);
-                const playerUrl = `${embedUrl}?enablejsapi=1&origin=${origin}&rel=0&modestbranding=1&controls=0&playsinline=1`;
-                if (iframe.src !== playerUrl) iframe.src = playerUrl;
+                const playerUrl = `${embedUrl}?enablejsapi=1&origin=${origin}&rel=0&modestbranding=1&controls=0&playsinline=1&autoplay=1&mute=1`;
+                if (iframe.src !== playerUrl) {
+                    iframe.src = playerUrl;
+                    livePlayerMuted = true;
+                    livePlayerPlaying = true;
+                }
                 iframe.hidden = false;
             } else {
                 if (iframe.src) iframe.src = '';
@@ -1210,6 +1214,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderLiveInfo() {
         const live = ensureLiveState();
         const embedUrl = getYouTubeEmbedUrl(live.youtubeUrl);
+        const infoCard = document.querySelector('.live-info-card');
+        const playerHeader = document.querySelector('.live-player-header');
+        if (infoCard) infoCard.hidden = role !== 'organizador';
+        if (playerHeader) playerHeader.hidden = role !== 'organizador';
         const status = live.enabled ? 'Ao vivo agora' : (embedUrl ? 'Offline' : 'Nao configurada');
         const player = embedUrl ? 'YouTube pronto' : 'Sem link';
         const comments = live.commentsEnabled ? 'Ativados' : 'Desativados';
@@ -3207,6 +3215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             if (tabId === 'ao-vivo') {
                 renderLiveSection();
+                setTimeout(() => postLivePlayerCommand('playVideo'), 350);
             }
             renderContextualTestToolbars();
         });

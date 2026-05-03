@@ -5853,8 +5853,25 @@ body {
         gap: 16px;
     }
 
+    .live-side-column {
+        position: relative;
+        z-index: 6;
+        margin-top: -210px;
+        padding: 0 12px 12px;
+        pointer-events: none;
+    }
+
+    .live-comments-card {
+        max-height: min(68vh, 520px);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.78);
+        box-shadow: 0 24px 70px rgba(4, 45, 21, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.84);
+        pointer-events: auto;
+    }
+
     .live-comments-list {
-        max-height: none;
+        min-height: 220px;
+        max-height: 38vh;
     }
 }
 
@@ -5946,5 +5963,17 @@ body {
 
     .live-player-name {
         font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 900px) {
+    body {
+        background-attachment: fixed !important;
+    }
+
+    .live-custom-controls {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
     }
 }

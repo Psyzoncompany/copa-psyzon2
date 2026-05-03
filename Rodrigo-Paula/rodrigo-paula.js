@@ -11,6 +11,12 @@ import {
     limitToLast,
     onDisconnect
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import {
+    getStorage,
+    ref as storageRef,
+    uploadBytesResumable,
+    getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCL2u-oSlw8EWQ96atPI9Tc-0cIl2k9K6M",
@@ -31,6 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const TIME_SYNC_THRESHOLD = 1.2;
     const TIME_UPDATE_THROTTLE = 4500;
     const PRESENCE_INTERVAL = 25000;
+    const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
+    const ALLOWED_UPLOAD_EXTENSIONS = [".mp4", ".webm", ".ogg", ".mov", ".mkv", ".avi"];
 
     const params = new URLSearchParams(window.location.search);
     const isHost = String(params.get("host") || "").toLowerCase() === "rodrigo";
@@ -41,11 +49,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const els = {
         connectionBadge: $("#connectionBadge"),
         roomBadge: $("#roomBadge"),
-        syncStatus: $("#syncStatus"),
+        syncStatus: $("#sync-status"),
         participantsBadge: $("#participantsBadge"),
         movieTitleDisplay: $("#movieTitleDisplay"),
         playerStateBadge: $("#playerStateBadge"),
-        moviePlayer: $("#moviePlayer"),
+        videoContainer: $("#video-container"),
+        moviePlayer: null,
         videoNotice: $("#videoNotice"),
         videoErrorCard: $("#videoErrorCard"),
         retryVideoButton: $("#retryVideoButton"),
@@ -57,6 +66,17 @@ document.addEventListener("DOMContentLoaded", () => {
         sharePaulaButton: $("#sharePaulaButton"),
         copyRoomButton: $("#copyRoomButton"),
         settingsFeedback: $("#settingsFeedback"),
+        uploadFileInput: $("#uploadFileInput"),
+        uploadFileName: $("#uploadFileName"),
+        uploadFileSize: $("#uploadFileSize"),
+        uploadWarning: $("#uploadWarning"),
+        uploadButton: $("#uploadButton"),
+        uploadProgress: $("#uploadProgress"),
+        uploadProgressText: $("#uploadProgressText"),
+        uploadStatus: $("#uploadStatus"),
+        mediaStatusType: $("#mediaStatusType"),
+        mediaStatusMode: $("#mediaStatusMode"),
+        mediaStatusSync: $("#mediaStatusSync"),
         chatPanel: $("#chatPanel"),
         toggleChatButton: $("#toggleChatButton"),
         hideChatButton: $("#hideChatButton"),
@@ -73,11 +93,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     let db = null;
+    let storage = null;
     let firebaseReady = false;
     let appStarted = false;
     let roomId = sanitizeRoomId(params.get("room"));
     let currentRoom = null;
     let currentVideoUrl = "";
+    let currentMediaType = "direct";
+    let iframeLoadTimer = null;
     let roomMissing = false;
     let userName = "";
     let userKey = "";
@@ -101,6 +124,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let isChatHidden = false;
     let isChatFullscreen = false;
     let messageItems = [];
+    let selectedUploadFile = null;
+    let uploadTask = null;
 
     initFirebase();
     setupEvents();
@@ -110,6 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const app = initializeApp(firebaseConfig);
             db = getDatabase(app);
+            storage = getStorage(app);
             firebaseReady = true;
         } catch (error) {
             firebaseReady = false;
@@ -131,6 +157,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         els.sharePaulaButton?.addEventListener("click", shareWithPaula);
         els.copyRoomButton?.addEventListener("click", copyRoomLink);
+        els.uploadFileInput?.addEventListener("change", handleUploadSelection);
+        els.uploadButton?.addEventListener("click", uploadSelectedMovie);
 
         els.chatForm?.addEventListener("submit", (event) => {
             event.preventDefault();
@@ -167,11 +195,9 @@ document.addEventListener("DOMContentLoaded", () => {
             startApp();
         });
 
-        setupVideoEvents();
     }
 
-    function setupVideoEvents() {
-        const video = els.moviePlayer;
+    function setupSync(video) {
         if (!video) return;
 
         video.addEventListener("loadedmetadata", () => {
@@ -223,9 +249,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         video.addEventListener("error", () => {
-            showVideoError("Não foi possível carregar o vídeo. Verifique o link MP4 e tente novamente.");
+            showVideoError("Não foi possível carregar o vídeo. Verifique o link direto e tente novamente.");
             setSyncStatus("Erro ao carregar vídeo", "warning");
-            showToast("Erro ao carregar vídeo", "O player não conseguiu abrir esse MP4.", "error");
+            showToast("Erro ao carregar vídeo", "O player não conseguiu abrir esse link direto.", "error");
         });
     }
 
@@ -315,13 +341,303 @@ document.addEventListener("DOMContentLoaded", () => {
             .slice(0, maxLength);
     }
 
-    function isValidMp4Url(value) {
+    function getMediaType(value) {
+        const url = String(value || "").toLowerCase();
+        return [".mp4", ".m3u8", ".webm", ".ogg"].some((extension) => url.includes(extension))
+            ? "direct"
+            : "iframe";
+    }
+
+    function isGoogleDriveUrl(value) {
         try {
             const parsed = new URL(String(value || "").trim());
-            return ["http:", "https:"].includes(parsed.protocol) && /\.mp4$/i.test(parsed.pathname);
+            return parsed.hostname.replace(/^www\./, "").toLowerCase() === "drive.google.com";
         } catch (_) {
             return false;
         }
+    }
+
+    function isYouFilesUrl(value) {
+        try {
+            const parsed = new URL(String(value || "").trim());
+            return parsed.hostname.replace(/^www\./, "").toLowerCase() === "youfiles.herokuapp.com";
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function isGoogleDriveFolderUrl(value) {
+        try {
+            const parsed = new URL(String(value || "").trim());
+            return parsed.hostname.replace(/^www\./, "").toLowerCase() === "drive.google.com"
+                && parsed.pathname.includes("/drive/folders/");
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function extractGoogleDriveFileId(value) {
+        try {
+            const parsed = new URL(String(value || "").trim());
+            const fileMatch = parsed.pathname.match(/\/file\/d\/([^/]+)/);
+            if (fileMatch?.[1]) return fileMatch[1];
+            const id = parsed.searchParams.get("id");
+            return id || null;
+        } catch (_) {
+            const fileMatch = String(value || "").match(/\/file\/d\/([^/?#]+)/);
+            return fileMatch?.[1] || null;
+        }
+    }
+
+    function buildGoogleDriveLinks(originalUrl, fileId) {
+        return {
+            originalUrl,
+            provider: "google-drive",
+            fileId,
+            directUrl: `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`,
+            embedUrl: `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`,
+            viewUrl: `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`
+        };
+    }
+
+    function extractYouFilesGoogleDriveFileId(value) {
+        try {
+            const parsed = new URL(String(value || "").trim());
+            const rawState = parsed.searchParams.get("state");
+            if (!rawState) return null;
+            const decoded = decodeURIComponent(rawState);
+            const state = JSON.parse(decoded);
+            const id = Array.isArray(state?.ids) ? state.ids[0] : null;
+            return typeof id === "string" && id.trim() ? id.trim() : null;
+        } catch (error) {
+            console.warn("Não foi possível extrair ID do YouFiles:", error);
+            return null;
+        }
+    }
+
+    function toMegaEmbedUrl(value) {
+        try {
+            const parsed = new URL(String(value || "").trim());
+            if (!parsed.hostname.toLowerCase().includes("mega.")) return "";
+            return parsed.href.replace("/file/", "/embed/");
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function isValidMediaUrl(value) {
+        try {
+            const parsed = new URL(String(value || "").trim());
+            return ["http:", "https:"].includes(parsed.protocol);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function isHtml5Playable(fileType, fileName) {
+        const type = String(fileType || "").toLowerCase();
+        const name = String(fileName || "").toLowerCase();
+        if (["video/mp4", "video/webm", "video/ogg"].includes(type)) return true;
+        if ([".mp4", ".webm", ".ogg"].some((extension) => name.endsWith(extension))) return true;
+        if (type === "video/quicktime" || name.endsWith(".mov")) return "warning";
+        if (name.endsWith(".mkv") || name.endsWith(".avi") || type.includes("matroska") || type.includes("x-msvideo")) return "warning";
+        return "warning";
+    }
+
+    function getUploadWarning(file) {
+        const playable = isHtml5Playable(file?.type, file?.name);
+        if (playable === true) return "";
+        return "Seu navegador pode não reproduzir este formato. Para melhor sincronização, use MP4 H.264.";
+    }
+
+    function isAllowedUploadFile(fileName) {
+        const name = String(fileName || "").toLowerCase();
+        return ALLOWED_UPLOAD_EXTENSIONS.some((extension) => name.endsWith(extension));
+    }
+
+    function formatBytes(bytes) {
+        const value = Number(bytes) || 0;
+        if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(2)} GB`;
+        if (value >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(1)} MB`;
+        if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
+        return `${value} B`;
+    }
+
+    function safeStorageFileName(name) {
+        const clean = String(name || "filme")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-zA-Z0-9._-]+/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-+|-+$/g, "");
+        return clean || "filme";
+    }
+
+    function validatePlayableVideo(url) {
+        return new Promise((resolve) => {
+            const video = document.createElement("video");
+            let settled = false;
+            const finish = (result) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                video.removeAttribute("src");
+                video.load();
+                resolve(result);
+            };
+            const timer = setTimeout(() => finish(false), 8000);
+            video.preload = "metadata";
+            video.muted = true;
+            video.playsInline = true;
+            video.onloadedmetadata = () => finish(true);
+            video.onerror = () => finish(false);
+            video.src = url;
+            video.load();
+        });
+    }
+
+    async function processGoogleDriveUrl(originalUrl) {
+        if (isGoogleDriveFolderUrl(originalUrl)) {
+            throw new Error("Esse link é de uma pasta. Cole o link do arquivo de vídeo.");
+        }
+
+        const fileId = extractGoogleDriveFileId(originalUrl);
+        if (!fileId) {
+            throw new Error("Não consegui identificar o arquivo do Google Drive.");
+        }
+
+        const links = buildGoogleDriveLinks(originalUrl, fileId);
+        setSettingsFeedback("Verificando link do Google Drive...");
+        setMediaStatus("Google Drive", "Verificando", "Testando", "neutral");
+
+        // Links do Google Drive podem falhar no <video> por bloqueio,
+        // permissão, quota ou CORS. Por isso testamos primeiro o modo direto.
+        // Se falhar, usamos o preview em iframe como fallback.
+        const directWorks = await validatePlayableVideo(links.directUrl);
+        if (directWorks) {
+            return {
+                ...links,
+                videoUrl: links.directUrl,
+                embedUrl: links.embedUrl,
+                viewUrl: links.viewUrl,
+                videoProvider: "google-drive",
+                playerMode: "video",
+                syncEnabled: true,
+                statusMessage: "Google Drive carregado com sincronização ativa."
+            };
+        }
+
+        return {
+            ...links,
+            videoUrl: links.embedUrl,
+            embedUrl: links.embedUrl,
+            viewUrl: links.viewUrl,
+            videoProvider: "google-drive",
+            playerMode: "iframe",
+            syncEnabled: false,
+            statusMessage: "Google Drive aberto em modo compatibilidade. A sincronização pode não funcionar.",
+            warning: "O Google Drive pode bloquear vídeos grandes ou muitos acessos. Se travar, tente compactar o vídeo ou usar Firebase Storage. Se o arquivo não estiver público, defina como 'Qualquer pessoa com o link pode ver'."
+        };
+    }
+
+    async function processYouFilesUrl(originalUrl) {
+        setSettingsFeedback("Link YouFiles detectado. Tentando extrair vídeo do Google Drive...");
+        setMediaStatus("YouFiles", "Extraindo Drive", "Testando", "neutral");
+
+        const fileId = extractYouFilesGoogleDriveFileId(originalUrl);
+        if (!fileId) {
+            return {
+                originalUrl,
+                videoUrl: originalUrl,
+                embedUrl: originalUrl,
+                viewUrl: originalUrl,
+                videoProvider: "youfiles",
+                playerMode: "iframe",
+                syncEnabled: false,
+                statusMessage: "YouFiles aberto em modo compatibilidade. Não consegui extrair o ID do Google Drive.",
+                warning: "Não consegui extrair o ID do Google Drive no parâmetro state; o link foi carregado como iframe externo."
+            };
+        }
+
+        const links = buildGoogleDriveLinks(originalUrl, fileId);
+        const directWorks = await validatePlayableVideo(links.directUrl);
+        if (directWorks) {
+            return {
+                ...links,
+                videoUrl: links.directUrl,
+                embedUrl: links.embedUrl,
+                viewUrl: links.viewUrl,
+                videoProvider: "youfiles-google-drive",
+                playerMode: "video",
+                syncEnabled: true,
+                statusMessage: "Link YouFiles convertido para Google Drive com sincronização ativa."
+            };
+        }
+
+        return {
+            ...links,
+            videoUrl: links.embedUrl,
+            embedUrl: links.embedUrl,
+            viewUrl: links.viewUrl,
+            videoProvider: "youfiles-google-drive",
+            playerMode: "iframe",
+            syncEnabled: false,
+            statusMessage: "YouFiles convertido para Google Drive em modo compatibilidade. A sincronização pode não funcionar.",
+            warning: "O Google Drive pode bloquear vídeos grandes ou muitos acessos. Se travar, tente compactar o vídeo ou usar Firebase Storage."
+        };
+    }
+
+    async function loadMedia(inputUrl) {
+        const originalUrl = sanitizeText(inputUrl, 800);
+        if (!isValidMediaUrl(originalUrl)) {
+            throw new Error("Link inválido. Use um endereço HTTP/HTTPS permitido.");
+        }
+
+        if (isYouFilesUrl(originalUrl)) {
+            return processYouFilesUrl(originalUrl);
+        }
+
+        if (isGoogleDriveUrl(originalUrl)) {
+            return processGoogleDriveUrl(originalUrl);
+        }
+
+        const megaEmbedUrl = toMegaEmbedUrl(originalUrl);
+        if (megaEmbedUrl) {
+            return {
+                originalUrl,
+                videoUrl: megaEmbedUrl,
+                embedUrl: megaEmbedUrl,
+                viewUrl: originalUrl,
+                videoProvider: "mega",
+                playerMode: "iframe",
+                syncEnabled: false,
+                statusMessage: "Mega aberto em modo compatibilidade. A sincronização pode não funcionar."
+            };
+        }
+
+        if (getMediaType(originalUrl) === "direct") {
+            return {
+                originalUrl,
+                videoUrl: originalUrl,
+                embedUrl: "",
+                viewUrl: originalUrl,
+                videoProvider: "direct-link",
+                playerMode: "video",
+                syncEnabled: true,
+                statusMessage: "Link direto carregado com sincronização ativa."
+            };
+        }
+
+        return {
+            originalUrl,
+            videoUrl: originalUrl,
+            embedUrl: originalUrl,
+            viewUrl: originalUrl,
+            videoProvider: "external-page",
+            playerMode: "iframe",
+            syncEnabled: false,
+            statusMessage: "Player externo aberto em modo compatibilidade."
+        };
     }
 
     function roomPath(path = "") {
@@ -408,19 +724,37 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderRoom(room) {
         const nextTitle = sanitizeText(room.movieTitle, 80) || DEFAULT_MOVIE_TITLE;
         const nextVideoUrl = sanitizeText(room.videoUrl, 500) || DEFAULT_VIDEO_URL;
+        const formatWarning = room.uploadSource === "firebase-storage" ? getUploadWarning({
+            type: room.videoType,
+            name: room.videoName
+        }) : "";
+        const forceDirect = room.uploadSource === "firebase-storage" || room.playerMode === "video" || room.syncEnabled === true;
 
         if (els.movieTitleDisplay) els.movieTitleDisplay.textContent = nextTitle;
         if (els.movieTitleInput && document.activeElement !== els.movieTitleInput) els.movieTitleInput.value = nextTitle;
-        if (els.videoUrlInput && document.activeElement !== els.videoUrlInput) els.videoUrlInput.value = nextVideoUrl;
+        if (els.videoUrlInput && document.activeElement !== els.videoUrlInput) els.videoUrlInput.value = room.originalUrl || room.viewUrl || nextVideoUrl;
 
         if (nextVideoUrl !== currentVideoUrl) {
-            loadVideo(nextVideoUrl, { keepNotice: true });
+            loadVideo(nextVideoUrl, {
+                keepNotice: true,
+                forceDirect,
+                forceIframe: room.playerMode === "iframe" || room.syncEnabled === false,
+                formatWarning
+            });
         }
 
-        renderParticipants(room.participants || {});
-        updateSyncStatusFromState(room.state);
+        setMediaStatusFromRoom(room);
 
-        if (room.state) {
+        renderParticipants(room.participants || {});
+
+        if (currentMediaType === "direct") {
+            updateSyncStatusFromState(room.state);
+        } else {
+            setSyncStatus("Modo compatibilidade: sincronização limitada", "warning");
+            setPlayerBadge("Modo compatibilidade", false);
+        }
+
+        if (room.state && currentMediaType === "direct") {
             applyRemoteState(room.state);
         }
     }
@@ -436,10 +770,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const title = sanitizeText(els.movieTitleInput?.value, 80) || DEFAULT_MOVIE_TITLE;
         const videoUrl = sanitizeText(els.videoUrlInput?.value, 500) || DEFAULT_VIDEO_URL;
 
-        if (!isValidMp4Url(videoUrl)) {
+        if (!isValidMediaUrl(videoUrl)) {
             roomId = "";
-            throw new Error("Link MP4 inválido");
+            throw new Error("Link inválido");
         }
+
+        const initialMediaMode = getMediaType(videoUrl) === "direct" ? "video" : "iframe";
 
         const initialState = {
             isPlaying: false,
@@ -455,6 +791,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const payload = {
             videoUrl,
             movieTitle: title,
+            originalUrl: videoUrl,
+            embedUrl: initialMediaMode === "iframe" ? videoUrl : "",
+            viewUrl: videoUrl,
+            videoProvider: initialMediaMode === "video" ? "direct-link" : "external-page",
+            playerMode: initialMediaMode,
+            syncEnabled: initialMediaMode === "video",
             createdAt: now,
             createdBy: userKey,
             updatedAt: now,
@@ -521,7 +863,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 hasSeenConnection = true;
                 hasShownLostConnection = false;
                 setConnectionStatus("Conectado", "connected");
-                if (roomId) setSyncStatus("Sincronizado", "active");
+                if (roomId) {
+                    setSyncStatus(
+                        currentMediaType === "direct" ? "Sincronização ativa" : "Modo compatibilidade: sincronização limitada",
+                        currentMediaType === "direct" ? "active" : "warning"
+                    );
+                }
                 return;
             }
 
@@ -536,22 +883,68 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function loadVideo(url, options = {}) {
         const cleanUrl = sanitizeText(url, 500);
-        if (!isValidMp4Url(cleanUrl)) {
-            showVideoError("Link inválido. Use um endereço HTTP/HTTPS apontando para um arquivo .mp4.");
-            showToast("Link inválido", "Use um link MP4 permitido para reprodução.", "warning");
+        if (!isValidMediaUrl(cleanUrl)) {
+            showVideoError("Link inválido. Use um endereço HTTP/HTTPS de vídeo direto ou página externa.");
+            showToast("Link inválido", "Use um link HTTP/HTTPS permitido para reprodução.", "warning");
             return false;
         }
 
         currentVideoUrl = cleanUrl;
+        currentMediaType = options.forceDirect ? "direct" : (options.forceIframe ? "iframe" : getMediaType(cleanUrl));
         ignorePlayerEventsUntil = Date.now() + 900;
         isApplyingRemoteUpdate = true;
 
         hideVideoError();
-        if (options.keepNotice !== false) showVideoNotice("Clique em play para iniciar sincronizado.");
+        clearTimeout(iframeLoadTimer);
+        els.moviePlayer = null;
+        if (els.videoContainer) els.videoContainer.replaceChildren();
 
-        if (els.moviePlayer) {
-            els.moviePlayer.src = cleanUrl;
-            els.moviePlayer.load();
+        if (currentMediaType === "direct") {
+            const video = document.createElement("video");
+            video.id = "moviePlayer";
+            video.className = "custom-player";
+            video.controls = true;
+            video.playsInline = true;
+            video.preload = "auto";
+            video.controlsList = "nodownload noplaybackrate";
+            video.textContent = "Seu navegador não suporta vídeo HTML5.";
+            video.src = cleanUrl;
+            els.videoContainer?.appendChild(video);
+            els.moviePlayer = video;
+            setupSync(video);
+            video.load();
+            if (options.keepNotice !== false) showVideoNotice("Clique em play para iniciar sincronizado.");
+            setSyncStatus("Sincronização ativa", "active");
+            setPlayerBadge("Sincronização ativa", true);
+            if (options.formatWarning) {
+                showVideoNotice(`${options.formatWarning} Clique em play para testar a reprodução sincronizada.`);
+            }
+        } else {
+            // IMPORTANTE:
+            // Iframes de sites externos NÃO permitem controle via JS (play/pause/tempo)
+            // devido a políticas de segurança do navegador (cross-origin).
+            // Portanto, sincronização só funciona com vídeos diretos (.mp4, .m3u8).
+            const iframe = document.createElement("iframe");
+            iframe.className = "custom-player";
+            iframe.src = cleanUrl;
+            iframe.allowFullscreen = true;
+            iframe.referrerPolicy = "no-referrer";
+            iframe.loading = "lazy";
+            iframe.title = "Player externo Rodrigo & Paula";
+            iframe.addEventListener("load", () => {
+                clearTimeout(iframeLoadTimer);
+            });
+            els.videoContainer?.appendChild(iframe);
+            showVideoNotice("Este tipo de link usa um player externo. A sincronização em tempo real pode não funcionar.");
+            setSyncStatus("Modo compatibilidade: sincronização limitada", "warning");
+            setPlayerBadge("Modo compatibilidade", false);
+            showToast("Modo compatibilidade", "Este link abriu em player externo; play, pause e tempo não sincronizam.", "warning");
+            iframeLoadTimer = setTimeout(() => {
+                if (currentMediaType === "iframe") {
+                    hideVideoNotice();
+                    showVideoError("Não foi possível confirmar o carregamento deste conteúdo. Alguns sites bloqueiam abertura em iframe.", true);
+                }
+            }, 12000);
         }
 
         setTimeout(() => {
@@ -564,18 +957,36 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!isHost) return;
 
         const title = sanitizeText(els.movieTitleInput?.value, 80) || DEFAULT_MOVIE_TITLE;
-        const videoUrl = sanitizeText(els.videoUrlInput?.value, 500) || DEFAULT_VIDEO_URL;
+        const inputUrl = sanitizeText(els.videoUrlInput?.value, 800) || DEFAULT_VIDEO_URL;
 
-        if (!isValidMp4Url(videoUrl)) {
-            setSettingsFeedback("Link inválido. Use um MP4 externo com permissão de reprodução.", true);
-            showToast("Link inválido", "O endereço precisa ser HTTP/HTTPS e terminar em .mp4.", "warning");
+        if (!isValidMediaUrl(inputUrl)) {
+            setSettingsFeedback("Link inválido. Use um endereço HTTP/HTTPS permitido.", true);
+            showToast("Link inválido", "O endereço precisa começar com http:// ou https://.", "warning");
+            setMediaStatus("Erro", "Não carregado", "Erro", "error");
+            return;
+        }
+
+        let media;
+        try {
+            setSettingsFeedback("Preparando link...");
+            media = await loadMedia(inputUrl);
+        } catch (error) {
+            const message = error.message || "Não foi possível carregar esse link.";
+            setSettingsFeedback(message, true);
+            setMediaStatus("Erro", "Não carregado", "Erro", "error");
+            showToast("Link não carregado", message, "error");
             return;
         }
 
         if (!firebaseReady || !db) {
-            if (loadVideo(videoUrl, { keepNotice: true })) {
+            if (loadVideo(media.videoUrl, {
+                keepNotice: true,
+                forceDirect: media.playerMode === "video",
+                forceIframe: media.playerMode === "iframe"
+            })) {
                 if (els.movieTitleDisplay) els.movieTitleDisplay.textContent = title;
             }
+            setMediaStatusFromDescriptor(media);
             setSettingsFeedback("Firebase não conectado. O filme mudou só neste navegador.", true);
             return;
         }
@@ -590,7 +1001,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 updatedBy: userKey,
                 updatedByName: userName,
                 updatedByClient: clientId,
-                action: "video",
+                action: "media_loaded",
                 version: Math.max(lastKnownVersion + 1, 1)
             };
             lastKnownVersion = nextState.version;
@@ -598,18 +1009,182 @@ document.addEventListener("DOMContentLoaded", () => {
 
             await update(ref(db, roomPath()), {
                 movieTitle: title,
-                videoUrl,
+                originalUrl: media.originalUrl,
+                videoUrl: media.videoUrl,
+                embedUrl: media.embedUrl || "",
+                viewUrl: media.viewUrl || "",
+                videoProvider: media.videoProvider,
+                playerMode: media.playerMode,
+                syncEnabled: media.syncEnabled,
+                videoName: "",
+                videoType: "",
+                uploadedAt: null,
+                uploadedBy: "",
+                uploadSource: "external-link",
                 updatedAt: now,
                 state: nextState
             });
 
-            setSettingsFeedback("Filme atualizado na sala em tempo real.");
+            setMediaStatusFromDescriptor(media);
+            setSettingsFeedback(media.statusMessage || "Filme atualizado na sala em tempo real.", !media.syncEnabled);
             showToast("Filme atualizado", "Rodrigo e Paula receberão o novo player.", "success");
+            if (media.warning) showToast("Aviso do Google Drive", media.warning, "warning");
         } catch (error) {
             console.warn("Erro ao atualizar filme:", error);
             setSettingsFeedback(error.message || "Não foi possível atualizar a sessão.", true);
             showToast("Erro ao atualizar", "Confira a conexão com o Firebase.", "error");
         }
+    }
+
+    function handleUploadSelection(event) {
+        const file = event.target.files?.[0] || null;
+        selectedUploadFile = file;
+        setUploadProgress(0);
+
+        if (!file) {
+            setUploadMeta("Nenhum arquivo selecionado", "Escolha um filme para enviar.");
+            setUploadWarning("");
+            setUploadStatus("Aguardando arquivo");
+            if (els.uploadButton) els.uploadButton.disabled = true;
+            return;
+        }
+
+        setUploadMeta(file.name, `${formatBytes(file.size)} • ${file.type || "tipo não informado"}`);
+
+        const warning = getUploadWarning(file);
+        setUploadWarning(warning);
+
+        if (!isAllowedUploadFile(file.name)) {
+            setUploadStatus("Formato não permitido. Use MP4, WebM, OGG, MOV, MKV ou AVI.", true);
+            if (els.uploadButton) els.uploadButton.disabled = true;
+            return;
+        }
+
+        if (file.size > MAX_UPLOAD_BYTES) {
+            setUploadStatus("Arquivo muito grande. Limite atual: 1GB.", true);
+            if (els.uploadButton) els.uploadButton.disabled = true;
+            showToast("Arquivo muito grande", "Limite atual: 1GB.", "warning");
+            return;
+        }
+
+        setUploadStatus(warning ? "Formato aceito com aviso de compatibilidade" : "Arquivo pronto para envio");
+        if (els.uploadButton) els.uploadButton.disabled = !!uploadTask;
+    }
+
+    async function uploadSelectedMovie() {
+        if (!isHost || uploadTask) return;
+        if (!selectedUploadFile) {
+            showToast("Selecione um arquivo", "Escolha um filme antes de enviar.", "warning");
+            return;
+        }
+        if (!isAllowedUploadFile(selectedUploadFile.name)) {
+            setUploadStatus("Formato não permitido. Use MP4, WebM, OGG, MOV, MKV ou AVI.", true);
+            return;
+        }
+        if (selectedUploadFile.size > MAX_UPLOAD_BYTES) {
+            setUploadStatus("Arquivo muito grande. Limite atual: 1GB.", true);
+            return;
+        }
+        if (!firebaseReady || !db || !storage) {
+            setUploadStatus("Firebase Storage não conectado.", true);
+            showToast("Storage indisponível", "Não foi possível iniciar o upload agora.", "error");
+            return;
+        }
+
+        // Proteção inicial apenas visual/frontend: sem autenticação real, regras do Firebase
+        // ainda devem validar permissões no backend antes de abrir uploads publicamente.
+        try {
+            await createRoomIfNeeded();
+            setUploadStatus("Preparando envio...");
+            setUploadProgress(0);
+            if (els.uploadButton) els.uploadButton.disabled = true;
+
+            const file = selectedUploadFile;
+            const path = `watchRooms/${roomId}/videos/${Date.now()}_${safeStorageFileName(file.name)}`;
+            const fileRef = storageRef(storage, path);
+            uploadTask = uploadBytesResumable(fileRef, file, {
+                contentType: file.type || "application/octet-stream",
+                customMetadata: {
+                    roomId,
+                    uploadedBy: userName,
+                    originalName: file.name
+                }
+            });
+
+            uploadTask.on("state_changed", (snapshot) => {
+                const percent = snapshot.totalBytes
+                    ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
+                    : 0;
+                setUploadProgress(percent);
+                setUploadStatus(percent >= 100 ? "Processando..." : `Enviando ${percent}%...`);
+            }, (error) => {
+                console.warn("Erro ao enviar filme:", error);
+                uploadTask = null;
+                if (els.uploadButton) els.uploadButton.disabled = false;
+                setUploadStatus("Erro ao enviar", true);
+                showToast("Erro ao enviar", "Confira as permissões do Firebase Storage.", "error");
+            }, async () => {
+                try {
+                    const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                    await finalizeUploadedMovie(file, downloadUrl);
+                    uploadTask = null;
+                    if (els.uploadButton) els.uploadButton.disabled = false;
+                    setUploadProgress(100);
+                    setUploadStatus("Filme pronto");
+                    showToast("Filme enviado com sucesso.", "Rodrigo e Paula já recebem o novo player.", "success");
+                } catch (error) {
+                    console.warn("Erro ao finalizar upload:", error);
+                    uploadTask = null;
+                    if (els.uploadButton) els.uploadButton.disabled = false;
+                    setUploadStatus("Erro ao enviar", true);
+                    showToast("Erro ao finalizar", "O upload terminou, mas a sala não foi atualizada.", "error");
+                }
+            });
+        } catch (error) {
+            console.warn("Erro ao preparar upload:", error);
+            uploadTask = null;
+            if (els.uploadButton) els.uploadButton.disabled = false;
+            setUploadStatus("Erro ao enviar", true);
+            showToast("Erro ao enviar", error.message || "Não foi possível preparar a sala.", "error");
+        }
+    }
+
+    async function finalizeUploadedMovie(file, downloadUrl) {
+        const now = Date.now();
+        const title = sanitizeText(els.movieTitleInput?.value, 80) || sanitizeText(file.name.replace(/\.[^.]+$/, ""), 80) || DEFAULT_MOVIE_TITLE;
+        const nextState = {
+            isPlaying: false,
+            currentTime: 0,
+            updatedAt: now,
+            updatedBy: userKey,
+            updatedByName: userName,
+            updatedByClient: clientId,
+            action: "video_uploaded",
+            version: Math.max(lastKnownVersion + 1, 1)
+        };
+        lastKnownVersion = nextState.version;
+        lastAppliedStateAt = Math.max(lastAppliedStateAt, now);
+
+        await update(ref(db, roomPath()), {
+            movieTitle: title,
+            originalUrl: downloadUrl,
+            videoUrl: downloadUrl,
+            embedUrl: "",
+            viewUrl: downloadUrl,
+            videoProvider: "firebase-storage",
+            playerMode: "video",
+            syncEnabled: true,
+            videoName: file.name,
+            videoType: file.type || "",
+            uploadedAt: now,
+            uploadedBy: userKey,
+            uploadSource: "firebase-storage",
+            updatedAt: now,
+            state: nextState
+        });
+
+        if (els.movieTitleInput) els.movieTitleInput.value = title;
+        if (els.videoUrlInput) els.videoUrlInput.value = downloadUrl;
     }
 
     async function shareWithPaula() {
@@ -781,6 +1356,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function sendPlayerState(action) {
         const video = els.moviePlayer;
+        if (currentMediaType !== "direct") return;
         if (!video || !roomId || !firebaseReady || !db) return;
         if (isApplyingRemoteUpdate || Date.now() < ignorePlayerEventsUntil) return;
 
@@ -818,6 +1394,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function applyRemoteState(remoteState, options = {}) {
         const video = els.moviePlayer;
+        if (currentMediaType !== "direct") return;
         if (!video || !remoteState) return;
 
         const remoteVersion = Number(remoteState.version) || 0;
@@ -1001,6 +1578,83 @@ document.addEventListener("DOMContentLoaded", () => {
         els.settingsFeedback.classList.toggle("is-warning", !!isWarning);
     }
 
+    function providerLabel(provider) {
+        const labels = {
+            "google-drive": "Google Drive",
+            "youfiles-google-drive": "YouFiles / Drive",
+            youfiles: "YouFiles",
+            "firebase-storage": "Upload Firebase",
+            "direct-link": "Link direto",
+            "external-page": "Player externo",
+            mega: "Mega"
+        };
+        return labels[provider] || "Link";
+    }
+
+    function modeLabel(mode) {
+        return mode === "video" ? "Vídeo direto" : "Compatibilidade iframe";
+    }
+
+    function setMediaStatus(type, mode, sync, tone = "neutral") {
+        if (els.mediaStatusType) els.mediaStatusType.textContent = type || "Aguardando link";
+        if (els.mediaStatusMode) els.mediaStatusMode.textContent = mode || "Não carregado";
+        if (els.mediaStatusSync) {
+            els.mediaStatusSync.textContent = sync || "Aguardando";
+            els.mediaStatusSync.classList.remove("rp-status-active", "rp-status-limited", "rp-status-error", "rp-status-neutral");
+            els.mediaStatusSync.classList.add(
+                tone === "active"
+                    ? "rp-status-active"
+                    : tone === "warning"
+                        ? "rp-status-limited"
+                        : tone === "error"
+                            ? "rp-status-error"
+                            : "rp-status-neutral"
+            );
+        }
+    }
+
+    function setMediaStatusFromDescriptor(media) {
+        setMediaStatus(
+            providerLabel(media.videoProvider),
+            modeLabel(media.playerMode),
+            media.syncEnabled ? "Ativa" : "Limitada",
+            media.syncEnabled ? "active" : "warning"
+        );
+    }
+
+    function setMediaStatusFromRoom(room) {
+        if (!room?.videoProvider && !room?.playerMode) return;
+        setMediaStatus(
+            providerLabel(room.videoProvider),
+            modeLabel(room.playerMode),
+            room.syncEnabled === false ? "Limitada" : "Ativa",
+            room.syncEnabled === false ? "warning" : "active"
+        );
+    }
+
+    function setUploadMeta(name, size) {
+        if (els.uploadFileName) els.uploadFileName.textContent = name;
+        if (els.uploadFileSize) els.uploadFileSize.textContent = size;
+    }
+
+    function setUploadWarning(message) {
+        if (!els.uploadWarning) return;
+        els.uploadWarning.textContent = message || "";
+        els.uploadWarning.hidden = !message;
+    }
+
+    function setUploadProgress(percent) {
+        const cleanPercent = Math.max(0, Math.min(100, Number(percent) || 0));
+        if (els.uploadProgress) els.uploadProgress.style.width = `${cleanPercent}%`;
+        if (els.uploadProgressText) els.uploadProgressText.textContent = `${Math.round(cleanPercent)}%`;
+    }
+
+    function setUploadStatus(message, isWarning = false) {
+        if (!els.uploadStatus) return;
+        els.uploadStatus.textContent = message || "";
+        els.uploadStatus.classList.toggle("is-warning", !!isWarning);
+    }
+
     function showVideoNotice(message) {
         if (!els.videoNotice) return;
         const label = els.videoNotice.querySelector("span");
@@ -1012,15 +1666,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (els.videoNotice) els.videoNotice.hidden = true;
     }
 
-    function showVideoError(message) {
+    function showVideoError(message, soft = false) {
         if (!els.videoErrorCard) return;
         const text = els.videoErrorCard.querySelector("span");
         if (text) text.textContent = message;
+        els.videoErrorCard.classList.toggle("is-soft", !!soft);
         els.videoErrorCard.hidden = false;
     }
 
     function hideVideoError() {
-        if (els.videoErrorCard) els.videoErrorCard.hidden = true;
+        if (els.videoErrorCard) {
+            els.videoErrorCard.hidden = true;
+            els.videoErrorCard.classList.remove("is-soft");
+        }
     }
 
     function formatMessageTime(value) {

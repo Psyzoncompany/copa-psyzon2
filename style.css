@@ -36,6 +36,7 @@ body {
 @media (max-width: 768px) {
     body {
         background-image: url('imgs/imagem de fundo-mobile.webp');
+        background-attachment: fixed;
     }
 
     .hero-logos img {
